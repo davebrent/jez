@@ -1,0 +1,10 @@
+spu:
+    [1 ~ ~ 2 ~ ~ 3 ~ ] 1000 0 track
+
+mpu_out:
+    event_value     ; Pitch
+    127             ; Velocity
+    event_duration  ; Duration
+    1               ; Channel
+    makenote        ; Trigger an off event after duration has elapsed
+    noteout         ; Dispatch the event
