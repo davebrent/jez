@@ -10,56 +10,84 @@ use std::thread;
 use lang::Program;
 use mpu::Mpu;
 use spu::Spu;
-use unit::Message;
+use unit::{Message, RuntimeErr};
 
 
 const MPU_ID: u8 = 0;
 const SPU_ID: u8 = 1;
 
 pub struct Machine {
-    glob: Receiver<Message>,
+    bus: Receiver<Message>,
     mpu: Sender<Message>,
     spu: Sender<Message>,
+    midiout: Sender<Message>,
 }
 
 impl Machine {
-    pub fn new(prog: &Program) -> Machine {
-        let (main_send, main_recv) = channel();
-
+    pub fn new(midiout: Sender<Message>,
+               prog: &Program)
+               -> Result<Self, RuntimeErr> {
+        let (bus_send, bus_recv) = channel();
         let (spu_send, spu_recv) = channel();
-        let mut spu =
-            Spu::new(SPU_ID, prog.section("spu"), main_send.clone(), spu_recv)
-                .unwrap();
-
         let (mpu_send, mpu_recv) = channel();
-        let mut mpu = Mpu::new(MPU_ID,
-                               prog.section("mpu_out"),
-                               main_send.clone(),
-                               mpu_recv)
-                .unwrap();
 
-        thread::spawn(move || { spu.run_forever(); });
-        thread::spawn(move || { mpu.run_forever(); });
+        Machine::new_mpu(prog, bus_send.clone(), mpu_recv);
+        Machine::new_spu(prog, bus_send.clone(), spu_recv);
 
-        Machine {
-            glob: main_recv,
-            mpu: mpu_send,
-            spu: spu_send,
+        Ok(Machine {
+               bus: bus_recv,
+               mpu: mpu_send,
+               spu: spu_send,
+               midiout: midiout,
+           })
+    }
+
+    fn new_spu(prog: &Program,
+               sender: Sender<Message>,
+               receiver: Receiver<Message>) {
+        match Spu::new(SPU_ID, prog.section("spu"), sender, receiver) {
+            Some(mut spu) => {
+                thread::spawn(move || { spu.run_forever(); });
+            }
+            None => (),
         }
     }
 
-    pub fn tick(&self) {
-        while let Ok(msg) = self.glob.try_recv() {
+    fn new_mpu(prog: &Program,
+               sender: Sender<Message>,
+               receiver: Receiver<Message>) {
+        match Mpu::new(MPU_ID, prog.section("mpu_out"), sender, receiver) {
+            Some(mut mpu) => {
+                thread::spawn(move || { mpu.run_forever(); });
+            }
+            None => (),
+        }
+    }
+
+    pub fn run_forever(&self) -> Result<(), RuntimeErr> {
+        while let Ok(msg) = self.bus.recv() {
             match msg {
+                Message::MidiNoteOn(chan, pitch, vel) => {
+                    self.midiout
+                        .send(Message::MidiNoteOn(chan, pitch, vel))
+                        .unwrap();
+                }
+                Message::MidiNoteOff(chan, pitch) => {
+                    self.midiout
+                        .send(Message::MidiNoteOff(chan, pitch))
+                        .unwrap();
+                }
                 Message::TriggerEvent(val, dur) => {
                     self.mpu.send(Message::TriggerEvent(val, dur)).unwrap();
                 }
                 Message::HasError(unit, err) => {
                     println!("Unit {} has crashed {}", unit, err);
+                    return Err(err);
                 }
                 _ => {}
             }
         }
+        Ok(())
     }
 }
 

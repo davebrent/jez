@@ -16,6 +16,7 @@
 //! The virtual machine is composed of 'functional units' that perform tasks
 //! for specific domains communicating with other units through message passing.
 
+mod backends;
 /// Parser for custom bytecode
 mod lang;
 /// MIDI processing unit
@@ -35,6 +36,7 @@ extern crate regex;
 
 use std::fs::File;
 use std::io;
+use std::sync::mpsc::channel;
 
 use clap::{Arg, App};
 
@@ -45,6 +47,13 @@ fn input(fp: Option<&str>) -> Result<Box<io::Read>, std::io::Error> {
         Some(fp) => Ok(Box::new(try!(File::open(fp)))),
         None => Ok(Box::new(io::stdin())),
     }
+}
+
+fn run_forever(prog: lang::Program) -> Result<(), unit::RuntimeErr> {
+    let (tx, rx) = channel();
+    let _jck = try!(backends::Jack::new(rx));
+    let mach = try!(vm::Machine::new(tx, &prog));
+    return mach.run_forever();
 }
 
 fn main() {
@@ -76,9 +85,11 @@ reactive visualisations.")
             match lang::Program::new(txt.as_str()) {
                 Err(err) => println!("Compile error, {}", err),
                 Ok(prog) => {
-                    let mach = vm::Machine::new(&prog);
-                    loop {
-                        mach.tick();
+                    match run_forever(prog) {
+                        Err(err) => {
+                            println!("Runtime error, {}", err);
+                        }
+                        _ => (),
                     }
                 }
             }

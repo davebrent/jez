@@ -64,6 +64,7 @@ pub enum RuntimeErr {
     NotImplemented,
     WrongType,
     InvalidArguments,
+    JackNotStarted,
 }
 
 impl fmt::Display for RuntimeErr {
@@ -84,6 +85,9 @@ impl fmt::Display for RuntimeErr {
             RuntimeErr::InvalidArguments => {
                 write!(f, "Function received wrong arguments")
             }
+            RuntimeErr::JackNotStarted => {
+                write!(f, "Jack server is not running")
+            }
         }
     }
 }
@@ -97,6 +101,8 @@ pub enum Message {
     HasError(u8, RuntimeErr),
     /// Sent from the machine to units, used for reloading
     Stop,
+    MidiNoteOn(u8, u8, u8),
+    MidiNoteOff(u8, u8),
 }
 
 pub type InterpResult = Result<(), RuntimeErr>;

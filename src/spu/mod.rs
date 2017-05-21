@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Duration, Instant};
+use std::thread;
 
 use unit::{Keyword, Message, Interpreter, InterpState, eval, add, subtract,
            multiply, divide, print, RuntimeErr, InterpResult};
@@ -96,7 +97,7 @@ pub struct Spu {
 
 pub fn from_millis(millis: f32) -> Duration {
     let secs = (millis / 1000f32).floor();
-    let nanos = (millis - secs) * 1000000f32;
+    let nanos = (millis - (secs * 1000f32)) * 1000000f32;
     return Duration::new(secs as u64, nanos as u32);
 }
 
@@ -106,7 +107,7 @@ impl Spu {
                instrs: Option<&[Instr]>,
                channel: Sender<Message>,
                input_channel: Receiver<Message>)
-               -> Option<Spu> {
+               -> Option<Self> {
         match instrs {
             None => None,
             Some(instrs) => {
@@ -157,6 +158,8 @@ impl Spu {
 
     /// Run sequencer forever blocking until 'callback' returns no more
     pub fn run_forever(&mut self) {
+        let res = Duration::new(0, 1000000); // 1ms
+
         while let Some(mut events) = self.get_events() {
             if self.should_stop() {
                 break;
@@ -168,15 +171,18 @@ impl Spu {
             let start = Instant::now();
             let end = from_millis(self.interp.seq_state.cycle.dur);
 
-            while start.elapsed() < end {
-                while let Some(event) = events.pop() {
-                    if start.elapsed() < from_millis(event.onset) {
-                        events.push(event);
-                        continue;
-                    }
-                    let msg = Message::TriggerEvent(event.value, event.dur);
-                    self.channel.send(msg).unwrap();
+            while let Some(event) = events.pop() {
+                if start.elapsed() < from_millis(event.onset) {
+                    events.push(event);
+                    thread::sleep(res);
+                    continue;
                 }
+                let msg = Message::TriggerEvent(event.value, event.dur);
+                self.channel.send(msg).unwrap();
+            }
+
+            while start.elapsed() < end {
+                thread::sleep(res);
             }
         }
     }
