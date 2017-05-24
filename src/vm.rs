@@ -20,11 +20,11 @@ pub struct Machine {
     bus: Receiver<Message>,
     mpu: Sender<Message>,
     spu: Sender<Message>,
-    midiout: Sender<Message>,
+    backend: Sender<Message>,
 }
 
 impl Machine {
-    pub fn new(midiout: Sender<Message>,
+    pub fn new(backend: Sender<Message>,
                prog: &Program)
                -> Result<Self, RuntimeErr> {
         let (bus_send, bus_recv) = channel();
@@ -38,7 +38,7 @@ impl Machine {
                bus: bus_recv,
                mpu: mpu_send,
                spu: spu_send,
-               midiout: midiout,
+               backend: backend,
            })
     }
 
@@ -68,14 +68,18 @@ impl Machine {
         while let Ok(msg) = self.bus.recv() {
             match msg {
                 Message::MidiNoteOn(chan, pitch, vel) => {
-                    self.midiout
-                        .send(Message::MidiNoteOn(chan, pitch, vel))
-                        .unwrap();
+                    let msg = Message::MidiNoteOn(chan, pitch, vel);
+                    match self.backend.send(msg) {
+                        Ok(_) => (),
+                        Err(_) => return Err(RuntimeErr::BackendUnreachable),
+                    }
                 }
                 Message::MidiNoteOff(chan, pitch) => {
-                    self.midiout
-                        .send(Message::MidiNoteOff(chan, pitch))
-                        .unwrap();
+                    let msg = Message::MidiNoteOff(chan, pitch);
+                    match self.backend.send(msg) {
+                        Ok(_) => (),
+                        Err(_) => return Err(RuntimeErr::BackendUnreachable),
+                    }
                 }
                 Message::TriggerEvent(val, dur) => {
                     self.mpu.send(Message::TriggerEvent(val, dur)).unwrap();

@@ -64,7 +64,7 @@ pub enum RuntimeErr {
     NotImplemented,
     WrongType,
     InvalidArguments,
-    JackNotStarted,
+    BackendUnreachable,
 }
 
 impl fmt::Display for RuntimeErr {
@@ -85,8 +85,8 @@ impl fmt::Display for RuntimeErr {
             RuntimeErr::InvalidArguments => {
                 write!(f, "Function received wrong arguments")
             }
-            RuntimeErr::JackNotStarted => {
-                write!(f, "Jack server is not running")
+            RuntimeErr::BackendUnreachable => {
+                write!(f, "Backend is unreachable")
             }
         }
     }

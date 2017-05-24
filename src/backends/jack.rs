@@ -56,7 +56,7 @@ pub struct Jack {
 impl Jack {
     pub fn new(channel: Receiver<Message>) -> Result<Self, RuntimeErr> {
         match Client::new("jez", client_options::NO_START_SERVER) {
-            Err(_) => Err(RuntimeErr::JackNotStarted),
+            Err(_) => Err(RuntimeErr::BackendUnreachable),
             Ok((client, _)) => {
                 let midi_out_port = client
                     .register_port("midiout_1", MidiOutSpec::default())
