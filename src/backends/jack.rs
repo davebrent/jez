@@ -40,9 +40,18 @@ impl ProcessHandler for Processor {
                     };
                     out_port.write(&midi).unwrap();
                 }
+                Message::MidiCtl(chn, ctl, val) => {
+                    assert!(chn < 16);
+                    assert!(ctl < 120);
+                    assert!(val < 128);
+                    let midi = RawMidi {
+                        time: 0,
+                        bytes: &[176 + chn, ctl, val],
+                    };
+                    out_port.write(&midi).unwrap();
+                }
                 _ => (),
             }
-
         }
 
         return JackControl::Continue;

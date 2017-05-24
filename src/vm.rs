@@ -81,8 +81,15 @@ impl Machine {
                         Err(_) => return Err(RuntimeErr::BackendUnreachable),
                     }
                 }
-                Message::TriggerEvent(val, dur) => {
-                    self.mpu.send(Message::TriggerEvent(val, dur)).unwrap();
+                Message::MidiCtl(chan, ctl, val) => {
+                    let msg = Message::MidiCtl(chan, ctl, val);
+                    match self.backend.send(msg) {
+                        Ok(_) => (),
+                        Err(_) => return Err(RuntimeErr::BackendUnreachable),
+                    }
+                }
+                Message::SeqEvent(event) => {
+                    self.mpu.send(Message::SeqEvent(event)).unwrap();
                 }
                 Message::HasError(unit, err) => {
                     println!("Unit {} has crashed {}", unit, err);

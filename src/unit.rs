@@ -15,6 +15,8 @@ use std::fmt;
 use lang::Instr;
 
 
+pub type Curve = [f32; 8];
+
 /// Represents all the values possible that can go on the stack
 #[derive(Copy, Clone, Debug)]
 pub enum Value {
@@ -28,6 +30,8 @@ pub enum Value {
     Instruction(Instr),
     /// Special value of nothing
     Null,
+    /// Cubic bezier curve
+    Curve(Curve),
 }
 
 impl Into<Option<f32>> for Value {
@@ -55,6 +59,20 @@ impl Into<Option<(usize, usize)>> for Value {
             _ => None,
         }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum EventValue {
+    Trigger(f32),
+    Curve(Curve),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Event {
+    pub track: u32,
+    pub onset: f32,
+    pub dur: f32,
+    pub value: EventValue,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -95,14 +113,14 @@ impl fmt::Display for RuntimeErr {
 /// Inter-unit messages
 #[derive(Clone, Copy, Debug)]
 pub enum Message {
-    /// Sent from spu
-    TriggerEvent(f32, f32),
+    SeqEvent(Event),
     /// Sent from units to the machine
     HasError(u8, RuntimeErr),
     /// Sent from the machine to units, used for reloading
     Stop,
     MidiNoteOn(u8, u8, u8),
     MidiNoteOff(u8, u8),
+    MidiCtl(u8, u8, u8),
 }
 
 pub type InterpResult = Result<(), RuntimeErr>;

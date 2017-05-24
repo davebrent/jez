@@ -1,8 +1,8 @@
 use rand::{Rng, StdRng};
 
-use unit::{InterpState, RuntimeErr, InterpResult, Value};
+use unit::{Event, EventValue, InterpState, RuntimeErr, InterpResult, Value};
 
-use super::seq::{Event, SeqState};
+use super::seq::SeqState;
 
 
 /// Repeat a value 'n' times
@@ -180,9 +180,24 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
 
     while let Some((onset, dur, val)) = visit.pop() {
         match val {
+            Value::Curve(points) => {
+                let event = Event {
+                    track: no,
+                    onset: onset,
+                    dur: dur,
+                    value: EventValue::Curve(points),
+                };
+                seq.events.push(event);
+            }
             Value::Null => (),
             Value::Number(val) => {
-                seq.events.push(Event::new(no, onset, dur, val));
+                let event = Event {
+                    track: no,
+                    onset: onset,
+                    dur: dur,
+                    value: EventValue::Trigger(val),
+                };
+                seq.events.push(event);
             }
             Value::Pair(start, end) => {
                 let interval = dur / (end - start) as f32;
@@ -197,6 +212,28 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
     }
 
     Ok(())
+}
+
+/// Create a bezier curve from a linear ramp
+pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+    match state.stack.pop().unwrap() {
+        Value::Pair(start, end) => {
+            if end - start != 2 {
+                return Err(RuntimeErr::WrongType);
+            }
+
+            let c0: Option<f32> = (*state.heap.get(start).unwrap()).into();
+            let c0 = c0.unwrap();
+            let c1: Option<f32> = (*state.heap.get(start + 1).unwrap()).into();
+            let c1 = c1.unwrap();
+            state
+                .stack
+                .push(Value::Curve([0.0, c0, 0.0, c0, 1.0, c1, 1.0, c1]));
+
+            Ok(())
+        }
+        _ => Err(RuntimeErr::WrongType),
+    }
 }
 
 #[cfg(test)]

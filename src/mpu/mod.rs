@@ -11,8 +11,9 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Duration, Instant};
 use std::thread;
 
-use unit::{Keyword, eval, Message, Interpreter, InterpState, add, subtract,
-           multiply, divide, print, RuntimeErr, InterpResult};
+use unit::{Curve, Keyword, eval, Event, EventValue, Message, Interpreter,
+           InterpState, add, subtract, multiply, divide, print, RuntimeErr,
+           InterpResult};
 use lang::{hash_str, Instr};
 
 use self::state::MidiState;
@@ -72,12 +73,35 @@ pub struct Mpu {
     input_channel: Receiver<Message>,
     instrs: Vec<Instr>,
     off_events: Vec<(Duration, u8, u8)>,
+    ctl_events: Vec<(Duration, f64, Curve)>,
 }
 
-pub fn from_millis(millis: f32) -> Duration {
+fn from_millis(millis: f32) -> Duration {
     let secs = (millis / 1000f32).floor();
     let nanos = (millis - (secs * 1000f32)) * 1000000f32;
     return Duration::new(secs as u64, nanos as u32);
+}
+
+fn to_millis(dur: &Duration) -> f64 {
+    let secs = dur.as_secs() as f64 * 1000.0;
+    let nanos = dur.subsec_nanos() as f64 / 1000.0;
+    return secs + nanos;
+}
+
+/// Get a point 't' on a cubic bezier curve
+fn get_point(t: f64, curve: Curve) -> [f32; 2] {
+    let t = t as f32;
+    let p0x = curve[0];
+    let p0y = curve[1];
+    let p1x = curve[2];
+    let p1y = curve[3];
+    let p2x = curve[4];
+    let p2y = curve[5];
+    let x = (1.0 - t) * (1.0 - t) * p0x + 2.0 * (1.0 - t) * t * p1x +
+            t * t * p2x;
+    let y = (1.0 - t) * (1.0 - t) * p0y + 2.0 * (1.0 - t) * t * p1y +
+            t * t * p2y;
+    return [x, y];
 }
 
 impl Mpu {
@@ -97,31 +121,58 @@ impl Mpu {
                          input_channel: input_channel,
                          instrs: instrs.to_vec(),
                          off_events: Vec::new(),
+                         ctl_events: Vec::new(),
                      })
             }
         }
     }
 
-    fn handle_trigger_event(&mut self, val: f32, dur: f32) {
+    fn handle_seq_event(&mut self, event: Event) {
         let instrs = self.instrs.as_slice();
-        let res = eval(instrs, &mut self.interp_state, &mut self.interp);
-        match res {
+        match eval(instrs, &mut self.interp_state, &mut self.interp) {
             Err(err) => {
                 let msg = Message::HasError(self.id, err);
                 self.channel.send(msg).unwrap();
             }
             Ok(_) => {
-                let val = val as u8;
-
-                self.off_events.push((from_millis(dur), 0, val));
-                self.off_events
-                    .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-
-                self.channel
-                    .send(Message::MidiNoteOn(0, val, 127))
-                    .unwrap();
+                match event.value {
+                    EventValue::Trigger(val) => {
+                        let val = val as u8;
+                        self.off_events.push((from_millis(event.dur), 0, val));
+                        self.off_events
+                            .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                        self.channel
+                            .send(Message::MidiNoteOn(0, val, 127))
+                            .unwrap();
+                    }
+                    EventValue::Curve(curve) => {
+                        let dur = from_millis(event.dur);
+                        self.ctl_events.push((dur, 0.0, curve));
+                        self.ctl_events
+                            .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                        self.channel
+                            .send(Message::MidiCtl(0, 0, curve[0] as u8))
+                            .unwrap();
+                    }
+                }
             }
         }
+    }
+
+    fn process_ctl_events(&mut self, delta: &Duration) {
+        // Advance 't' for each curve
+        for evt in self.ctl_events.iter_mut() {
+            evt.1 += to_millis(&evt.0) / to_millis(delta);
+        }
+
+        for evt in self.ctl_events.iter_mut() {
+            let t = evt.1;
+            let val = get_point(t, evt.2);
+            let msg = Message::MidiCtl(0, 0, val[1] as u8);
+            self.channel.send(msg).unwrap();
+        }
+
+        // Remove any event with a t >= 1
     }
 
     fn process_off_events(&mut self, delta: &Duration) {
@@ -153,14 +204,16 @@ impl Mpu {
             let now = Instant::now();
             let delta = now.duration_since(previous);
             previous = now;
+
+            self.process_ctl_events(&delta);
             self.process_off_events(&delta);
 
             match self.input_channel.try_recv() {
                 Ok(msg) => {
                     match msg {
                         Message::Stop => break,
-                        Message::TriggerEvent(val, dur) => {
-                            self.handle_trigger_event(val, dur);
+                        Message::SeqEvent(event) => {
+                            self.handle_seq_event(event)
                         }
                         _ => (),
                     }

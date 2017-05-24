@@ -24,12 +24,12 @@ use std::time::{Duration, Instant};
 use std::thread;
 
 use unit::{Keyword, Message, Interpreter, InterpState, eval, add, subtract,
-           multiply, divide, print, RuntimeErr, InterpResult};
+           multiply, divide, print, RuntimeErr, InterpResult, Event};
 use lang::{hash_str, Instr};
 
-use self::seq::{Event, SeqState};
+use self::seq::SeqState;
 use self::words::{repeat, every, reverse, shuffle, rotate, degrade, cycle,
-                  palindrome, hopjump, track};
+                  palindrome, hopjump, track, linear};
 
 
 type SpuKeyword = fn(&mut SeqState, &mut InterpState) -> InterpResult;
@@ -61,6 +61,7 @@ impl SpuInterp {
         spu_words.insert(hash_str("palindrome"), palindrome);
         spu_words.insert(hash_str("hopjump"), hopjump);
         spu_words.insert(hash_str("track"), track);
+        spu_words.insert(hash_str("linear"), linear);
 
         SpuInterp {
             built_ins: built_ins,
@@ -177,8 +178,7 @@ impl Spu {
                     thread::sleep(res);
                     continue;
                 }
-                let msg = Message::TriggerEvent(event.value, event.dur);
-                self.channel.send(msg).unwrap();
+                self.channel.send(Message::SeqEvent(event)).unwrap();
             }
 
             while start.elapsed() < end {
