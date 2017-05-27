@@ -160,7 +160,6 @@ impl Mpu {
     }
 
     fn process_ctl_events(&mut self, delta: &Duration) {
-        // Advance 't' for each curve
         for evt in &mut self.ctl_events {
             evt.1 += to_millis(&evt.0) / to_millis(delta);
         }
@@ -172,7 +171,7 @@ impl Mpu {
             self.channel.send(msg).unwrap();
         }
 
-        // Remove any event with a t >= 1
+        self.ctl_events.retain(|&evt| evt.1 >= 1.0);
     }
 
     fn process_off_events(&mut self, delta: &Duration) {
