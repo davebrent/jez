@@ -136,6 +136,7 @@ pub struct InterpState {
     pub heap: Vec<Value>,
     /// Variable mapping table, points into `heap` by default
     pub vars: HashMap<u64, usize>,
+    save_point: usize,
 }
 
 impl InterpState {
@@ -145,7 +146,18 @@ impl InterpState {
             stack: vec![],
             heap: vec![],
             vars: HashMap::new(),
+            save_point: 0,
         }
+    }
+
+    // /// All values pushed to the heap after this point may be truncated
+    // pub fn set_save_point(&mut self) {
+    //     self.save_point = self.heap.len();
+    // }
+
+    /// Remove all values from the heap above the save point
+    pub fn reset(&mut self) {
+        self.heap.truncate(self.save_point);
     }
 }
 

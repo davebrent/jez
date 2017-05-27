@@ -57,7 +57,8 @@ impl Machine {
                sender: Sender<Message>,
                receiver: Receiver<Message>) {
         if let Some(mut mpu) = Mpu::new(MPU_ID,
-                                        prog.section("mpu_out"),
+                                        prog.section("mpu_out_note"),
+                                        prog.section("mpu_out_ctrl"),
                                         sender,
                                         receiver) {
             thread::spawn(move || { mpu.run_forever(); });

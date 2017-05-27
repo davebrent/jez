@@ -17,8 +17,8 @@ use unit::{Keyword, eval, Event, EventValue, Message, Interpreter,
 use lang::{hash_str, Instr};
 use math::{Curve, point_on_curve, dur_to_millis, millis_to_dur};
 
-use self::state::MidiState;
-use self::words::{event_value, event_duration, makenote, noteout};
+use self::state::{MidiState, MidiMessage};
+use self::words::{event_value, event_duration, ctrlout, noteout};
 
 
 type MpuKeyword = fn(&mut MidiState, &mut InterpState) -> InterpResult;
@@ -41,8 +41,8 @@ impl MpuInterp {
         let mut mpu_words: HashMap<u64, MpuKeyword> = HashMap::new();
         mpu_words.insert(hash_str("event_value"), event_value);
         mpu_words.insert(hash_str("event_duration"), event_duration);
-        mpu_words.insert(hash_str("makenote"), makenote);
         mpu_words.insert(hash_str("noteout"), noteout);
+        mpu_words.insert(hash_str("ctrlout"), ctrlout);
 
         MpuInterp {
             built_ins: built_ins,
@@ -72,60 +72,115 @@ pub struct Mpu {
     interp: MpuInterp,
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
-    instrs: Vec<Instr>,
+    instrs_out_note: Vec<Instr>,
+    instrs_out_ctrl: Vec<Instr>,
     off_events: Vec<(Duration, u8, u8)>,
     ctl_events: Vec<(Duration, f64, Curve)>,
 }
 
 impl Mpu {
     pub fn new(id: u8,
-               instrs: Option<&[Instr]>,
+               instrs_out_note: Option<&[Instr]>,
+               instrs_out_ctrl: Option<&[Instr]>,
                channel: Sender<Message>,
                input_channel: Receiver<Message>)
                -> Option<Self> {
-        match instrs {
-            None => None,
-            Some(instrs) => {
-                Some(Mpu {
-                         id: id,
-                         interp_state: InterpState::new(),
-                         interp: MpuInterp::new(),
-                         channel: channel,
-                         input_channel: input_channel,
-                         instrs: instrs.to_vec(),
-                         off_events: Vec::new(),
-                         ctl_events: Vec::new(),
-                     })
+        if instrs_out_note.is_none() && instrs_out_ctrl.is_none() {
+            return None;
+        }
+
+        let instrs_out_note = match instrs_out_note {
+            Some(instrs) => instrs.to_vec(),
+            None => Vec::new(),
+        };
+
+        let instrs_out_ctrl = match instrs_out_ctrl {
+            Some(instrs) => instrs.to_vec(),
+            None => Vec::new(),
+        };
+
+        Some(Mpu {
+                 id: id,
+                 interp_state: InterpState::new(),
+                 interp: MpuInterp::new(),
+                 channel: channel,
+                 input_channel: input_channel,
+                 instrs_out_note: instrs_out_note,
+                 instrs_out_ctrl: instrs_out_ctrl,
+                 off_events: Vec::new(),
+                 ctl_events: Vec::new(),
+             })
+    }
+
+    fn handle_trg_event(&mut self, event: Event) {
+        let instrs = self.instrs_out_note.as_slice();
+
+        self.interp_state.reset();
+        self.interp.midi_state.event = event;
+
+        match eval(instrs, &mut self.interp_state, &mut self.interp) {
+            Err(err) => {
+                self.channel
+                    .send(Message::HasError(self.id, err))
+                    .unwrap();
+            }
+            Ok(_) => {
+                match self.interp.midi_state.message {
+                    MidiMessage::None => return,
+                    MidiMessage::Note {
+                        channel: chan,
+                        pitch: ptch,
+                        velocity: vel,
+                        duration: dur,
+                    } => {
+                        self.off_events.push((millis_to_dur(dur), chan, ptch));
+                        self.off_events
+                            .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                        self.channel
+                            .send(Message::MidiNoteOn(chan, ptch, vel))
+                            .unwrap();
+                    }
+                    _ => {
+                        let err = RuntimeErr::WrongType;
+                        self.channel
+                            .send(Message::HasError(self.id, err))
+                            .unwrap();
+                    }
+                }
             }
         }
     }
 
-    fn handle_seq_event(&mut self, event: Event) {
-        let instrs = self.instrs.as_slice();
+    fn handle_ctl_event(&mut self, event: Event, curve: Curve) {
+        let instrs = self.instrs_out_ctrl.as_slice();
+
+        self.interp_state.reset();
+        self.interp.midi_state.event = event;
+
         match eval(instrs, &mut self.interp_state, &mut self.interp) {
             Err(err) => {
-                let msg = Message::HasError(self.id, err);
-                self.channel.send(msg).unwrap();
+                self.channel
+                    .send(Message::HasError(self.id, err))
+                    .unwrap();
             }
             Ok(_) => {
-                match event.value {
-                    EventValue::Trigger(val) => {
-                        let val = val as u8;
+                match self.interp.midi_state.message {
+                    MidiMessage::None => return,
+                    MidiMessage::Ctrl {
+                        channel: chan,
+                        ctrl: ctl,
+                    } => {
                         let dur = millis_to_dur(event.dur);
-                        self.off_events.push((dur, 0, val));
-                        self.off_events
-                            .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-                        self.channel
-                            .send(Message::MidiNoteOn(0, val, 127))
-                            .unwrap();
-                    }
-                    EventValue::Curve(curve) => {
-                        let dur = millis_to_dur(event.dur);
+                        let msg = Message::MidiCtl(chan, ctl, curve[0] as u8);
                         self.ctl_events.push((dur, 0.0, curve));
                         self.ctl_events
                             .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                        self.channel.send(msg).unwrap();
+                    }
+                    _ => {
+                        let err = RuntimeErr::WrongType;
                         self.channel
-                            .send(Message::MidiCtl(0, 0, curve[0] as u8))
+                            .send(Message::HasError(self.id, err))
                             .unwrap();
                     }
                 }
@@ -184,7 +239,16 @@ impl Mpu {
             if let Ok(msg) = self.input_channel.try_recv() {
                 match msg {
                     Message::Stop => break,
-                    Message::SeqEvent(event) => self.handle_seq_event(event),
+                    Message::SeqEvent(event) => {
+                        match event.value {
+                            EventValue::Trigger(_) => {
+                                self.handle_trg_event(event)
+                            }
+                            EventValue::Curve(curve) => {
+                                self.handle_ctl_event(event, curve)
+                            }
+                        }
+                    }
                     _ => (),
                 }
             }

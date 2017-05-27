@@ -123,7 +123,10 @@ impl Spu {
     fn get_events(&mut self) -> Option<Vec<Event>> {
         let instrs = self.instrs.lock().unwrap();
         let instrs = instrs.as_slice();
+
         self.interp.seq_state.events.drain(..);
+        self.interp_state.reset();
+
         match eval(instrs, &mut self.interp_state, &mut self.interp) {
             Err(err) => {
                 let msg = Message::HasError(self.id, err);
