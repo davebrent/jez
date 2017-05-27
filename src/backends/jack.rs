@@ -22,9 +22,6 @@ impl ProcessHandler for Processor {
         while let Ok(msg) = self.channel.try_recv() {
             match msg {
                 Message::MidiNoteOn(chn, pitch, vel) => {
-                    assert!(chn < 16);
-                    assert!(pitch < 128);
-                    assert!(vel < 128);
                     let midi = RawMidi {
                         time: 0,
                         bytes: &[144 + chn, pitch, vel],
@@ -32,8 +29,6 @@ impl ProcessHandler for Processor {
                     out_port.write(&midi).unwrap();
                 }
                 Message::MidiNoteOff(chn, pitch) => {
-                    assert!(chn < 16);
-                    assert!(pitch < 128);
                     let midi = RawMidi {
                         time: 0,
                         bytes: &[128 + chn, pitch, 0],
@@ -41,9 +36,6 @@ impl ProcessHandler for Processor {
                     out_port.write(&midi).unwrap();
                 }
                 Message::MidiCtl(chn, ctl, val) => {
-                    assert!(chn < 16);
-                    assert!(ctl < 120);
-                    assert!(val < 128);
                     let midi = RawMidi {
                         time: 0,
                         bytes: &[176 + chn, ctl, val],

@@ -18,7 +18,7 @@ use lang::{hash_str, Instr};
 use math::{Curve, point_on_curve, dur_to_millis, millis_to_dur};
 
 use self::state::{MidiState, MidiMessage};
-use self::words::{event_value, event_duration, ctrlout, noteout};
+use self::words::{event_value, event_duration, event_track, ctrlout, noteout};
 
 
 type MpuKeyword = fn(&mut MidiState, &mut InterpState) -> InterpResult;
@@ -41,6 +41,7 @@ impl MpuInterp {
         let mut mpu_words: HashMap<u64, MpuKeyword> = HashMap::new();
         mpu_words.insert(hash_str("event_value"), event_value);
         mpu_words.insert(hash_str("event_duration"), event_duration);
+        mpu_words.insert(hash_str("event_track"), event_track);
         mpu_words.insert(hash_str("noteout"), noteout);
         mpu_words.insert(hash_str("ctrlout"), ctrlout);
 
@@ -75,7 +76,7 @@ pub struct Mpu {
     instrs_out_note: Vec<Instr>,
     instrs_out_ctrl: Vec<Instr>,
     off_events: Vec<(Duration, u8, u8)>,
-    ctl_events: Vec<(Duration, f64, Curve)>,
+    ctl_events: Vec<(Duration, f64, u8, u8, Curve)>,
 }
 
 impl Mpu {
@@ -172,7 +173,7 @@ impl Mpu {
                     } => {
                         let dur = millis_to_dur(event.dur);
                         let msg = Message::MidiCtl(chan, ctl, curve[0] as u8);
-                        self.ctl_events.push((dur, 0.0, curve));
+                        self.ctl_events.push((dur, 0.0, chan, ctl, curve));
                         self.ctl_events
                             .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
                         self.channel.send(msg).unwrap();
@@ -195,8 +196,8 @@ impl Mpu {
 
         for evt in &mut self.ctl_events {
             let t = evt.1;
-            let val = point_on_curve(t, &evt.2);
-            let msg = Message::MidiCtl(0, 0, val[1] as u8);
+            let val = point_on_curve(t, &evt.4);
+            let msg = Message::MidiCtl(evt.2, evt.3, val[1] as u8);
             self.channel.send(msg).unwrap();
         }
 
