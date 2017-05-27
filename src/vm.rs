@@ -69,23 +69,20 @@ impl Machine {
             match msg {
                 Message::MidiNoteOn(chan, pitch, vel) => {
                     let msg = Message::MidiNoteOn(chan, pitch, vel);
-                    match self.backend.send(msg) {
-                        Ok(_) => (),
-                        Err(_) => return Err(RuntimeErr::BackendUnreachable),
+                    if self.backend.send(msg).is_err() {
+                        return Err(RuntimeErr::BackendUnreachable);
                     }
                 }
                 Message::MidiNoteOff(chan, pitch) => {
                     let msg = Message::MidiNoteOff(chan, pitch);
-                    match self.backend.send(msg) {
-                        Ok(_) => (),
-                        Err(_) => return Err(RuntimeErr::BackendUnreachable),
+                    if self.backend.send(msg).is_err() {
+                        return Err(RuntimeErr::BackendUnreachable);
                     }
                 }
                 Message::MidiCtl(chan, ctl, val) => {
                     let msg = Message::MidiCtl(chan, ctl, val);
-                    match self.backend.send(msg) {
-                        Ok(_) => (),
-                        Err(_) => return Err(RuntimeErr::BackendUnreachable),
+                    if self.backend.send(msg).is_err() {
+                        return Err(RuntimeErr::BackendUnreachable);
                     }
                 }
                 Message::SeqEvent(event) => {
