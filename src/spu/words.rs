@@ -1,13 +1,14 @@
 use rand::{Rng, StdRng};
 
 use unit::{Event, EventValue, InterpState, RuntimeErr, InterpResult, Value};
+use math::path_to_curve;
 
 use super::seq::SeqState;
 
 
 /// Repeat a value 'n' times
 pub fn repeat(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let times: Option<f32> = state.stack.pop().unwrap().into();
+    let times: Option<f64> = state.stack.pop().unwrap().into();
     let times = times.unwrap() as u32;
     let val = state.stack.pop().unwrap();
     for _ in 0..times {
@@ -18,7 +19,7 @@ pub fn repeat(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 
 /// Put a value on the stack every 'n' cycles
 pub fn every(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let freq: Option<f32> = state.stack.pop().unwrap().into();
+    let freq: Option<f64> = state.stack.pop().unwrap().into();
     let freq = freq.unwrap() as usize;
     if freq % seq.cycle.rev == 0 {
         state.stack.pop().unwrap();
@@ -56,7 +57,7 @@ pub fn shuffle(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 
 /// Rotate a list
 pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let amount: Option<f32> = state.stack.pop().unwrap().into();
+    let amount: Option<f64> = state.stack.pop().unwrap().into();
     let amount = amount.unwrap() as usize;
     match *state.stack.last().unwrap() {
         Value::Pair(start, end) => {
@@ -118,11 +119,11 @@ pub fn palindrome(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
 ///   [1]: Simha Arom. African Polyphony and Polyrhythm.
 ///        Cambridge University Press, Cambridge, England, 1991.
 pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let hopsize: Option<f32> = state.stack.pop().unwrap().into();
+    let hopsize: Option<f64> = state.stack.pop().unwrap().into();
     let hopsize = hopsize.unwrap() as usize;
-    let pulses: Option<f32> = state.stack.pop().unwrap().into();
+    let pulses: Option<f64> = state.stack.pop().unwrap().into();
     let pulses = pulses.unwrap() as usize;
-    let onsets: Option<f32> = state.stack.pop().unwrap().into();
+    let onsets: Option<f64> = state.stack.pop().unwrap().into();
     let onsets = onsets.unwrap() as usize;
 
     if onsets * hopsize >= pulses {
@@ -155,9 +156,9 @@ pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     for value in &mut rhythm {
         let value = *value;
         if value == 2 {
-            state.heap.push(Value::Number(0f32));
+            state.heap.push(Value::Number(0.0));
         } else {
-            state.heap.push(Value::Number(value as f32));
+            state.heap.push(Value::Number(value as f64));
         }
     }
 
@@ -167,16 +168,16 @@ pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 
 /// Build a track by recursively subdividing a list into a series of events
 pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let no: Option<f32> = state.stack.pop().unwrap().into();
+    let no: Option<f64> = state.stack.pop().unwrap().into();
     let no = no.unwrap() as u32;
 
-    let dur: Option<f32> = state.stack.pop().unwrap().into();
+    let dur: Option<f64> = state.stack.pop().unwrap().into();
     let dur = dur.unwrap();
 
     seq.cycle.dur = dur;
 
-    let mut visit: Vec<(f32, f32, Value)> = Vec::new();
-    visit.push((0f32, dur, state.stack.pop().unwrap()));
+    let mut visit: Vec<(f64, f64, Value)> = Vec::new();
+    visit.push((0.0, dur, state.stack.pop().unwrap()));
 
     while let Some((onset, dur, val)) = visit.pop() {
         match val {
@@ -200,7 +201,7 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
                 seq.events.push(event);
             }
             Value::Pair(start, end) => {
-                let interval = dur / (end - start) as f32;
+                let interval = dur / (end - start) as f64;
                 let mut onset = onset;
                 for n in start..end {
                     visit.push((onset, interval, state.heap[n]));
@@ -222,13 +223,13 @@ pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
                 return Err(RuntimeErr::WrongType);
             }
 
-            let c0: Option<f32> = state.heap[start].into();
+            let c0: Option<f64> = state.heap[start].into();
             let c0 = c0.unwrap();
-            let c1: Option<f32> = state.heap[start + 1].into();
+            let c1: Option<f64> = state.heap[start + 1].into();
             let c1 = c1.unwrap();
-            state
-                .stack
-                .push(Value::Curve([0.0, c0, 0.0, c0, 1.0, c1, 1.0, c1]));
+            let curve = path_to_curve(&[0.0, c0 as f64], &[1.0, c1 as f64]);
+
+            state.stack.push(Value::Curve(curve));
 
             Ok(())
         }
@@ -244,18 +245,18 @@ mod tests {
     fn repeat_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.stack.push(Value::Number(12f32));
-        state.stack.push(Value::Number(3f32));
+        state.stack.push(Value::Number(12.0));
+        state.stack.push(Value::Number(3.0));
         repeat(&mut seq, &mut state).unwrap();
-        let a: Option<f32> = state.stack.pop().unwrap().into();
+        let a: Option<f64> = state.stack.pop().unwrap().into();
         let a = a.unwrap();
-        let b: Option<f32> = state.stack.pop().unwrap().into();
+        let b: Option<f64> = state.stack.pop().unwrap().into();
         let b = b.unwrap();
-        let c: Option<f32> = state.stack.pop().unwrap().into();
+        let c: Option<f64> = state.stack.pop().unwrap().into();
         let c = c.unwrap();
-        assert_eq!(a, 12f32);
-        assert_eq!(b, 12f32);
-        assert_eq!(c, 12f32);
+        assert_eq!(a, 12.0);
+        assert_eq!(b, 12.0);
+        assert_eq!(c, 12.0);
         assert_eq!(state.stack.len(), 0);
     }
 
@@ -266,9 +267,9 @@ mod tests {
         seq.cycle.rev = 3;
         state.stack.push(Value::Number(3.14));
         state.stack.push(Value::Number(2.17));
-        state.stack.push(Value::Number(3f32));
+        state.stack.push(Value::Number(3.0));
         every(&mut seq, &mut state).unwrap();
-        let a: Option<f32> = state.stack.pop().unwrap().into();
+        let a: Option<f64> = state.stack.pop().unwrap().into();
         let a = a.unwrap();
         assert_eq!(a, 3.14);
         assert_eq!(state.stack.len(), 0);
@@ -281,9 +282,9 @@ mod tests {
         seq.cycle.rev = 3;
         state.stack.push(Value::Number(3.14));
         state.stack.push(Value::Number(2.17));
-        state.stack.push(Value::Number(4f32));
+        state.stack.push(Value::Number(4.0));
         every(&mut seq, &mut state).unwrap();
-        let a: Option<f32> = state.stack.pop().unwrap().into();
+        let a: Option<f64> = state.stack.pop().unwrap().into();
         let a = a.unwrap();
         assert_eq!(a, 2.17);
         assert_eq!(state.stack.len(), 0);
@@ -293,20 +294,20 @@ mod tests {
     fn reverse_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.heap.push(Value::Number(1f32));
-        state.heap.push(Value::Number(2f32));
-        state.heap.push(Value::Number(3f32));
+        state.heap.push(Value::Number(1.0));
+        state.heap.push(Value::Number(2.0));
+        state.heap.push(Value::Number(3.0));
         state.stack.push(Value::Pair(0, 3));
         reverse(&mut seq, &mut state).unwrap();
-        let a: Option<f32> = state.heap.remove(0).into();
+        let a: Option<f64> = state.heap.remove(0).into();
         let a = a.unwrap();
-        let b: Option<f32> = state.heap.remove(0).into();
+        let b: Option<f64> = state.heap.remove(0).into();
         let b = b.unwrap();
-        let c: Option<f32> = state.heap.remove(0).into();
+        let c: Option<f64> = state.heap.remove(0).into();
         let c = c.unwrap();
-        assert_eq!(a, 3f32);
-        assert_eq!(b, 2f32);
-        assert_eq!(c, 1f32);
+        assert_eq!(a, 3.0);
+        assert_eq!(b, 2.0);
+        assert_eq!(c, 1.0);
         assert_eq!(state.stack.len(), 1);
     }
 
@@ -314,21 +315,21 @@ mod tests {
     fn rotate_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.heap.push(Value::Number(1f32));
-        state.heap.push(Value::Number(2f32));
-        state.heap.push(Value::Number(3f32));
+        state.heap.push(Value::Number(1.0));
+        state.heap.push(Value::Number(2.0));
+        state.heap.push(Value::Number(3.0));
         state.stack.push(Value::Pair(0, 3));
-        state.stack.push(Value::Number(1f32));
+        state.stack.push(Value::Number(1.0));
         rotate(&mut seq, &mut state).unwrap();
-        let a: Option<f32> = state.heap.remove(0).into();
+        let a: Option<f64> = state.heap.remove(0).into();
         let a = a.unwrap();
-        let b: Option<f32> = state.heap.remove(0).into();
+        let b: Option<f64> = state.heap.remove(0).into();
         let b = b.unwrap();
-        let c: Option<f32> = state.heap.remove(0).into();
+        let c: Option<f64> = state.heap.remove(0).into();
         let c = c.unwrap();
-        assert_eq!(a, 3f32);
-        assert_eq!(b, 1f32);
-        assert_eq!(c, 2f32);
+        assert_eq!(a, 3.0);
+        assert_eq!(b, 1.0);
+        assert_eq!(c, 2.0);
         assert_eq!(state.stack.len(), 1);
     }
 
@@ -336,9 +337,9 @@ mod tests {
     fn hopjump_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.stack.push(Value::Number(5f32));
-        state.stack.push(Value::Number(12f32));
-        state.stack.push(Value::Number(2f32));
+        state.stack.push(Value::Number(5.0));
+        state.stack.push(Value::Number(12.0));
+        state.stack.push(Value::Number(2.0));
         hopjump(&mut seq, &mut state).unwrap();
         assert_eq!(state.stack.len(), 1);
     }

@@ -1,9 +1,6 @@
 spu:
-    [1 ~ ~ 2 ~ ~ 3 ~ ] 1000 0 track
-    [
-      0
-      127
-    ] linear 1000 1 track
+    [1 ~ ~ 2 ~ ~ 3 ~] 1000 0 track
+    [0 127] linear 1000 1 track
 
 mpu_out:
     event_value     ; Pitch

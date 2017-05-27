@@ -13,15 +13,14 @@ use std::convert::Into;
 use std::fmt;
 
 use lang::Instr;
+use math::Curve;
 
-
-pub type Curve = [f32; 8];
 
 /// Represents all the values possible that can go on the stack
 #[derive(Copy, Clone, Debug)]
 pub enum Value {
     /// All numbers are floats
-    Number(f32),
+    Number(f64),
     /// A hashed string
     Symbol(u64),
     /// Used for representing lists, a range of values on the heap
@@ -34,8 +33,8 @@ pub enum Value {
     Curve(Curve),
 }
 
-impl Into<Option<f32>> for Value {
-    fn into(self) -> Option<f32> {
+impl Into<Option<f64>> for Value {
+    fn into(self) -> Option<f64> {
         match self {
             Value::Number(num) => Some(num),
             _ => None,
@@ -63,15 +62,15 @@ impl Into<Option<(usize, usize)>> for Value {
 
 #[derive(Copy, Clone, Debug)]
 pub enum EventValue {
-    Trigger(f32),
+    Trigger(f64),
     Curve(Curve),
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct Event {
     pub track: u32,
-    pub onset: f32,
-    pub dur: f32,
+    pub onset: f64,
+    pub dur: f64,
     pub value: EventValue,
 }
 
@@ -157,7 +156,7 @@ pub fn load_null(state: &mut InterpState) -> InterpResult {
 }
 
 /// Put a number onto the stack
-pub fn load_number(num: f32, state: &mut InterpState) -> InterpResult {
+pub fn load_number(num: f64, state: &mut InterpState) -> InterpResult {
     state.stack.push(Value::Number(num));
     Ok(())
 }
@@ -221,8 +220,8 @@ pub fn list_end(state: &mut InterpState) -> InterpResult {
 
 /// Add top two stack values
 pub fn add(state: &mut InterpState) -> InterpResult {
-    let rhs: Option<f32> = state.stack.pop().unwrap().into();
-    let lhs: Option<f32> = state.stack.pop().unwrap().into();
+    let rhs: Option<f64> = state.stack.pop().unwrap().into();
+    let lhs: Option<f64> = state.stack.pop().unwrap().into();
     state
         .stack
         .push(Value::Number(lhs.unwrap() + rhs.unwrap()));
@@ -231,8 +230,8 @@ pub fn add(state: &mut InterpState) -> InterpResult {
 
 /// Subtract top two stack values
 pub fn subtract(state: &mut InterpState) -> InterpResult {
-    let rhs: Option<f32> = state.stack.pop().unwrap().into();
-    let lhs: Option<f32> = state.stack.pop().unwrap().into();
+    let rhs: Option<f64> = state.stack.pop().unwrap().into();
+    let lhs: Option<f64> = state.stack.pop().unwrap().into();
     state
         .stack
         .push(Value::Number(lhs.unwrap() - rhs.unwrap()));
@@ -241,8 +240,8 @@ pub fn subtract(state: &mut InterpState) -> InterpResult {
 
 /// Multiply top two stack values
 pub fn multiply(state: &mut InterpState) -> InterpResult {
-    let rhs: Option<f32> = state.stack.pop().unwrap().into();
-    let lhs: Option<f32> = state.stack.pop().unwrap().into();
+    let rhs: Option<f64> = state.stack.pop().unwrap().into();
+    let lhs: Option<f64> = state.stack.pop().unwrap().into();
     state
         .stack
         .push(Value::Number(lhs.unwrap() * rhs.unwrap()));
@@ -251,8 +250,8 @@ pub fn multiply(state: &mut InterpState) -> InterpResult {
 
 /// Divide top two stack values
 pub fn divide(state: &mut InterpState) -> InterpResult {
-    let rhs: Option<f32> = state.stack.pop().unwrap().into();
-    let lhs: Option<f32> = state.stack.pop().unwrap().into();
+    let rhs: Option<f64> = state.stack.pop().unwrap().into();
+    let lhs: Option<f64> = state.stack.pop().unwrap().into();
     state
         .stack
         .push(Value::Number(lhs.unwrap() / rhs.unwrap()));
@@ -285,7 +284,7 @@ pub fn eval<T>(instrs: &[Instr],
     while state.pc < instrs.len() {
         let instr = instrs[state.pc];
         match instr {
-            Instr::LoadNumber(num) => load_number(num, state),
+            Instr::LoadNumber(num) => load_number(num as f64, state),
             Instr::LoadString(_) => Err(RuntimeErr::NotImplemented),
             Instr::Null => load_null(state),
             Instr::LoadSymbol(sym) => load_symbol(sym, state),

@@ -11,10 +11,11 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Duration, Instant};
 use std::thread;
 
-use unit::{Curve, Keyword, eval, Event, EventValue, Message, Interpreter,
+use unit::{Keyword, eval, Event, EventValue, Message, Interpreter,
            InterpState, add, subtract, multiply, divide, print, RuntimeErr,
            InterpResult};
 use lang::{hash_str, Instr};
+use math::{Curve, point_on_curve, dur_to_millis, millis_to_dur};
 
 use self::state::MidiState;
 use self::words::{event_value, event_duration, makenote, noteout};
@@ -76,34 +77,6 @@ pub struct Mpu {
     ctl_events: Vec<(Duration, f64, Curve)>,
 }
 
-fn from_millis(millis: f32) -> Duration {
-    let secs = (millis / 1000f32).floor();
-    let nanos = (millis - (secs * 1000f32)) * 1000000f32;
-    Duration::new(secs as u64, nanos as u32)
-}
-
-fn to_millis(dur: &Duration) -> f64 {
-    let secs = dur.as_secs() as f64 * 1000.0;
-    let nanos = dur.subsec_nanos() as f64 / 1000.0;
-    secs + nanos
-}
-
-/// Get a point 't' on a cubic bezier curve
-fn get_point(t: f64, curve: Curve) -> [f32; 2] {
-    let t = t as f32;
-    let p0x = curve[0];
-    let p0y = curve[1];
-    let p1x = curve[2];
-    let p1y = curve[3];
-    let p2x = curve[4];
-    let p2y = curve[5];
-    let x = (1.0 - t) * (1.0 - t) * p0x + 2.0 * (1.0 - t) * t * p1x +
-            t * t * p2x;
-    let y = (1.0 - t) * (1.0 - t) * p0y + 2.0 * (1.0 - t) * t * p1y +
-            t * t * p2y;
-    [x, y]
-}
-
 impl Mpu {
     pub fn new(id: u8,
                instrs: Option<&[Instr]>,
@@ -138,7 +111,8 @@ impl Mpu {
                 match event.value {
                     EventValue::Trigger(val) => {
                         let val = val as u8;
-                        self.off_events.push((from_millis(event.dur), 0, val));
+                        let dur = millis_to_dur(event.dur);
+                        self.off_events.push((dur, 0, val));
                         self.off_events
                             .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
                         self.channel
@@ -146,7 +120,7 @@ impl Mpu {
                             .unwrap();
                     }
                     EventValue::Curve(curve) => {
-                        let dur = from_millis(event.dur);
+                        let dur = millis_to_dur(event.dur);
                         self.ctl_events.push((dur, 0.0, curve));
                         self.ctl_events
                             .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
@@ -161,17 +135,17 @@ impl Mpu {
 
     fn process_ctl_events(&mut self, delta: &Duration) {
         for evt in &mut self.ctl_events {
-            evt.1 += to_millis(&evt.0) / to_millis(delta);
+            evt.1 += dur_to_millis(delta) / dur_to_millis(&evt.0);
         }
 
         for evt in &mut self.ctl_events {
             let t = evt.1;
-            let val = get_point(t, evt.2);
+            let val = point_on_curve(t, &evt.2);
             let msg = Message::MidiCtl(0, 0, val[1] as u8);
             self.channel.send(msg).unwrap();
         }
 
-        self.ctl_events.retain(|&evt| evt.1 >= 1.0);
+        self.ctl_events.retain(|&evt| evt.1 < 1.0);
     }
 
     fn process_off_events(&mut self, delta: &Duration) {

@@ -5,14 +5,14 @@ use unit::Event;
 #[derive(Copy, Clone, Debug)]
 pub struct Cycle {
     /// Duration in milliseconds
-    pub dur: f32,
+    pub dur: f64,
     /// Current revision of the cycle
     pub rev: usize,
 }
 
 impl Cycle {
     pub fn new() -> Cycle {
-        Cycle { dur: 0f32, rev: 0 }
+        Cycle { dur: 0.0, rev: 0 }
     }
 }
 

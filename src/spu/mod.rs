@@ -26,6 +26,7 @@ use std::thread;
 use unit::{Keyword, Message, Interpreter, InterpState, eval, add, subtract,
            multiply, divide, print, RuntimeErr, InterpResult, Event};
 use lang::{hash_str, Instr};
+use math::millis_to_dur;
 
 use self::seq::SeqState;
 use self::words::{repeat, every, reverse, shuffle, rotate, degrade, cycle,
@@ -96,12 +97,6 @@ pub struct Spu {
     instrs: Mutex<Vec<Instr>>,
 }
 
-pub fn from_millis(millis: f32) -> Duration {
-    let secs = (millis / 1000f32).floor();
-    let nanos = (millis - (secs * 1000f32)) * 1000000f32;
-    Duration::new(secs as u64, nanos as u32)
-}
-
 impl Spu {
     /// Returns a new SPU if there are instructions to execute
     pub fn new(id: u8,
@@ -170,10 +165,10 @@ impl Spu {
             events.sort_by(|a, b| b.onset.partial_cmp(&a.onset).unwrap());
 
             let start = Instant::now();
-            let end = from_millis(self.interp.seq_state.cycle.dur);
+            let end = millis_to_dur(self.interp.seq_state.cycle.dur);
 
             while let Some(event) = events.pop() {
-                if start.elapsed() < from_millis(event.onset) {
+                if start.elapsed() < millis_to_dur(event.onset) {
                     events.push(event);
                     thread::sleep(res);
                     continue;

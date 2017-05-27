@@ -19,6 +19,8 @@
 mod backends;
 /// Parser for custom bytecode
 mod lang;
+/// Math functions
+mod math;
 /// MIDI processing unit
 mod mpu;
 /// Sequencer processing unit
