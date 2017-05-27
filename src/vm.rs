@@ -45,22 +45,22 @@ impl Machine {
     fn new_spu(prog: &Program,
                sender: Sender<Message>,
                receiver: Receiver<Message>) {
-        match Spu::new(SPU_ID, prog.section("spu"), sender, receiver) {
-            Some(mut spu) => {
-                thread::spawn(move || { spu.run_forever(); });
-            }
-            None => (),
+        if let Some(mut spu) = Spu::new(SPU_ID,
+                                        prog.section("spu"),
+                                        sender,
+                                        receiver) {
+            thread::spawn(move || { spu.run_forever(); });
         }
     }
 
     fn new_mpu(prog: &Program,
                sender: Sender<Message>,
                receiver: Receiver<Message>) {
-        match Mpu::new(MPU_ID, prog.section("mpu_out"), sender, receiver) {
-            Some(mut mpu) => {
-                thread::spawn(move || { mpu.run_forever(); });
-            }
-            None => (),
+        if let Some(mut mpu) = Mpu::new(MPU_ID,
+                                        prog.section("mpu_out"),
+                                        sender,
+                                        receiver) {
+            thread::spawn(move || { mpu.run_forever(); });
         }
     }
 

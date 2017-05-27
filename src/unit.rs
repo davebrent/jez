@@ -179,8 +179,8 @@ pub fn store_var(name: u64, state: &mut InterpState) -> InterpResult {
 
 /// Load a variable value back onto the stack
 pub fn load_var(name: u64, state: &mut InterpState) -> InterpResult {
-    let ptr = state.vars.get(&name).unwrap();
-    state.stack.push(state.heap.get(*ptr).unwrap().clone());
+    let ptr = &state.vars[&name];
+    state.stack.push(state.heap[*ptr]);
     Ok(())
 }
 
@@ -205,7 +205,7 @@ pub fn list_end(state: &mut InterpState) -> InterpResult {
                             Instr::ListBegin => {
                                 let end = state.heap.len();
                                 let pair = Value::Pair(start, end);
-                                &state.heap[start..end].reverse();
+                                state.heap[start..end].reverse();
                                 state.stack.push(pair);
                                 return Ok(());
                             }
@@ -283,8 +283,8 @@ pub fn eval<T>(instrs: &[Instr],
 {
     state.pc = 0;
     while state.pc < instrs.len() {
-        let instr = instrs.get(state.pc).unwrap();
-        match *instr {
+        let instr = instrs[state.pc];
+        match instr {
             Instr::LoadNumber(num) => load_number(num, state),
             Instr::LoadString(_) => Err(RuntimeErr::NotImplemented),
             Instr::Null => load_null(state),
@@ -297,5 +297,5 @@ pub fn eval<T>(instrs: &[Instr],
         }?;
         state.pc += 1;
     }
-    return Ok(());
+    Ok(())
 }

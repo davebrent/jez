@@ -54,7 +54,7 @@ impl ProcessHandler for Processor {
             }
         }
 
-        return JackControl::Continue;
+        JackControl::Continue
     }
 }
 

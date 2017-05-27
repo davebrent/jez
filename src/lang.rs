@@ -81,7 +81,7 @@ impl Program {
         match self.labels.iter().position(|&l| l == label) {
             None => None,
             Some(idx) => {
-                let sec = self.sections.get(idx).unwrap();
+                let sec = &self.sections[idx];
                 Some(&self.instrs[sec.start..sec.end])
             }
         }
@@ -154,7 +154,7 @@ impl TokState {
             }
             return true;
         }
-        return false;
+        false
 
     }
 
@@ -234,7 +234,7 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ParseErr> {
         // Match the next word
         let word = &text[offset..end];
         let mut handled = false;
-        for expr in types.iter() {
+        for expr in &types {
             match expr.re.captures(word) {
                 None => (),
                 Some(caps) => {
@@ -280,8 +280,7 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ParseErr> {
 }
 
 // Validate 'List' tokens are balenced
-fn validate_lists<'a>(tokens: &Vec<Token<'a>>)
-                      -> Result<Vec<Token<'a>>, ParseErr<'a>> {
+fn validate_lists<'a>(tokens: &[Token<'a>]) -> Result<(), ParseErr<'a>> {
     let mut stack: Vec<Token> = vec![];
 
     for tok in tokens {
@@ -296,13 +295,12 @@ fn validate_lists<'a>(tokens: &Vec<Token<'a>>)
 
     match stack.first() {
         Some(tok) => Err(ParseErr::UnmatchedPair(tok.clone())),
-        None => Ok(tokens.clone()),
+        None => Ok(()),
     }
 }
 
 // Validate references to variables
-fn validate_vars<'a>(tokens: &Vec<Token<'a>>)
-                     -> Result<Vec<Token<'a>>, ParseErr<'a>> {
+fn validate_vars<'a>(tokens: &[Token<'a>]) -> Result<(), ParseErr<'a>> {
     let mut vars = vec![];
 
     for tok in tokens {
@@ -317,7 +315,7 @@ fn validate_vars<'a>(tokens: &Vec<Token<'a>>)
         }
     }
 
-    Ok(tokens.clone())
+    Ok(())
 }
 
 pub fn hash_str(text: &str) -> u64 {
@@ -331,11 +329,10 @@ fn parse(text: &str) -> Result<Program, ParseErr> {
     let tokens = try!(tokenize(text));
 
     let validators = [validate_lists, validate_vars];
-    for validator in validators.iter() {
-        match validator(&tokens) {
-            Err(err) => return Err(err),
-            _ => (),
-        }
+    for validator in &validators {
+        if let Err(err) = validator(&tokens) {
+            return Err(err);
+        };
     }
 
     let mut program = Program {
@@ -402,7 +399,7 @@ fn parse(text: &str) -> Result<Program, ParseErr> {
         }
     }
 
-    return Ok(program);
+    Ok(program)
 }
 
 #[cfg(test)]

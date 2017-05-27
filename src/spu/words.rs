@@ -11,7 +11,7 @@ pub fn repeat(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     let times = times.unwrap() as u32;
     let val = state.stack.pop().unwrap();
     for _ in 0..times {
-        state.stack.push(val.clone());
+        state.stack.push(val);
     }
     Ok(())
 }
@@ -35,7 +35,7 @@ pub fn every(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
 pub fn reverse(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     match *state.stack.last().unwrap() {
         Value::Pair(start, end) => {
-            &state.heap[start..end].reverse();
+            state.heap[start..end].reverse();
             Ok(())
         }
         _ => Err(RuntimeErr::WrongType),
@@ -65,7 +65,7 @@ pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
             let mut out = Vec::new();
             out.extend_from_slice(b);
             out.extend_from_slice(a);
-            &state.heap[start..end].copy_from_slice(&out);
+            state.heap[start..end].copy_from_slice(&out);
             Ok(())
         }
         _ => Err(RuntimeErr::WrongType),
@@ -78,9 +78,9 @@ pub fn degrade(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     match *state.stack.last().unwrap() {
         Value::Pair(start, end) => {
             let lst = &mut state.heap[start..end];
-            for i in 0..lst.len() {
+            for item in lst {
                 if rng.gen() {
-                    lst[i] = Value::Null;
+                    *item = Value::Null;
                 }
             }
             Ok(())
@@ -95,7 +95,7 @@ pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
         Value::Pair(start, end) => {
             if start != end {
                 let i = seq.cycle.rev % (end - start);
-                state.stack.push(state.heap.get(i).unwrap().clone());
+                state.stack.push(state.heap[i]);
             }
             Ok(())
         }
@@ -203,7 +203,7 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
                 let interval = dur / (end - start) as f32;
                 let mut onset = onset;
                 for n in start..end {
-                    visit.push((onset, interval, *state.heap.get(n).unwrap()));
+                    visit.push((onset, interval, state.heap[n]));
                     onset += interval;
                 }
             }
@@ -222,9 +222,9 @@ pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
                 return Err(RuntimeErr::WrongType);
             }
 
-            let c0: Option<f32> = (*state.heap.get(start).unwrap()).into();
+            let c0: Option<f32> = state.heap[start].into();
             let c0 = c0.unwrap();
-            let c1: Option<f32> = (*state.heap.get(start + 1).unwrap()).into();
+            let c1: Option<f32> = state.heap[start + 1].into();
             let c1 = c1.unwrap();
             state
                 .stack

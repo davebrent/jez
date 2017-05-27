@@ -1,7 +1,7 @@
 //! # Sequence Processing Unit
 //!
 //! A sequence & pattern generator. Functions are Heavily influenced by
-//! [TidalCycles][1] and the writing of [Godfrey Toussaint][2].
+//! [Tidal Cycles][1] and the writing of [Godfrey Toussaint][2].
 //!
 //!   [1]: https://tidalcycles.org/
 //!   [2]: https://link.springer.com/chapter/10.1007/11589440_20
@@ -99,7 +99,7 @@ pub struct Spu {
 pub fn from_millis(millis: f32) -> Duration {
     let secs = (millis / 1000f32).floor();
     let nanos = (millis - (secs * 1000f32)) * 1000000f32;
-    return Duration::new(secs as u64, nanos as u32);
+    Duration::new(secs as u64, nanos as u32)
 }
 
 impl Spu {

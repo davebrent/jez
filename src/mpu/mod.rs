@@ -79,13 +79,13 @@ pub struct Mpu {
 fn from_millis(millis: f32) -> Duration {
     let secs = (millis / 1000f32).floor();
     let nanos = (millis - (secs * 1000f32)) * 1000000f32;
-    return Duration::new(secs as u64, nanos as u32);
+    Duration::new(secs as u64, nanos as u32)
 }
 
 fn to_millis(dur: &Duration) -> f64 {
     let secs = dur.as_secs() as f64 * 1000.0;
     let nanos = dur.subsec_nanos() as f64 / 1000.0;
-    return secs + nanos;
+    secs + nanos
 }
 
 /// Get a point 't' on a cubic bezier curve
@@ -101,7 +101,7 @@ fn get_point(t: f64, curve: Curve) -> [f32; 2] {
             t * t * p2x;
     let y = (1.0 - t) * (1.0 - t) * p0y + 2.0 * (1.0 - t) * t * p1y +
             t * t * p2y;
-    return [x, y];
+    [x, y]
 }
 
 impl Mpu {
@@ -161,11 +161,11 @@ impl Mpu {
 
     fn process_ctl_events(&mut self, delta: &Duration) {
         // Advance 't' for each curve
-        for evt in self.ctl_events.iter_mut() {
+        for evt in &mut self.ctl_events {
             evt.1 += to_millis(&evt.0) / to_millis(delta);
         }
 
-        for evt in self.ctl_events.iter_mut() {
+        for evt in &mut self.ctl_events {
             let t = evt.1;
             let val = get_point(t, evt.2);
             let msg = Message::MidiCtl(0, 0, val[1] as u8);
@@ -178,7 +178,7 @@ impl Mpu {
     fn process_off_events(&mut self, delta: &Duration) {
         let zero = Duration::new(0, 0);
 
-        for evt in self.off_events.iter_mut() {
+        for evt in &mut self.off_events {
             evt.0 = match evt.0.checked_sub(*delta) {
                 Some(dur) => dur,
                 None => zero,
@@ -208,17 +208,12 @@ impl Mpu {
             self.process_ctl_events(&delta);
             self.process_off_events(&delta);
 
-            match self.input_channel.try_recv() {
-                Ok(msg) => {
-                    match msg {
-                        Message::Stop => break,
-                        Message::SeqEvent(event) => {
-                            self.handle_seq_event(event)
-                        }
-                        _ => (),
-                    }
+            if let Ok(msg) = self.input_channel.try_recv() {
+                match msg {
+                    Message::Stop => break,
+                    Message::SeqEvent(event) => self.handle_seq_event(event),
+                    _ => (),
                 }
-                Err(_) => {}
             }
 
             thread::sleep(res);

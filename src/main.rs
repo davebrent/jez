@@ -49,11 +49,11 @@ fn input(fp: Option<&str>) -> Result<Box<io::Read>, std::io::Error> {
     }
 }
 
-fn run_forever(prog: lang::Program) -> Result<(), unit::RuntimeErr> {
+fn run_forever(prog: &lang::Program) -> Result<(), unit::RuntimeErr> {
     let (tx, rx) = channel();
     let _jck = try!(backends::Jack::new(rx));
-    let mach = try!(vm::Machine::new(tx, &prog));
-    return mach.run_forever();
+    let mach = try!(vm::Machine::new(tx, prog));
+    mach.run_forever()
 }
 
 fn main() {
@@ -85,11 +85,8 @@ reactive visualisations.")
             match lang::Program::new(txt.as_str()) {
                 Err(err) => println!("Compile error, {}", err),
                 Ok(prog) => {
-                    match run_forever(prog) {
-                        Err(err) => {
-                            println!("Runtime error, {}", err);
-                        }
-                        _ => (),
+                    if let Err(err) = run_forever(&prog) {
+                        println!("Runtime error, {}", err);
                     }
                 }
             }
