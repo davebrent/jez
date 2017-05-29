@@ -1,15 +1,14 @@
 spu:
-    [1 ~ ~ 12 ~ ~ 1 ~] 2000 0 track     ; Rhythmic sequence
-    [[0 127] linear] 2000 1 track       ; Continuous ramp
-
-mpu_out_ctrl:
-    event_track                         ; Controller
-    1                                   ; Channel
-    ctrlout                             ; Dispatch the control event
+    [48 ~~ 48 ~~ 49 ~ ~~~~ ~~ 48 ~ ~~~~] palindrome 3000 0 track
+    [~~~~ ~~~~ 50 ~~~ ~~~~ 51 ~~~] 3000 1 track
+    [
+      52 ~ 53 ~ 52 ~ 53 ~ 52 ~
+      52 ~ 52 ~ 52 ~ 54 ~ 52 ~
+    ] 1 rotate degrade 3000 2 track
 
 mpu_out_note:
-    64 event_value add                  ; Pitch
-    127                                 ; Velocity
-    event_duration                      ; Duration
-    1                                   ; Channel
-    noteout                             ; Dispatch the note
+    event_value
+    127
+    event_duration
+    1
+    noteout
