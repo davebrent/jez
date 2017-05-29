@@ -16,93 +16,86 @@ use unit::{Message, RuntimeErr};
 const MPU_ID: u8 = 0;
 const SPU_ID: u8 = 1;
 
-pub struct Machine {
-    bus: Receiver<Message>,
-    mpu: Sender<Message>,
-    spu: Sender<Message>,
-    backend: Sender<Message>,
-}
+pub struct Machine;
 
 impl Machine {
-    pub fn new(backend: Sender<Message>,
+    pub fn run(backend: Sender<Message>,
+               bus_send: Sender<Message>,
+               bus_recv: Receiver<Message>,
                prog: &Program)
-               -> Result<Self, RuntimeErr> {
-        let (bus_send, bus_recv) = channel();
-        let (spu_send, spu_recv) = channel();
-        let (mpu_send, mpu_recv) = channel();
+               -> Result<bool, RuntimeErr> {
+        let (spu, spu_recv) = channel();
+        let (mpu, mpu_recv) = channel();
 
-        Machine::new_mpu(prog, bus_send.clone(), mpu_recv);
-        Machine::new_spu(prog, bus_send.clone(), spu_recv);
-
-        Ok(Machine {
-               bus: bus_recv,
-               mpu: mpu_send,
-               spu: spu_send,
-               backend: backend,
-           })
-    }
-
-    fn new_spu(prog: &Program,
-               sender: Sender<Message>,
-               receiver: Receiver<Message>) {
-        if let Some(mut spu) = Spu::new(SPU_ID,
+        let spu_thread = match Spu::new(SPU_ID,
                                         prog.section("spu"),
-                                        sender,
-                                        receiver) {
-            thread::spawn(move || { spu.run_forever(); });
-        }
-    }
+                                        bus_send.clone(),
+                                        spu_recv) {
+            Some(mut u) => Some(thread::spawn(move || { u.run_forever(); })),
+            None => None,
+        };
 
-    fn new_mpu(prog: &Program,
-               sender: Sender<Message>,
-               receiver: Receiver<Message>) {
-        if let Some(mut mpu) = Mpu::new(MPU_ID,
+        let mpu_thread = match Mpu::new(MPU_ID,
                                         prog.section("mpu_out_note"),
                                         prog.section("mpu_out_ctrl"),
-                                        sender,
-                                        receiver) {
-            thread::spawn(move || { mpu.run_forever(); });
-        }
-    }
+                                        bus_send.clone(),
+                                        mpu_recv) {
+            Some(mut u) => Some(thread::spawn(move || { u.run_forever(); })),
+            None => None,
+        };
 
-    pub fn run_forever(&self) -> Result<(), RuntimeErr> {
-        while let Ok(msg) = self.bus.recv() {
+        while let Ok(msg) = bus_recv.recv() {
             match msg {
+                Message::Stop => {
+                    mpu.send(Message::Stop).unwrap();
+                    spu.send(Message::Stop).unwrap();
+                    if let Some(thread) = spu_thread {
+                        thread.join().unwrap();
+                    }
+                    if let Some(thread) = mpu_thread {
+                        thread.join().unwrap();
+                    }
+                    return Ok(false);
+                }
+                Message::Reload => {
+                    mpu.send(Message::Stop).unwrap();
+                    spu.send(Message::Stop).unwrap();
+                    if let Some(thread) = spu_thread {
+                        thread.join().unwrap();
+                    }
+                    if let Some(thread) = mpu_thread {
+                        thread.join().unwrap();
+                    }
+                    return Ok(true);
+                }
                 Message::MidiNoteOn(chan, pitch, vel) => {
                     let msg = Message::MidiNoteOn(chan, pitch, vel);
-                    if self.backend.send(msg).is_err() {
+                    if backend.send(msg).is_err() {
                         return Err(RuntimeErr::BackendUnreachable);
                     }
                 }
                 Message::MidiNoteOff(chan, pitch) => {
                     let msg = Message::MidiNoteOff(chan, pitch);
-                    if self.backend.send(msg).is_err() {
+                    if backend.send(msg).is_err() {
                         return Err(RuntimeErr::BackendUnreachable);
                     }
                 }
                 Message::MidiCtl(chan, ctl, val) => {
                     let msg = Message::MidiCtl(chan, ctl, val);
-                    if self.backend.send(msg).is_err() {
+                    if backend.send(msg).is_err() {
                         return Err(RuntimeErr::BackendUnreachable);
                     }
                 }
                 Message::SeqEvent(event) => {
-                    self.mpu.send(Message::SeqEvent(event)).unwrap();
+                    mpu.send(Message::SeqEvent(event)).unwrap();
                 }
                 Message::HasError(unit, err) => {
                     println!("Unit {} has crashed {}", unit, err);
                     return Err(err);
                 }
-                _ => {}
             }
         }
-        Ok(())
-    }
-}
 
-impl Drop for Machine {
-    fn drop(&mut self) {
-        self.mpu.send(Message::Stop).unwrap();
-        self.spu.send(Message::Stop).unwrap();
+        Ok(false)
     }
 }

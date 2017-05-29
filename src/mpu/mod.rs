@@ -225,6 +225,14 @@ impl Mpu {
         }
     }
 
+    fn dispatch_off_events(&mut self) {
+        while let Some((_, chan, pitch)) = self.off_events.pop() {
+            self.channel
+                .send(Message::MidiNoteOff(chan, pitch))
+                .unwrap();
+        }
+    }
+
     pub fn run_forever(&mut self) {
         let res = Duration::new(0, 1000000); // 1ms
         let mut previous = Instant::now();
@@ -239,7 +247,10 @@ impl Mpu {
 
             if let Ok(msg) = self.input_channel.try_recv() {
                 match msg {
-                    Message::Stop => break,
+                    Message::Stop => {
+                        self.dispatch_off_events();
+                        break;
+                    }
                     Message::SeqEvent(event) => {
                         match event.value {
                             EventValue::Trigger(_) => {

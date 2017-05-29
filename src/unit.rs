@@ -9,8 +9,9 @@
 //! This module contains the shared functionality common across the units.
 
 use std::collections::HashMap;
-use std::convert::Into;
+use std::convert::{From, Into};
 use std::fmt;
+use std::io;
 
 use lang::Instr;
 use math::Curve;
@@ -76,6 +77,8 @@ pub struct Event {
 
 #[derive(Clone, Copy, Debug)]
 pub enum RuntimeErr {
+    UnknownBackend,
+    FileNotFound,
     UnknownKeyword(u64),
     UnmatchedPair,
     NotImplemented,
@@ -84,9 +87,17 @@ pub enum RuntimeErr {
     BackendUnreachable,
 }
 
+impl From<io::Error> for RuntimeErr {
+    fn from(_: io::Error) -> RuntimeErr {
+        RuntimeErr::FileNotFound
+    }
+}
+
 impl fmt::Display for RuntimeErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            RuntimeErr::UnknownBackend => write!(f, "Unknown backend"),
+            RuntimeErr::FileNotFound => write!(f, "File not found"),
             RuntimeErr::UnknownKeyword(word) => {
                 write!(f, "Unknown keyword {}", word)
             }
@@ -117,6 +128,7 @@ pub enum Message {
     HasError(u8, RuntimeErr),
     /// Sent from the machine to units, used for reloading
     Stop,
+    Reload,
     MidiNoteOn(u8, u8, u8),
     MidiNoteOff(u8, u8),
     MidiCtl(u8, u8, u8),

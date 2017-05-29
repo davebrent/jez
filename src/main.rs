@@ -30,68 +30,122 @@ mod unit;
 /// Virtual machine
 mod vm;
 
-extern crate clap;
+extern crate docopt;
 extern crate jack;
 extern crate jack_sys;
 extern crate rand;
 extern crate regex;
+extern crate rustc_serialize;
 
-use std::fs::File;
+use std::fs;
 use std::io;
-use std::sync::mpsc::channel;
+use std::io::{Read, Write};
+use std::sync::mpsc::{channel, Sender, Receiver};
+use std::thread;
+use std::time::Duration;
 
-use clap::{Arg, App};
+use docopt::Docopt;
 
 
-/// Return a file reader or load from stdin
-fn input(fp: Option<&str>) -> Result<Box<io::Read>, std::io::Error> {
-    match fp {
-        Some(fp) => Ok(Box::new(try!(File::open(fp)))),
-        None => Ok(Box::new(io::stdin())),
+const USAGE: &'static str = "
+Jez.
+
+Usage:
+  jez [options] <file>
+  jez (-h | --help)
+  jez --version
+
+Options:
+  -h --help         Show this screen.
+  --watch           Reload input file on changes.
+  --backend=NAME    Specify the backend (either 'jack' OR 'debug').
+";
+
+#[derive(Debug, RustcDecodable)]
+struct Args {
+    flag_backend: String,
+    flag_watch: bool,
+    arg_file: String,
+}
+
+fn watch_file(filepath: String, channel: Sender<unit::Message>) {
+    thread::spawn(move || {
+        let dur = Duration::new(1, 0);
+        let meta_data = fs::metadata(filepath.clone()).unwrap();
+        let mod_time = meta_data.modified().expect("File has been deleted");
+
+        loop {
+            let new_meta_data = fs::metadata(filepath.clone()).unwrap();
+            let new_mod_time =
+                new_meta_data.modified().expect("File has been deleted");
+
+            if new_mod_time != mod_time {
+                channel.send(unit::Message::Reload).unwrap();
+                return;
+            }
+
+            thread::sleep(dur);
+        }
+    });
+}
+
+fn make_backend(name: &str,
+                channel: Receiver<unit::Message>)
+                -> Result<Box<backends::Backend>, unit::RuntimeErr> {
+    match name {
+        "debug" | "" => Ok(Box::new(try!(backends::Debug::new(channel)))),
+        "jack" => Ok(Box::new(try!(backends::Jack::new(channel)))),
+        _ => Err(unit::RuntimeErr::UnknownBackend),
     }
 }
 
-fn run_forever(prog: &lang::Program) -> Result<(), unit::RuntimeErr> {
-    let (tx, rx) = channel();
-    let _jck = try!(backends::Jack::new(rx));
-    let mach = try!(vm::Machine::new(tx, prog));
-    mach.run_forever()
-}
+fn run_app(args: &Args) -> Result<(), unit::RuntimeErr> {
+    let (audio_send, audio_recv) = channel();
+    let mut backend = try!(make_backend(args.flag_backend.as_ref(),
+                                        audio_recv));
 
-fn main() {
-    let matches = App::new("Jez")
-        .about("An audio visual stack machine")
-        .after_help("\
-Jez is a stack machine & JACK client for generating musical sequences and audio
-reactive visualisations.")
-        .arg(Arg::with_name("file")
-                 .short("f")
-                 .long("file")
-                 .value_name("FILE")
-                 .help("Input file to execute")
-                 .takes_value(true))
-        .arg(Arg::with_name("v")
-                 .short("v")
-                 .multiple(true)
-                 .help("Sets the level of verbosity"))
-        .get_matches();
+    loop {
+        let mut txt = String::new();
+        let mut fp = try!(fs::File::open(args.arg_file.clone()));
+        fp.read_to_string(&mut txt)
+            .expect("Unrecognised data in file");
 
-    match input(matches.value_of("file")) {
-        Err(_) => println!("Error, File not found"),
-        Ok(mut reader) => {
-            let mut txt = String::new();
-            reader
-                .read_to_string(&mut txt)
-                .expect("Unrecognised data in file");
+        if let Ok(prog) = lang::Program::new(txt.as_str()) {
+            let (host_send, host_recv) = channel();
+            if args.flag_watch {
+                watch_file(args.arg_file.clone(), host_send.clone());
+            }
 
-            match lang::Program::new(txt.as_str()) {
-                Err(err) => println!("Compile error, {}", err),
-                Ok(prog) => {
-                    if let Err(err) = run_forever(&prog) {
-                        println!("Runtime error, {}", err);
+            let res = vm::Machine::run(audio_send.clone(),
+                                       host_send.clone(),
+                                       host_recv,
+                                       &prog);
+            match res {
+                Ok(reload) => {
+                    if !reload {
+                        return Ok(());
                     }
+                    backend.drain();
+                }
+                Err(err) => {
+                    return Err(err);
                 }
             }
         }
     }
+}
+
+fn main() {
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|d| d.decode())
+        .unwrap_or_else(|e| e.exit());
+    let code = match run_app(&args) {
+        Ok(_) => 0,
+        Err(err) => {
+            writeln!(io::stderr(), "Error: {}", err).unwrap();
+            1
+        }
+    };
+
+    std::process::exit(code);
 }
