@@ -1,6 +1,7 @@
 use rand::{Rng, StdRng};
 
-use unit::{Event, EventValue, InterpState, RuntimeErr, InterpResult, Value};
+use err::RuntimeErr;
+use unit::{Event, EventValue, InterpState, InterpResult, Value};
 use math::path_to_curve;
 
 use super::seq::SeqState;
@@ -39,7 +40,7 @@ pub fn reverse(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
             state.heap[start..end].reverse();
             Ok(())
         }
-        _ => Err(RuntimeErr::WrongType),
+        _ => Err(RuntimeErr::InvalidArgs),
     }
 }
 
@@ -51,7 +52,7 @@ pub fn shuffle(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
             rng.shuffle(&mut state.heap[start..end]);
             Ok(())
         }
-        _ => Err(RuntimeErr::WrongType),
+        _ => Err(RuntimeErr::InvalidArgs),
     }
 }
 
@@ -69,7 +70,7 @@ pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
             state.heap[start..end].copy_from_slice(&out);
             Ok(())
         }
-        _ => Err(RuntimeErr::WrongType),
+        _ => Err(RuntimeErr::InvalidArgs),
     }
 }
 
@@ -86,7 +87,7 @@ pub fn degrade(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
             }
             Ok(())
         }
-        _ => Err(RuntimeErr::WrongType),
+        _ => Err(RuntimeErr::InvalidArgs),
     }
 }
 
@@ -100,7 +101,7 @@ pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
             }
             Ok(())
         }
-        _ => Err(RuntimeErr::WrongType),
+        _ => Err(RuntimeErr::InvalidArgs),
     }
 }
 
@@ -127,7 +128,7 @@ pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     let onsets = onsets.unwrap() as usize;
 
     if onsets * hopsize >= pulses {
-        return Err(RuntimeErr::InvalidArguments);
+        return Err(RuntimeErr::InvalidArgs);
     }
 
     let mut rhythm: Vec<u8> = vec![0; pulses];
@@ -208,7 +209,7 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
                     onset += interval;
                 }
             }
-            _ => return Err(RuntimeErr::WrongType),
+            _ => return Err(RuntimeErr::InvalidArgs),
         }
     }
 
@@ -220,7 +221,7 @@ pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     match state.stack.pop().unwrap() {
         Value::Pair(start, end) => {
             if end - start != 2 {
-                return Err(RuntimeErr::WrongType);
+                return Err(RuntimeErr::InvalidArgs);
             }
 
             let c0: Option<f64> = state.heap[start].into();
@@ -233,7 +234,7 @@ pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 
             Ok(())
         }
-        _ => Err(RuntimeErr::WrongType),
+        _ => Err(RuntimeErr::InvalidArgs),
     }
 }
 

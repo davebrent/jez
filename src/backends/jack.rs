@@ -1,6 +1,7 @@
 use std::sync::mpsc::Receiver;
 
-use unit::{RuntimeErr, Message};
+use err::SysErr;
+use unit::Message;
 
 use jack::prelude::{AsyncClient, Client, client_options, JackControl,
                     MidiOutPort, MidiOutSpec, NotificationHandler,
@@ -57,9 +58,9 @@ pub struct Jack {
 }
 
 impl Jack {
-    pub fn new(channel: Receiver<Message>) -> Result<Self, RuntimeErr> {
+    pub fn new(channel: Receiver<Message>) -> Result<Self, SysErr> {
         match Client::new("jez", client_options::NO_START_SERVER) {
-            Err(_) => Err(RuntimeErr::BackendUnreachable),
+            Err(_) => Err(SysErr::UnreachableBackend),
             Ok((client, _)) => {
                 let midi_out_port = client
                     .register_port("midiout_1", MidiOutSpec::default())

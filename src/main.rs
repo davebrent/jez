@@ -17,6 +17,7 @@
 //! for specific domains communicating with other units through message passing.
 
 mod backends;
+mod err;
 /// Parser for custom bytecode
 mod lang;
 /// Math functions
@@ -32,11 +33,11 @@ mod vm;
 
 extern crate docopt;
 extern crate jack;
-extern crate jack_sys;
 extern crate rand;
 extern crate regex;
 extern crate rustc_serialize;
 
+use std::convert::From;
 use std::fs;
 use std::io;
 use std::io::{Read, Write};
@@ -91,15 +92,15 @@ fn watch_file(filepath: String, channel: Sender<unit::Message>) {
 
 fn make_backend(name: &str,
                 channel: Receiver<unit::Message>)
-                -> Result<Box<backends::Backend>, unit::RuntimeErr> {
+                -> Result<Box<backends::Backend>, err::JezErr> {
     match name {
-        "debug" | "" => Ok(Box::new(try!(backends::Debug::new(channel)))),
+        "debug" | "" => Ok(Box::new(backends::Debug::new(channel))),
         "jack" => Ok(Box::new(try!(backends::Jack::new(channel)))),
-        _ => Err(unit::RuntimeErr::UnknownBackend),
+        _ => Err(From::from(err::SysErr::UnknownBackend)),
     }
 }
 
-fn run_app(args: &Args) -> Result<(), unit::RuntimeErr> {
+fn run_app(args: &Args) -> Result<(), err::JezErr> {
     let (audio_send, audio_recv) = channel();
     let mut backend = try!(make_backend(args.flag_backend.as_ref(),
                                         audio_recv));
@@ -107,29 +108,27 @@ fn run_app(args: &Args) -> Result<(), unit::RuntimeErr> {
     loop {
         let mut txt = String::new();
         let mut fp = try!(fs::File::open(args.arg_file.clone()));
-        fp.read_to_string(&mut txt)
-            .expect("Unrecognised data in file");
+        try!(fp.read_to_string(&mut txt));
 
-        if let Ok(prog) = lang::Program::new(txt.as_str()) {
-            let (host_send, host_recv) = channel();
-            if args.flag_watch {
-                watch_file(args.arg_file.clone(), host_send.clone());
+        let prog = try!(lang::Program::new(txt.as_str()));
+        let (host_send, host_recv) = channel();
+        if args.flag_watch {
+            watch_file(args.arg_file.clone(), host_send.clone());
+        }
+
+        let res = vm::Machine::run(audio_send.clone(),
+                                   host_send.clone(),
+                                   host_recv,
+                                   &prog);
+        match res {
+            Ok(reload) => {
+                if !reload {
+                    return Ok(());
+                }
+                backend.drain();
             }
-
-            let res = vm::Machine::run(audio_send.clone(),
-                                       host_send.clone(),
-                                       host_recv,
-                                       &prog);
-            match res {
-                Ok(reload) => {
-                    if !reload {
-                        return Ok(());
-                    }
-                    backend.drain();
-                }
-                Err(err) => {
-                    return Err(err);
-                }
+            Err(err) => {
+                return Err(err);
             }
         }
     }

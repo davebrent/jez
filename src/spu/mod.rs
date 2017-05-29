@@ -17,14 +17,16 @@
 mod seq;
 mod words;
 
+use std::convert::From;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Duration, Instant};
 use std::thread;
 
+use err::RuntimeErr;
 use unit::{Keyword, Message, Interpreter, InterpState, eval, add, subtract,
-           multiply, divide, print, RuntimeErr, InterpResult, Event};
+           multiply, divide, print, InterpResult, Event};
 use lang::{hash_str, Instr};
 use math::millis_to_dur;
 
@@ -129,7 +131,7 @@ impl Spu {
 
         match eval(instrs, &mut self.interp_state, &mut self.interp) {
             Err(err) => {
-                let msg = Message::HasError(self.id, err);
+                let msg = Message::Error(self.id, From::from(err));
                 self.channel.send(msg).unwrap();
                 None
             }

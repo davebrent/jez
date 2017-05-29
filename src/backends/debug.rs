@@ -3,7 +3,7 @@ use std::thread;
 use std::time::Instant;
 
 use math::dur_to_millis;
-use unit::{RuntimeErr, Message};
+use unit::Message;
 
 use super::base::Backend;
 
@@ -11,7 +11,7 @@ use super::base::Backend;
 pub struct Debug;
 
 impl Debug {
-    pub fn new(channel: Receiver<Message>) -> Result<Self, RuntimeErr> {
+    pub fn new(channel: Receiver<Message>) -> Self {
         thread::spawn(move || {
             let start = Instant::now();
             while let Ok(msg) = channel.recv() {
@@ -34,7 +34,7 @@ impl Debug {
                 }
             }
         });
-        Ok(Debug {})
+        Debug {}
     }
 }
 

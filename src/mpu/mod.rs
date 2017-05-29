@@ -6,14 +6,15 @@
 mod words;
 mod state;
 
+use std::convert::From;
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Duration, Instant};
 use std::thread;
 
+use err::RuntimeErr;
 use unit::{Keyword, eval, Event, EventValue, Message, Interpreter,
-           InterpState, add, subtract, multiply, divide, print, RuntimeErr,
-           InterpResult};
+           InterpState, add, subtract, multiply, divide, print, InterpResult};
 use lang::{hash_str, Instr};
 use math::{Curve, point_on_curve, dur_to_millis, millis_to_dur};
 
@@ -122,7 +123,7 @@ impl Mpu {
         match eval(instrs, &mut self.interp_state, &mut self.interp) {
             Err(err) => {
                 self.channel
-                    .send(Message::HasError(self.id, err))
+                    .send(Message::Error(self.id, From::from(err)))
                     .unwrap();
             }
             Ok(_) => {
@@ -142,9 +143,9 @@ impl Mpu {
                             .unwrap();
                     }
                     _ => {
-                        let err = RuntimeErr::WrongType;
+                        let err = RuntimeErr::InvalidArgs;
                         self.channel
-                            .send(Message::HasError(self.id, err))
+                            .send(Message::Error(self.id, From::from(err)))
                             .unwrap();
                     }
                 }
@@ -161,7 +162,7 @@ impl Mpu {
         match eval(instrs, &mut self.interp_state, &mut self.interp) {
             Err(err) => {
                 self.channel
-                    .send(Message::HasError(self.id, err))
+                    .send(Message::Error(self.id, From::from(err)))
                     .unwrap();
             }
             Ok(_) => {
@@ -179,9 +180,9 @@ impl Mpu {
                         self.channel.send(msg).unwrap();
                     }
                     _ => {
-                        let err = RuntimeErr::WrongType;
+                        let err = RuntimeErr::InvalidArgs;
                         self.channel
-                            .send(Message::HasError(self.id, err))
+                            .send(Message::Error(self.id, From::from(err)))
                             .unwrap();
                     }
                 }

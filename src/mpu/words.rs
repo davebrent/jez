@@ -1,4 +1,5 @@
-use unit::{EventValue, InterpState, InterpResult, Value, RuntimeErr};
+use err::RuntimeErr;
+use unit::{EventValue, InterpState, InterpResult, Value};
 
 use super::state::{MidiState, MidiMessage};
 
@@ -41,7 +42,7 @@ pub fn noteout(ms: &mut MidiState, is: &mut InterpState) -> InterpResult {
     let pitch = pitch.unwrap() as u8;
 
     if channel >= 16 || pitch >= 128 || velocity >= 128 {
-        return Err(RuntimeErr::InvalidArguments);
+        return Err(RuntimeErr::InvalidArgs);
     }
 
     ms.message = MidiMessage::Note {
@@ -61,7 +62,7 @@ pub fn ctrlout(ms: &mut MidiState, is: &mut InterpState) -> InterpResult {
     let ctrl = ctrl.unwrap() as u8;
 
     if channel >= 16 || ctrl >= 120 {
-        return Err(RuntimeErr::InvalidArguments);
+        return Err(RuntimeErr::InvalidArgs);
     }
 
     ms.message = MidiMessage::Ctrl {

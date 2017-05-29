@@ -9,10 +9,9 @@
 //! This module contains the shared functionality common across the units.
 
 use std::collections::HashMap;
-use std::convert::{From, Into};
-use std::fmt;
-use std::io;
+use std::convert::Into;
 
+use err::{RuntimeErr, JezErr};
 use lang::Instr;
 use math::Curve;
 
@@ -75,57 +74,12 @@ pub struct Event {
     pub value: EventValue,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum RuntimeErr {
-    UnknownBackend,
-    FileNotFound,
-    UnknownKeyword(u64),
-    UnmatchedPair,
-    NotImplemented,
-    WrongType,
-    InvalidArguments,
-    BackendUnreachable,
-}
-
-impl From<io::Error> for RuntimeErr {
-    fn from(_: io::Error) -> RuntimeErr {
-        RuntimeErr::FileNotFound
-    }
-}
-
-impl fmt::Display for RuntimeErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            RuntimeErr::UnknownBackend => write!(f, "Unknown backend"),
-            RuntimeErr::FileNotFound => write!(f, "File not found"),
-            RuntimeErr::UnknownKeyword(word) => {
-                write!(f, "Unknown keyword {}", word)
-            }
-            RuntimeErr::UnmatchedPair => {
-                write!(f, "Unmatched pair, stack exhausted")
-            }
-            RuntimeErr::NotImplemented => {
-                write!(f, "Instruction is not yet implemented")
-            }
-            RuntimeErr::WrongType => {
-                write!(f, "Function received the wrong type")
-            }
-            RuntimeErr::InvalidArguments => {
-                write!(f, "Function received wrong arguments")
-            }
-            RuntimeErr::BackendUnreachable => {
-                write!(f, "Backend is unreachable")
-            }
-        }
-    }
-}
-
 /// Inter-unit messages
 #[derive(Clone, Copy, Debug)]
 pub enum Message {
     SeqEvent(Event),
     /// Sent from units to the machine
-    HasError(u8, RuntimeErr),
+    Error(u8, JezErr),
     /// Sent from the machine to units, used for reloading
     Stop,
     Reload,
@@ -220,7 +174,7 @@ pub fn list_end(state: &mut InterpState) -> InterpResult {
         // Loop back through the stack, moving objects to the heap, until a
         // 'ListBegin' instruction is reached then, store the range on the stack
         match state.stack.pop() {
-            None => return Err(RuntimeErr::UnmatchedPair),
+            None => return Err(RuntimeErr::StackExhausted),
             Some(val) => {
                 match val {
                     Value::Instruction(instr) => {

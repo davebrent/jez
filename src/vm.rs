@@ -4,13 +4,15 @@
 //! serves as the central hub for all unit messages and is responsible for
 //! dispatching actions to other units based on those messages.
 
+use std::convert::From;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 
+use err::{JezErr, SysErr};
 use lang::Program;
 use mpu::Mpu;
 use spu::Spu;
-use unit::{Message, RuntimeErr};
+use unit::Message;
 
 
 const MPU_ID: u8 = 0;
@@ -23,7 +25,7 @@ impl Machine {
                bus_send: Sender<Message>,
                bus_recv: Receiver<Message>,
                prog: &Program)
-               -> Result<bool, RuntimeErr> {
+               -> Result<bool, JezErr> {
         let (spu, spu_recv) = channel();
         let (mpu, mpu_recv) = channel();
 
@@ -71,25 +73,25 @@ impl Machine {
                 Message::MidiNoteOn(chan, pitch, vel) => {
                     let msg = Message::MidiNoteOn(chan, pitch, vel);
                     if backend.send(msg).is_err() {
-                        return Err(RuntimeErr::BackendUnreachable);
+                        return Err(From::from(SysErr::UnreachableBackend));
                     }
                 }
                 Message::MidiNoteOff(chan, pitch) => {
                     let msg = Message::MidiNoteOff(chan, pitch);
                     if backend.send(msg).is_err() {
-                        return Err(RuntimeErr::BackendUnreachable);
+                        return Err(From::from(SysErr::UnreachableBackend));
                     }
                 }
                 Message::MidiCtl(chan, ctl, val) => {
                     let msg = Message::MidiCtl(chan, ctl, val);
                     if backend.send(msg).is_err() {
-                        return Err(RuntimeErr::BackendUnreachable);
+                        return Err(From::from(SysErr::UnreachableBackend));
                     }
                 }
                 Message::SeqEvent(event) => {
                     mpu.send(Message::SeqEvent(event)).unwrap();
                 }
-                Message::HasError(unit, err) => {
+                Message::Error(unit, err) => {
                     println!("Unit {} has crashed {}", unit, err);
                     return Err(err);
                 }

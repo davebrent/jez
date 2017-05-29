@@ -14,10 +14,10 @@
 use regex::Regex;
 
 use std::collections::hash_map::DefaultHasher;
-use std::fmt;
 use std::hash::Hasher;
 use std::ops::Range;
-use std::error::Error;
+
+use err::ParseErr;
 
 
 /// Representation of the different token types
@@ -86,54 +86,6 @@ impl Program {
             }
         }
 
-    }
-}
-
-#[derive(Debug)]
-pub enum ParseErr<'a> {
-    UnknownToken(Token<'a>),
-    UnmatchedPair(Token<'a>),
-    UnknownVariable(Token<'a>),
-}
-
-impl<'a> fmt::Display for ParseErr<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ParseErr::UnknownToken(ref token) => {
-                write!(f,
-                       "Encounteded unknown token \"{}\" at line {} col {}",
-                       token.val,
-                       token.line,
-                       token.col)
-            }
-            ParseErr::UnmatchedPair(ref token) => {
-                write!(f,
-                       "Missing closing token at line {} col {}",
-                       token.line,
-                       token.col)
-            }
-            ParseErr::UnknownVariable(ref token) => {
-                write!(f,
-                       "Unknown variable \"{}\" at line {} col {}",
-                       token.val,
-                       token.line,
-                       token.col)
-            }
-        }
-    }
-}
-
-impl<'a> Error for ParseErr<'a> {
-    fn description(&self) -> &str {
-        match *self {
-            ParseErr::UnknownToken(_) => "unknown token",
-            ParseErr::UnmatchedPair(_) => "unmatched pair",
-            ParseErr::UnknownVariable(_) => "unknown variable",
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        None
     }
 }
 
@@ -266,13 +218,7 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ParseErr> {
         }
 
         if !handled {
-            let token = Token {
-                tag: Tag::Keyword,
-                line: state.line,
-                col: state.col,
-                val: word,
-            };
-            return Err(ParseErr::UnknownToken(token));
+            return Err(ParseErr::UnknownToken(state.line, state.col));
         }
     }
 
@@ -280,7 +226,7 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ParseErr> {
 }
 
 // Validate 'List' tokens are balenced
-fn validate_lists<'a>(tokens: &[Token<'a>]) -> Result<(), ParseErr<'a>> {
+fn validate_lists<'a>(tokens: &[Token<'a>]) -> Result<(), ParseErr> {
     let mut stack: Vec<Token> = vec![];
 
     for tok in tokens {
@@ -294,13 +240,13 @@ fn validate_lists<'a>(tokens: &[Token<'a>]) -> Result<(), ParseErr<'a>> {
     }
 
     match stack.first() {
-        Some(tok) => Err(ParseErr::UnmatchedPair(tok.clone())),
+        Some(tok) => Err(ParseErr::UnmatchedPair(tok.line, tok.col)),
         None => Ok(()),
     }
 }
 
 // Validate references to variables
-fn validate_vars<'a>(tokens: &[Token<'a>]) -> Result<(), ParseErr<'a>> {
+fn validate_vars<'a>(tokens: &[Token<'a>]) -> Result<(), ParseErr> {
     let mut vars = vec![];
 
     for tok in tokens {
@@ -308,7 +254,7 @@ fn validate_vars<'a>(tokens: &[Token<'a>]) -> Result<(), ParseErr<'a>> {
             Tag::StoreVar => vars.push(tok.val),
             Tag::LoadVar => {
                 if !vars.contains(&tok.val) {
-                    return Err(ParseErr::UnknownVariable(tok.clone()));
+                    return Err(ParseErr::UnknownVariable(tok.line, tok.col));
                 }
             }
             _ => (),
@@ -529,13 +475,7 @@ mod tests {
     #[test]
     fn parse_errors() {
         let err = parse("\n ?");
-        assert!(err.is_err(),
-                ParseErr::UnknownToken(Token {
-                                           tag: Tag::Keyword,
-                                           line: 1,
-                                           col: 1,
-                                           val: "?",
-                                       }));
+        assert!(err.is_err(), ParseErr::UnknownToken(1, 1));
     }
 
     #[test]
