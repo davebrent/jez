@@ -19,7 +19,6 @@ mod words;
 
 use std::convert::From;
 use std::collections::HashMap;
-use std::sync::Mutex;
 use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Duration, Instant};
 use std::thread;
@@ -89,6 +88,55 @@ impl Interpreter for SpuInterp {
     }
 }
 
+struct Track {
+    pub cycle: usize,
+    pub num: usize,
+    pub events: Vec<Event>,
+    channel: Sender<Message>,
+    start: Instant,
+    end: Duration,
+}
+
+impl Track {
+    pub fn new(num: usize, channel: Sender<Message>) -> Track {
+        Track {
+            cycle: 0,
+            num: num,
+            channel: channel,
+            events: Vec::new(),
+            start: Instant::now(),
+            end: Duration::new(0, 0),
+        }
+    }
+
+    pub fn start(&mut self) {
+        self.start = Instant::now();
+    }
+
+    pub fn set(&mut self, len: f64, events: Vec<Event>) {
+        self.end = millis_to_dur(len);
+        self.events = events;
+        // Sort events by time in descending order
+        self.events
+            .sort_by(|a, b| b.onset.partial_cmp(&a.onset).unwrap());
+
+    }
+
+    pub fn finished(&self) -> bool {
+        self.start.elapsed() >= self.end
+    }
+
+    pub fn advance(&mut self) {
+        while let Some(event) = self.events.pop() {
+            if self.start.elapsed() < millis_to_dur(event.onset) {
+                self.events.push(event);
+                break;
+            }
+            self.channel.send(Message::SeqEvent(event)).unwrap();
+        }
+    }
+}
+
 /// Sequencer processing unit
 pub struct Spu {
     id: u8,
@@ -96,7 +144,7 @@ pub struct Spu {
     interp: SpuInterp,
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
-    instrs: Mutex<Vec<Instr>>,
+    instrs: Vec<Instr>,
 }
 
 impl Spu {
@@ -115,29 +163,68 @@ impl Spu {
                          interp: SpuInterp::new(),
                          channel: channel.clone(),
                          input_channel: input_channel,
-                         instrs: Mutex::new(instrs.to_vec()),
+                         instrs: instrs.to_vec(),
                      })
             }
         }
     }
 
-    /// Returns a series of events for the current cycle
-    fn get_events(&mut self) -> Option<Vec<Event>> {
-        let instrs = self.instrs.lock().unwrap();
-        let instrs = instrs.as_slice();
+    /// Fills all tracks with initial data
+    fn init_tracks(&mut self,
+                   tracks: &mut Vec<Track>)
+                   -> Result<(), RuntimeErr> {
+        tracks.clear();
 
-        self.interp.seq_state.events.drain(..);
+        self.interp.seq_state.cycle.rev = 0;
+        self.interp.seq_state.tracks.clear();
         self.interp_state.reset();
 
-        match eval(instrs, &mut self.interp_state, &mut self.interp) {
+        match eval(&self.instrs, &mut self.interp_state, &mut self.interp) {
             Err(err) => {
                 let msg = Message::Error(self.id, From::from(err));
                 self.channel.send(msg).unwrap();
-                None
+                Err(err)
             }
             Ok(_) => {
-                self.interp.seq_state.cycle.rev += 1;
-                Some(self.interp.seq_state.events.clone())
+                for t in &mut self.interp.seq_state.tracks {
+                    let mut track = Track::new(t.num, self.channel.clone());
+                    track.set(t.dur, t.events.clone());
+                    tracks.push(track);
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Fill a track with events and set its duration
+    fn fill_track(&mut self, track: &mut Track) -> Result<(), RuntimeErr> {
+        track.events.clear();
+        track.cycle += 1;
+
+        self.interp.seq_state.cycle.rev = track.cycle;
+        self.interp.seq_state.tracks.clear();
+        self.interp_state.reset();
+
+        match eval(&self.instrs, &mut self.interp_state, &mut self.interp) {
+            Err(err) => {
+                let msg = Message::Error(self.id, From::from(err));
+                self.channel.send(msg).unwrap();
+                Err(err)
+            }
+            Ok(_) => {
+                let res = self.interp
+                    .seq_state
+                    .tracks
+                    .iter_mut()
+                    .find(|t| t.num == track.num);
+
+                match res {
+                    Some(t) => {
+                        track.set(t.dur, t.events.clone());
+                        Ok(())
+                    }
+                    None => Ok(()),
+                }
             }
         }
     }
@@ -157,33 +244,27 @@ impl Spu {
         }
     }
 
-    /// Run sequencer forever blocking until 'callback' returns no more
+    /// Run sequencer forever
     pub fn run_forever(&mut self) {
         let res = Duration::new(0, 1000000); // 1ms
 
-        while let Some(mut events) = self.get_events() {
-            if self.should_stop() {
-                break;
-            }
+        let mut tracks = Vec::new();
+        if self.init_tracks(&mut tracks).is_err() {
+            return;
+        }
 
-            // Sort events by time in descending order
-            events.sort_by(|a, b| b.onset.partial_cmp(&a.onset).unwrap());
-
-            let start = Instant::now();
-            let end = millis_to_dur(self.interp.seq_state.cycle.dur);
-
-            while let Some(event) = events.pop() {
-                if start.elapsed() < millis_to_dur(event.onset) {
-                    events.push(event);
-                    thread::sleep(res);
-                    continue;
+        while !self.should_stop() {
+            for track in &mut tracks {
+                if track.finished() {
+                    if self.fill_track(track).is_err() {
+                        return;
+                    }
+                    track.start();
                 }
-                self.channel.send(Message::SeqEvent(event)).unwrap();
+                track.advance();
             }
 
-            while start.elapsed() < end {
-                thread::sleep(res);
-            }
+            thread::sleep(res);
         }
     }
 }

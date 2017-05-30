@@ -4,7 +4,7 @@ use err::RuntimeErr;
 use unit::{Event, EventValue, InterpState, InterpResult, Value};
 use math::path_to_curve;
 
-use super::seq::SeqState;
+use super::seq::{SeqState, SeqTrack};
 
 
 /// Repeat a value 'n' times
@@ -169,13 +169,17 @@ pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 
 /// Build a track by recursively subdividing a list into a series of events
 pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let no: Option<f64> = state.stack.pop().unwrap().into();
-    let no = no.unwrap() as u32;
+    let num: Option<f64> = state.stack.pop().unwrap().into();
+    let num = num.unwrap() as u32;
 
     let dur: Option<f64> = state.stack.pop().unwrap().into();
     let dur = dur.unwrap();
 
-    seq.cycle.dur = dur;
+    let mut track = SeqTrack {
+        num: num as usize,
+        events: Vec::new(),
+        dur: dur,
+    };
 
     let mut visit: Vec<(f64, f64, Value)> = Vec::new();
     visit.push((0.0, dur, state.stack.pop().unwrap()));
@@ -184,22 +188,22 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
         match val {
             Value::Curve(points) => {
                 let event = Event {
-                    track: no,
+                    track: num,
                     onset: onset,
                     dur: dur,
                     value: EventValue::Curve(points),
                 };
-                seq.events.push(event);
+                track.events.push(event);
             }
             Value::Null => (),
             Value::Number(val) => {
                 let event = Event {
-                    track: no,
+                    track: num,
                     onset: onset,
                     dur: dur,
                     value: EventValue::Trigger(val),
                 };
-                seq.events.push(event);
+                track.events.push(event);
             }
             Value::Pair(start, end) => {
                 let interval = dur / (end - start) as f64;
@@ -213,6 +217,7 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
         }
     }
 
+    seq.tracks.push(track);
     Ok(())
 }
 

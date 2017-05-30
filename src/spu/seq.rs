@@ -17,16 +17,23 @@ impl Cycle {
 }
 
 #[derive(Clone, Debug)]
+pub struct SeqTrack {
+    pub num: usize,
+    pub dur: f64,
+    pub events: Vec<Event>,
+}
+
+#[derive(Clone, Debug)]
 pub struct SeqState {
     pub cycle: Cycle,
-    pub events: Vec<Event>,
+    pub tracks: Vec<SeqTrack>,
 }
 
 impl SeqState {
     pub fn new() -> SeqState {
         SeqState {
             cycle: Cycle::new(),
-            events: Vec::new(),
+            tracks: Vec::new(),
         }
     }
 }
