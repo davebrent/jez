@@ -42,6 +42,7 @@ Options:
 struct Args {
     flag_backend: String,
     flag_watch: bool,
+    flag_version: bool,
     arg_file: String,
 }
 
@@ -114,6 +115,11 @@ fn main() {
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.decode())
         .unwrap_or_else(|e| e.exit());
+    if args.flag_version {
+        println!("v0.1.0");
+        return;
+    }
+
     let code = match run_app(&args) {
         Ok(_) => 0,
         Err(err) => {
