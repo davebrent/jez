@@ -1,34 +1,10 @@
-//! # Jez
-//!
-//! Jez is a [stack machine][1] & [JACK][2] client for generating musical
-//! sequences and audio reactive visualisations.
-//!
-//!   [1]: https://en.wikipedia.org/wiki/Stack_machine
-//!   [2]: http://www.jackaudio.org/
-//!
-//! It uses a custom bytecode, written in [reverse polish notation][3], to
-//! describe behaviour for sequences, visualisations or audio processing. The
-//! bytecode is interpretted by a virtual machine to produce graphics, sound,
-//! MIDI etc.
-//!
-//!   [3]: https://en.wikipedia.org/wiki/Reverse_Polish_notation
-//!
-//! The virtual machine is composed of 'functional units' that perform tasks
-//! for specific domains communicating with other units through message passing.
-
 mod backends;
 mod err;
-/// Parser for custom bytecode
 mod lang;
-/// Math functions
 mod math;
-/// MIDI processing unit
 mod mpu;
-/// Sequencer processing unit
 mod spu;
-/// Base & shared unit functionality
 mod unit;
-/// Virtual machine
 mod vm;
 
 extern crate docopt;

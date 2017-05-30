@@ -1,8 +1,3 @@
-//! # MIDI Processing Unit
-//!
-//! The MPU reads events from its input channel, evaluating its instructions
-//! against each event. Then dispatching any generated MIDI events.
-
 mod words;
 mod state;
 

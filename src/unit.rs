@@ -1,13 +1,3 @@
-//! # Units
-//!
-//! Units are the building block of the virtual machine, responsible for
-//! executing instructions and performing domain specific operations.
-//!
-//! Each unit operates independently from others, maintaining their own "heaps"
-//! and communicate only via message passsing.
-//!
-//! This module contains the shared functionality common across the units.
-
 use std::collections::HashMap;
 use std::convert::Into;
 

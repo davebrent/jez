@@ -1,19 +1,3 @@
-//! # Sequence Processing Unit
-//!
-//! A sequence & pattern generator. Functions are Heavily influenced by
-//! [Tidal Cycles][1] and the writing of [Godfrey Toussaint][2].
-//!
-//!   [1]: https://tidalcycles.org/
-//!   [2]: https://link.springer.com/chapter/10.1007/11589440_20
-//!
-//! At the start of each cycle the sequencers instructions are evaluated. The
-//! output of which is a series of events to be written to the units output
-//! channel at a specified time relative to the start of the cycle.
-//!
-//! Events are time tagged by recursively subdividing the top most list against
-//! a total cycle length (ms). Lists may be nested to generate more interesting
-//! results.
-
 mod seq;
 mod words;
 

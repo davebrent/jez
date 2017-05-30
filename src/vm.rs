@@ -1,9 +1,3 @@
-//! # Virtual machine
-//!
-//! The virtual machine is the composition of various functional units. It
-//! serves as the central hub for all unit messages and is responsible for
-//! dispatching actions to other units based on those messages.
-
 use std::convert::From;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
