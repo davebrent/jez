@@ -229,6 +229,31 @@ impl Mpu {
         }
     }
 
+    fn tick(&mut self, delta: Duration) -> bool {
+        self.process_ctl_events(&delta);
+        self.process_off_events(&delta);
+
+        if let Ok(msg) = self.input_channel.try_recv() {
+            match msg {
+                Message::Stop => {
+                    self.dispatch_off_events();
+                    return true;
+                }
+                Message::SeqEvent(event) => {
+                    match event.value {
+                        EventValue::Trigger(_) => self.handle_trg_event(event),
+                        EventValue::Curve(curve) => {
+                            self.handle_ctl_event(event, curve)
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        false
+    }
+
     pub fn run_forever(&mut self) {
         let res = Duration::new(0, 1000000); // 1ms
         let mut previous = Instant::now();
@@ -236,32 +261,70 @@ impl Mpu {
         loop {
             let now = Instant::now();
             let delta = now.duration_since(previous);
+            self.tick(delta);
             previous = now;
-
-            self.process_ctl_events(&delta);
-            self.process_off_events(&delta);
-
-            if let Ok(msg) = self.input_channel.try_recv() {
-                match msg {
-                    Message::Stop => {
-                        self.dispatch_off_events();
-                        break;
-                    }
-                    Message::SeqEvent(event) => {
-                        match event.value {
-                            EventValue::Trigger(_) => {
-                                self.handle_trg_event(event)
-                            }
-                            EventValue::Curve(curve) => {
-                                self.handle_ctl_event(event, curve)
-                            }
-                        }
-                    }
-                    _ => (),
-                }
-            }
-
             thread::sleep(res);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::mpsc::channel;
+
+    use lang::{hash_str, Instr};
+    use math::millis_to_dur;
+    use unit::{Event, EventValue, Message};
+
+
+    #[test]
+    fn test_simple_note_off_events() {
+        // Tests the note events for two scheduled events
+        let instrs = [Instr::Keyword(hash_str("event_value")),
+                      Instr::LoadNumber(127.0),
+                      Instr::Keyword(hash_str("event_duration")),
+                      Instr::LoadNumber(1.0),
+                      Instr::Keyword(hash_str("noteout"))];
+
+        let (in_tx, in_rx) = channel();
+        let (out_tx, out_rx) = channel();
+        let mut mpu = Mpu::new(0, Some(&instrs), None, out_tx, in_rx).unwrap();
+
+        in_tx
+            .send(Message::SeqEvent(Event {
+                                        track: 1,
+                                        onset: 0.0,
+                                        dur: 100.0,
+                                        value: EventValue::Trigger(64.0),
+                                    }))
+            .unwrap();
+
+        mpu.tick(Duration::new(0, 0));
+        assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOn(1, 64, 127));
+
+        mpu.tick(millis_to_dur(99.0));
+        assert_eq!(out_rx.try_recv().is_err(), true);
+
+        mpu.tick(millis_to_dur(1.0));
+        assert_eq!(out_rx.try_recv().unwrap(), Message::MidiNoteOff(1, 64));
+
+        in_tx
+            .send(Message::SeqEvent(Event {
+                                        track: 1,
+                                        onset: 100.0,
+                                        dur: 200.0,
+                                        value: EventValue::Trigger(96.0),
+                                    }))
+            .unwrap();
+        mpu.tick(Duration::new(0, 0));
+        assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOn(1, 96, 127));
+
+        mpu.tick(millis_to_dur(199.0));
+        assert_eq!(out_rx.try_recv().is_err(), true);
+
+        mpu.tick(millis_to_dur(1.0));
+        assert_eq!(out_rx.try_recv().unwrap(), Message::MidiNoteOff(1, 96));
     }
 }
