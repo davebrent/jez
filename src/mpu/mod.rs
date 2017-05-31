@@ -130,6 +130,15 @@ impl Mpu {
                         velocity: vel,
                         duration: dur,
                     } => {
+                        let len = self.off_events.len();
+                        self.off_events
+                            .retain(|&evt| !(evt.1 == chan && evt.2 == ptch));
+                        if len != self.off_events.len() {
+                            self.channel
+                                .send(Message::MidiNoteOff(chan, ptch))
+                                .unwrap();
+                        }
+
                         self.off_events.push((millis_to_dur(dur), chan, ptch));
                         self.off_events
                             .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
@@ -326,5 +335,52 @@ mod tests {
 
         mpu.tick(millis_to_dur(1.0));
         assert_eq!(out_rx.try_recv().unwrap(), Message::MidiNoteOff(1, 96));
+    }
+
+    #[test]
+    fn test_flush_single_note_off() {
+        // Tests that a note off event is sent, if the same note has been
+        // newly triggered, so that the new event is not cut short
+        let instrs = [Instr::Keyword(hash_str("event_value")),
+                      Instr::LoadNumber(127.0),
+                      Instr::Keyword(hash_str("event_duration")),
+                      Instr::LoadNumber(1.0),
+                      Instr::Keyword(hash_str("noteout"))];
+
+        let (in_tx, in_rx) = channel();
+        let (out_tx, out_rx) = channel();
+        let mut mpu = Mpu::new(0, Some(&instrs), None, out_tx, in_rx).unwrap();
+
+        in_tx
+            .send(Message::SeqEvent(Event {
+                                        track: 1,
+                                        onset: 0.0,
+                                        dur: 100.0,
+                                        value: EventValue::Trigger(64.0),
+                                    }))
+            .unwrap();
+
+        mpu.tick(Duration::new(0, 0));
+        let evt = out_rx.recv().unwrap();
+        assert_eq!(evt, Message::MidiNoteOn(1, 64, 127));
+        mpu.tick(millis_to_dur(50.0));
+
+        in_tx
+            .send(Message::SeqEvent(Event {
+                                        track: 1,
+                                        onset: 0.0,
+                                        dur: 100.0,
+                                        value: EventValue::Trigger(64.0),
+                                    }))
+            .unwrap();
+
+        mpu.tick(Duration::new(0, 0));
+        assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOff(1, 64));
+        assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOn(1, 64, 127));
+
+        mpu.tick(millis_to_dur(99.0));
+        assert_eq!(out_rx.try_recv().is_err(), true);
+        mpu.tick(millis_to_dur(1.0));
+        assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOff(1, 64));
     }
 }
