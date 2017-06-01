@@ -46,7 +46,9 @@ struct Args {
     arg_file: String,
 }
 
-fn watch_file(filepath: String, channel: Sender<unit::Message>) {
+fn watch_file(filepath: String,
+              prog: lang::Program,
+              channel: Sender<unit::Message>) {
     thread::spawn(move || {
         let dur = Duration::new(1, 0);
         let meta_data = fs::metadata(filepath.clone()).unwrap();
@@ -58,8 +60,17 @@ fn watch_file(filepath: String, channel: Sender<unit::Message>) {
                 new_meta_data.modified().expect("File has been deleted");
 
             if new_mod_time != mod_time {
-                channel.send(unit::Message::Reload).unwrap();
-                return;
+                if let Ok(mut fp) = fs::File::open(filepath.clone()) {
+                    let mut txt = String::new();
+                    if fp.read_to_string(&mut txt).is_ok() {
+                        if let Ok(next) = lang::Program::new(txt.as_str()) {
+                            if prog != next {
+                                channel.send(unit::Message::Reload).unwrap();
+                                return;
+                            }
+                        }
+                    }
+                }
             }
 
             thread::sleep(dur);
@@ -90,7 +101,7 @@ fn run_app(args: &Args) -> Result<(), err::JezErr> {
         let prog = try!(lang::Program::new(txt.as_str()));
         let (host_send, host_recv) = channel();
         if args.flag_watch {
-            watch_file(args.arg_file.clone(), host_send.clone());
+            watch_file(args.arg_file.clone(), prog.clone(), host_send.clone());
         }
 
         let res = vm::Machine::run(audio_send.clone(),

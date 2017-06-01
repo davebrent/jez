@@ -514,4 +514,18 @@ mod tests {
                    vec![Range { start: 0, end: 3 },
                         Range { start: 3, end: 7 }]);
     }
+
+    #[test]
+    fn test_program_equality() {
+        let prog0 = Program::new("draw: 1 2 square audio: 0 channel 0.5 gain");
+        let prog1 = Program::new("draw: 0 2 square audio: 0 channel 0.5 gain");
+        let prog2 = Program::new("
+        draw:
+            0 2 square
+        audio:
+            0 channel 0.5 gain
+        ");
+        assert!(prog0 != prog1);
+        assert!(prog1 == prog2);
+    }
 }
