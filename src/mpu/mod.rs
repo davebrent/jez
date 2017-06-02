@@ -270,7 +270,9 @@ impl Mpu {
         loop {
             let now = Instant::now();
             let delta = now.duration_since(previous);
-            self.tick(delta);
+            if self.tick(delta) {
+                return;
+            }
             previous = now;
             thread::sleep(res);
         }
@@ -382,5 +384,16 @@ mod tests {
         assert_eq!(out_rx.try_recv().is_err(), true);
         mpu.tick(millis_to_dur(1.0));
         assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOff(1, 64));
+    }
+
+    #[test]
+    fn test_stopping() {
+        let instrs = [];
+        let (in_tx, in_rx) = channel();
+        let (out_tx, _) = channel();
+        let mut mpu = Mpu::new(0, Some(&instrs), None, out_tx, in_rx).unwrap();
+        in_tx.send(Message::Stop).unwrap();
+        mpu.run_forever();
+        assert_eq!(true, true);
     }
 }
