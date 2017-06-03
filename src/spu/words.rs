@@ -167,6 +167,17 @@ pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     Ok(())
 }
 
+/// Define a list of simultanious events
+pub fn simul(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+    match state.stack.pop().unwrap() {
+        Value::Pair(start, end) => {
+            state.stack.push(Value::Tuple(start, end));
+            Ok(())
+        }
+        _ => Err(RuntimeErr::InvalidArgs),
+    }
+}
+
 /// Build a track by recursively subdividing a list into a series of events
 pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
     let num: Option<f64> = state.stack.pop().unwrap().into();
@@ -211,6 +222,11 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
                 for n in start..end {
                     visit.push((onset, interval, state.heap[n]));
                     onset += interval;
+                }
+            }
+            Value::Tuple(start, end) => {
+                for n in start..end {
+                    visit.push((onset, dur, state.heap[n]));
                 }
             }
             _ => return Err(RuntimeErr::InvalidArgs),
@@ -348,5 +364,39 @@ mod tests {
         state.stack.push(Value::Number(2.0));
         hopjump(&mut seq, &mut state).unwrap();
         assert_eq!(state.stack.len(), 1);
+    }
+
+    #[test]
+    fn test_simultaneous_events() {
+        let mut state = InterpState::new();
+        let mut seq = SeqState::new();
+        state.heap.push(Value::Number(1.0));
+        state.heap.push(Value::Number(2.0));
+        state.heap.push(Value::Number(3.0));
+        state.stack.push(Value::Pair(0, 3));
+        simul(&mut seq, &mut state).unwrap();
+        state.stack.push(Value::Number(1000.0));
+        state.stack.push(Value::Number(0.0));
+        track(&mut seq, &mut state).unwrap();
+
+        assert_eq!(seq.tracks[0].events,
+                   [Event {
+                        track: 0,
+                        onset: 0.0,
+                        dur: 1000.0,
+                        value: EventValue::Trigger(3.0),
+                    },
+                    Event {
+                        track: 0,
+                        onset: 0.0,
+                        dur: 1000.0,
+                        value: EventValue::Trigger(2.0),
+                    },
+                    Event {
+                        track: 0,
+                        onset: 0.0,
+                        dur: 1000.0,
+                        value: EventValue::Trigger(1.0),
+                    }]);
     }
 }

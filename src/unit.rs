@@ -15,6 +15,8 @@ pub enum Value {
     Symbol(u64),
     /// Used for representing lists, a range of values on the heap
     Pair(usize, usize),
+    /// An immutable pair
+    Tuple(usize, usize),
     /// Interpreter instructions
     Instruction(Instr),
     /// Special value of nothing

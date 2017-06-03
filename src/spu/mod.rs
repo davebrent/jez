@@ -15,7 +15,7 @@ use math::millis_to_dur;
 
 use self::seq::SeqState;
 use self::words::{repeat, every, reverse, shuffle, rotate, degrade, cycle,
-                  palindrome, hopjump, track, linear};
+                  palindrome, hopjump, track, linear, simul};
 
 
 type SpuKeyword = fn(&mut SeqState, &mut InterpState) -> InterpResult;
@@ -48,6 +48,7 @@ impl SpuInterp {
         spu_words.insert(hash_str("hopjump"), hopjump);
         spu_words.insert(hash_str("track"), track);
         spu_words.insert(hash_str("linear"), linear);
+        spu_words.insert(hash_str("simul"), simul);
 
         SpuInterp {
             built_ins: built_ins,
