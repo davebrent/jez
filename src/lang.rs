@@ -157,11 +157,11 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ParseErr> {
                  },
                  TagExpr {
                      tag: Tag::LoadVar,
-                     re: Regex::new(r"^(?:@)(\w+)").unwrap(),
+                     re: Regex::new(r"^(?:@)([a-zA-Z0-9_#-]+)").unwrap(),
                  },
                  TagExpr {
                      tag: Tag::StoreVar,
-                     re: Regex::new(r"^(?:=)(\w+)").unwrap(),
+                     re: Regex::new(r"^(?:=)([a-zA-Z0-9_#-]+)").unwrap(),
                  },
                  TagExpr {
                      tag: Tag::StringLiteral,
@@ -471,6 +471,25 @@ mod tests {
                             val: "foo",
                         }]);
     }
+
+    #[test]
+    fn test_variable_special_characters() {
+        let instrs = tokenize("=f#o-o @f#o-o").unwrap();
+        assert_eq!(instrs,
+                   vec![Token {
+                            tag: Tag::StoreVar,
+                            line: 0,
+                            col: 0,
+                            val: "f#o-o",
+                        },
+                        Token {
+                            tag: Tag::LoadVar,
+                            line: 0,
+                            col: 7,
+                            val: "f#o-o",
+                        }]);
+    }
+
 
     #[test]
     fn parse_errors() {
