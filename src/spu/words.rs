@@ -259,6 +259,34 @@ pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     }
 }
 
+/// Gray code number encoding
+pub fn graycode(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+    let num: Option<f64> = state.stack.pop().unwrap().into();
+    let num = num.unwrap() as i64;
+    let num = (num >> 1) ^ num;
+    state.stack.push(Value::Number(num as f64));
+    Ok(())
+}
+
+/// Encode a number into a binary list
+pub fn binlist(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+    let num: Option<f64> = state.stack.pop().unwrap().into();
+    let num = num.unwrap() as i64;
+    let n: Option<f64> = state.stack.pop().unwrap().into();
+    let n = n.unwrap() as i64;
+    let start = state.heap.len();
+    for i in 0..n {
+        let val = if num & (1 << i) > 0 {
+            Value::Number(1.0)
+        } else {
+            Value::Null
+        };
+        state.heap.push(val);
+    }
+    state.stack.push(Value::Pair(start, state.heap.len()));
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,5 +426,33 @@ mod tests {
                         dur: 1000.0,
                         value: EventValue::Trigger(1.0),
                     }]);
+    }
+
+    #[test]
+    fn test_binlist() {
+        let mut state = InterpState::new();
+        let mut seq = SeqState::new();
+        state.stack.push(Value::Number(5.0));
+        state.stack.push(Value::Number(12.0));
+        binlist(&mut seq, &mut state).unwrap();
+        assert_eq!(state.heap.len(), 5);
+        for expected in &[Value::Null,
+                          Value::Null,
+                          Value::Number(1.0),
+                          Value::Number(1.0),
+                          Value::Null] {
+            assert_eq!(state.heap.remove(0), *expected);
+        }
+    }
+
+    #[test]
+    fn test_graycode() {
+        let mut state = InterpState::new();
+        let mut seq = SeqState::new();
+        state.stack.push(Value::Number(12.0));
+        graycode(&mut seq, &mut state).unwrap();
+        let code: Option<f64> = state.stack.remove(0).into();
+        let code = code.unwrap() as i64;
+        assert_eq!(code, 10);
     }
 }

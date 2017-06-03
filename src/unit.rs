@@ -7,7 +7,7 @@ use math::Curve;
 
 
 /// Represents all the values possible that can go on the stack
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Value {
     /// All numbers are floats
     Number(f64),
