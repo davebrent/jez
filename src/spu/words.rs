@@ -287,6 +287,12 @@ pub fn binlist(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     Ok(())
 }
 
+/// Puts the current cycle revision onto the stack
+pub fn rev(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
+    state.stack.push(Value::Number(seq.cycle.rev as f64));
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -454,5 +460,15 @@ mod tests {
         let code: Option<f64> = state.stack.remove(0).into();
         let code = code.unwrap() as i64;
         assert_eq!(code, 10);
+    }
+
+    #[test]
+    fn test_rev() {
+        let mut state = InterpState::new();
+        let mut seq = SeqState::new();
+        seq.cycle.rev = 99;
+        rev(&mut seq, &mut state).unwrap();
+        let code: Option<f64> = state.stack.remove(0).into();
+        assert_eq!(code.unwrap(), 99.0);
     }
 }
