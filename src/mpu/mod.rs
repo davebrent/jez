@@ -3,18 +3,18 @@ mod state;
 
 use std::convert::From;
 use std::collections::HashMap;
-use std::sync::mpsc::{Sender, Receiver};
-use std::time::{Duration, Instant};
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use err::RuntimeErr;
-use unit::{Keyword, eval, Event, EventValue, Message, Interpreter,
-           InterpState, add, subtract, multiply, divide, print, InterpResult};
 use lang::{hash_str, Instr};
-use math::{Curve, point_on_curve, dur_to_millis, millis_to_dur};
+use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
+use unit::{add, divide, eval, Event, EventValue, InterpResult, InterpState,
+           Interpreter, Keyword, Message, multiply, print, subtract};
 
-use self::state::{MidiState, MidiMessage};
-use self::words::{event_value, event_duration, event_track, ctrlout, noteout};
+use self::state::{MidiMessage, MidiState};
+use self::words::{ctrlout, event_duration, event_track, event_value, noteout};
 
 
 type MpuKeyword = fn(&mut MidiState, &mut InterpState) -> InterpResult;
@@ -29,17 +29,17 @@ impl MpuInterp {
     pub fn new() -> MpuInterp {
         let mut built_ins: HashMap<u64, Keyword> = HashMap::new();
         built_ins.insert(hash_str("add"), add);
-        built_ins.insert(hash_str("subtract"), subtract);
-        built_ins.insert(hash_str("multiply"), multiply);
         built_ins.insert(hash_str("divide"), divide);
+        built_ins.insert(hash_str("multiply"), multiply);
         built_ins.insert(hash_str("print"), print);
+        built_ins.insert(hash_str("subtract"), subtract);
 
         let mut mpu_words: HashMap<u64, MpuKeyword> = HashMap::new();
-        mpu_words.insert(hash_str("event_value"), event_value);
+        mpu_words.insert(hash_str("ctrlout"), ctrlout);
         mpu_words.insert(hash_str("event_duration"), event_duration);
         mpu_words.insert(hash_str("event_track"), event_track);
+        mpu_words.insert(hash_str("event_value"), event_value);
         mpu_words.insert(hash_str("noteout"), noteout);
-        mpu_words.insert(hash_str("ctrlout"), ctrlout);
 
         MpuInterp {
             built_ins: built_ins,
