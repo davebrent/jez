@@ -4,14 +4,13 @@ mod words;
 use std::collections::HashMap;
 use std::convert::From;
 use std::sync::mpsc::{Receiver, Sender};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use err::RuntimeErr;
 use lang::{hash_str, Instr};
 use math::millis_to_dur;
 use unit::{add, divide, eval, Event, InterpState, InterpResult, Interpreter,
-           Keyword, Message, multiply, print, subtract};
+           Keyword, Message, multiply, print, subtract, Unit};
 
 use self::seq::SeqState;
 use self::words::{binlist, cycle, degrade, every, graycode, hopjump, linear,
@@ -82,7 +81,7 @@ struct Track {
     pub num: usize,
     pub events: Vec<Event>,
     channel: Sender<Message>,
-    start: Instant,
+    start: Duration,
     end: Duration,
 }
 
@@ -93,13 +92,13 @@ impl Track {
             num: num,
             channel: channel,
             events: Vec::new(),
-            start: Instant::now(),
+            start: Duration::new(0, 0),
             end: Duration::new(0, 0),
         }
     }
 
     pub fn start(&mut self) {
-        self.start = Instant::now();
+        self.start = Duration::new(0, 0);
     }
 
     pub fn set(&mut self, len: f64, events: Vec<Event>) {
@@ -108,16 +107,48 @@ impl Track {
         // Sort events by time in descending order
         self.events
             .sort_by(|a, b| b.onset.partial_cmp(&a.onset).unwrap());
+    }
 
+    fn eval(&mut self,
+            instrs: &[Instr],
+            interp: &mut SpuInterp,
+            interp_state: &mut InterpState)
+            -> Result<(), RuntimeErr> {
+        self.events.clear();
+        self.cycle += 1;
+
+        interp.seq_state.cycle.rev = self.cycle;
+        interp.seq_state.tracks.clear();
+        interp_state.reset();
+
+        match eval(instrs, interp_state, interp) {
+            Err(err) => Err(err),
+            Ok(_) => {
+                let res = interp
+                    .seq_state
+                    .tracks
+                    .iter_mut()
+                    .find(|t| t.num == self.num);
+
+                match res {
+                    Some(t) => {
+                        self.set(t.dur, t.events.clone());
+                        Ok(())
+                    }
+                    None => Ok(()),
+                }
+            }
+        }
     }
 
     pub fn finished(&self) -> bool {
-        self.start.elapsed() >= self.end
+        self.start >= self.end
     }
 
-    pub fn advance(&mut self) {
+    pub fn tick(&mut self, delta: &Duration) {
+        self.start += *delta;
         while let Some(event) = self.events.pop() {
-            if self.start.elapsed() < millis_to_dur(event.onset) {
+            if self.start < millis_to_dur(event.onset) {
                 self.events.push(event);
                 break;
             }
@@ -134,6 +165,7 @@ pub struct Spu {
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
     instrs: Vec<Instr>,
+    tracks: Vec<Track>,
 }
 
 impl Spu {
@@ -146,73 +178,33 @@ impl Spu {
         match instrs {
             None => None,
             Some(instrs) => {
-                Some(Spu {
-                         id: id,
-                         interp_state: InterpState::new(),
-                         interp: SpuInterp::new(),
-                         channel: channel.clone(),
-                         input_channel: input_channel,
-                         instrs: instrs.to_vec(),
-                     })
-            }
-        }
-    }
+                let mut tracks = Vec::new();
+                let mut interp_state = InterpState::new();
+                let mut interp = SpuInterp::new();
 
-    /// Fills all tracks with initial data
-    fn init_tracks(&mut self,
-                   tracks: &mut Vec<Track>)
-                   -> Result<(), RuntimeErr> {
-        tracks.clear();
-
-        self.interp.seq_state.cycle.rev = 0;
-        self.interp.seq_state.tracks.clear();
-        self.interp_state.reset();
-
-        match eval(&self.instrs, &mut self.interp_state, &mut self.interp) {
-            Err(err) => {
-                let msg = Message::Error(self.id, From::from(err));
-                self.channel.send(msg).unwrap();
-                Err(err)
-            }
-            Ok(_) => {
-                for t in &mut self.interp.seq_state.tracks {
-                    let mut track = Track::new(t.num, self.channel.clone());
-                    track.set(t.dur, t.events.clone());
-                    tracks.push(track);
-                }
-                Ok(())
-            }
-        }
-    }
-
-    /// Fill a track with events and set its duration
-    fn fill_track(&mut self, track: &mut Track) -> Result<(), RuntimeErr> {
-        track.events.clear();
-        track.cycle += 1;
-
-        self.interp.seq_state.cycle.rev = track.cycle;
-        self.interp.seq_state.tracks.clear();
-        self.interp_state.reset();
-
-        match eval(&self.instrs, &mut self.interp_state, &mut self.interp) {
-            Err(err) => {
-                let msg = Message::Error(self.id, From::from(err));
-                self.channel.send(msg).unwrap();
-                Err(err)
-            }
-            Ok(_) => {
-                let res = self.interp
-                    .seq_state
-                    .tracks
-                    .iter_mut()
-                    .find(|t| t.num == track.num);
-
-                match res {
-                    Some(t) => {
-                        track.set(t.dur, t.events.clone());
-                        Ok(())
+                match eval(instrs, &mut interp_state, &mut interp) {
+                    Err(err) => {
+                        let msg = Message::Error(id, From::from(err));
+                        channel.send(msg).unwrap();
+                        None
                     }
-                    None => Ok(()),
+                    Ok(_) => {
+                        for t in &mut interp.seq_state.tracks {
+                            let mut track = Track::new(t.num, channel.clone());
+                            track.set(t.dur, t.events.clone());
+                            tracks.push(track);
+                        }
+
+                        Some(Spu {
+                                 id: id,
+                                 interp_state: interp_state,
+                                 interp: interp,
+                                 channel: channel,
+                                 input_channel: input_channel,
+                                 instrs: instrs.to_vec(),
+                                 tracks: tracks,
+                             })
+                    }
                 }
             }
         }
@@ -232,28 +224,28 @@ impl Spu {
             _ => false,
         }
     }
+}
 
-    /// Run sequencer forever
-    pub fn run_forever(&mut self) {
-        let res = Duration::new(0, 1000000); // 1ms
-
-        let mut tracks = Vec::new();
-        if self.init_tracks(&mut tracks).is_err() {
-            return;
-        }
-
-        while !self.should_stop() {
-            for track in &mut tracks {
-                if track.finished() {
-                    if self.fill_track(track).is_err() {
-                        return;
+impl Unit for Spu {
+    fn tick(&mut self, delta: &Duration) -> bool {
+        for track in &mut self.tracks {
+            if track.finished() {
+                match track.eval(&self.instrs,
+                                 &mut self.interp,
+                                 &mut self.interp_state) {
+                    Err(err) => {
+                        let msg = Message::Error(self.id, From::from(err));
+                        self.channel.send(msg).unwrap();
+                        return true;
                     }
-                    track.start();
+                    _ => {
+                        track.start();
+                    }
                 }
-                track.advance();
             }
-
-            thread::sleep(res);
+            track.tick(delta);
         }
+
+        self.should_stop()
     }
 }

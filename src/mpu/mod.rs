@@ -4,14 +4,13 @@ mod state;
 use std::convert::From;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use err::RuntimeErr;
 use lang::{hash_str, Instr};
 use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 use unit::{add, divide, eval, Event, EventValue, InterpResult, InterpState,
-           Interpreter, Keyword, Message, multiply, print, subtract};
+           Interpreter, Keyword, Message, multiply, print, subtract, Unit};
 
 use self::state::{MidiMessage, MidiState};
 use self::words::{ctrlout, event_duration, event_track, event_value, noteout};
@@ -237,10 +236,12 @@ impl Mpu {
                 .unwrap();
         }
     }
+}
 
-    fn tick(&mut self, delta: Duration) -> bool {
-        self.process_ctl_events(&delta);
-        self.process_off_events(&delta);
+impl Unit for Mpu {
+    fn tick(&mut self, delta: &Duration) -> bool {
+        self.process_ctl_events(delta);
+        self.process_off_events(delta);
 
         if let Ok(msg) = self.input_channel.try_recv() {
             match msg {
@@ -261,21 +262,6 @@ impl Mpu {
         }
 
         false
-    }
-
-    pub fn run_forever(&mut self) {
-        let res = Duration::new(0, 1000000); // 1ms
-        let mut previous = Instant::now();
-
-        loop {
-            let now = Instant::now();
-            let delta = now.duration_since(previous);
-            if self.tick(delta) {
-                return;
-            }
-            previous = now;
-            thread::sleep(res);
-        }
     }
 }
 
@@ -312,13 +298,13 @@ mod tests {
                                     }))
             .unwrap();
 
-        mpu.tick(Duration::new(0, 0));
+        mpu.tick(&Duration::new(0, 0));
         assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOn(1, 64, 127));
 
-        mpu.tick(millis_to_dur(99.0));
+        mpu.tick(&millis_to_dur(99.0));
         assert_eq!(out_rx.try_recv().is_err(), true);
 
-        mpu.tick(millis_to_dur(1.0));
+        mpu.tick(&millis_to_dur(1.0));
         assert_eq!(out_rx.try_recv().unwrap(), Message::MidiNoteOff(1, 64));
 
         in_tx
@@ -329,13 +315,13 @@ mod tests {
                                         value: EventValue::Trigger(96.0),
                                     }))
             .unwrap();
-        mpu.tick(Duration::new(0, 0));
+        mpu.tick(&Duration::new(0, 0));
         assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOn(1, 96, 127));
 
-        mpu.tick(millis_to_dur(199.0));
+        mpu.tick(&millis_to_dur(199.0));
         assert_eq!(out_rx.try_recv().is_err(), true);
 
-        mpu.tick(millis_to_dur(1.0));
+        mpu.tick(&millis_to_dur(1.0));
         assert_eq!(out_rx.try_recv().unwrap(), Message::MidiNoteOff(1, 96));
     }
 
@@ -362,10 +348,10 @@ mod tests {
                                     }))
             .unwrap();
 
-        mpu.tick(Duration::new(0, 0));
+        mpu.tick(&Duration::new(0, 0));
         let evt = out_rx.recv().unwrap();
         assert_eq!(evt, Message::MidiNoteOn(1, 64, 127));
-        mpu.tick(millis_to_dur(50.0));
+        mpu.tick(&millis_to_dur(50.0));
 
         in_tx
             .send(Message::SeqEvent(Event {
@@ -376,13 +362,13 @@ mod tests {
                                     }))
             .unwrap();
 
-        mpu.tick(Duration::new(0, 0));
+        mpu.tick(&Duration::new(0, 0));
         assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOff(1, 64));
         assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOn(1, 64, 127));
 
-        mpu.tick(millis_to_dur(99.0));
+        mpu.tick(&millis_to_dur(99.0));
         assert_eq!(out_rx.try_recv().is_err(), true);
-        mpu.tick(millis_to_dur(1.0));
+        mpu.tick(&millis_to_dur(1.0));
         assert_eq!(out_rx.recv().unwrap(), Message::MidiNoteOff(1, 64));
     }
 
@@ -393,7 +379,7 @@ mod tests {
         let (out_tx, _) = channel();
         let mut mpu = Mpu::new(0, Some(&instrs), None, out_tx, in_rx).unwrap();
         in_tx.send(Message::Stop).unwrap();
-        mpu.run_forever();
+        mpu.run_forever(Duration::new(0, 1000000));
         assert_eq!(true, true);
     }
 }

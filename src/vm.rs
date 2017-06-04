@@ -1,12 +1,13 @@
 use std::convert::From;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
+use std::time::Duration;
 
 use err::{JezErr, SysErr};
 use lang::Program;
 use mpu::Mpu;
 use spu::Spu;
-use unit::Message;
+use unit::{Message, Unit};
 
 
 const MPU_ID: u8 = 0;
@@ -27,7 +28,12 @@ impl Machine {
                                         prog.section("spu"),
                                         bus_send.clone(),
                                         spu_recv) {
-            Some(mut u) => Some(thread::spawn(move || { u.run_forever(); })),
+            Some(mut unit) => {
+                Some(thread::spawn(move || {
+                                       let res = Duration::new(0, 1000000);
+                                       unit.run_forever(res);
+                                   }))
+            }
             None => None,
         };
 
@@ -36,7 +42,12 @@ impl Machine {
                                         prog.section("mpu_out_ctrl"),
                                         bus_send.clone(),
                                         mpu_recv) {
-            Some(mut u) => Some(thread::spawn(move || { u.run_forever(); })),
+            Some(mut unit) => {
+                Some(thread::spawn(move || {
+                                       let res = Duration::new(0, 1000000);
+                                       unit.run_forever(res);
+                                   }))
+            }
             None => None,
         };
 

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::convert::Into;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use err::{RuntimeErr, JezErr};
 use lang::Instr;
@@ -237,6 +239,23 @@ pub fn print(state: &mut InterpState) -> InterpResult {
 /// An `Interpreter` provides a method for evaluating keywords
 pub trait Interpreter {
     fn eval(&mut self, word: u64, state: &mut InterpState) -> InterpResult;
+}
+
+pub trait Unit {
+    fn tick(&mut self, delta: &Duration) -> bool;
+
+    fn run_forever(&mut self, res: Duration) {
+        let mut previous = Instant::now();
+        loop {
+            let now = Instant::now();
+            let delta = now.duration_since(previous);
+            if self.tick(&delta) {
+                return;
+            }
+            previous = now;
+            thread::sleep(res);
+        }
+    }
 }
 
 /// Evaluate instructions, calling back to an `Interpreter` for evaling keywords
