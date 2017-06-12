@@ -1,17 +1,23 @@
 mod backends;
 mod err;
 mod lang;
+mod log;
 mod math;
 mod mpu;
 mod spu;
 mod unit;
 mod vm;
 
+
 extern crate docopt;
 extern crate jack;
 extern crate rand;
 extern crate regex;
 extern crate rustc_serialize;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 use std::convert::From;
 use std::fs;
@@ -36,11 +42,13 @@ Options:
   -h --help         Show this screen.
   --watch           Reload input file on changes.
   --backend=NAME    Specify the backend (either 'jack' OR 'debug').
+  --logger=NAME     Logging backend (either 'console' OR 'file').
 ";
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
     flag_backend: String,
+    flag_logger: String,
     flag_watch: bool,
     flag_version: bool,
     arg_file: String,
@@ -78,20 +86,34 @@ fn watch_file(filepath: String,
     });
 }
 
-fn make_backend(name: &str,
-                channel: Receiver<unit::Message>)
-                -> Result<Box<backends::Backend>, err::JezErr> {
+fn make_log_backend(name: &str) -> Result<Box<log::LogBackend>, err::JezErr> {
     match name {
-        "debug" | "" => Ok(Box::new(backends::Debug::new(channel))),
-        "jack" => Ok(Box::new(try!(backends::Jack::new(channel)))),
+        "console" | "" => Ok(Box::new(log::ConsoleLogger::new())),
+        "file" => Ok(Box::new(log::FileLogger::new())),
+        _ => Err(From::from(err::SysErr::UnknownBackend)),
+    }
+}
+
+fn make_vm_backend(name: &str,
+                   logger: log::Logger,
+                   channel: Receiver<unit::Message>)
+                   -> Result<Box<backends::Backend>, err::JezErr> {
+    match name {
+        "debug" | "" => Ok(Box::new(backends::Debug::new(logger, channel))),
+        "jack" => Ok(Box::new(try!(backends::Jack::new(logger, channel)))),
         _ => Err(From::from(err::SysErr::UnknownBackend)),
     }
 }
 
 fn run_app(args: &Args) -> Result<(), err::JezErr> {
+    let (log_send, log_recv) = channel();
+    let log_backend = try!(make_log_backend(args.flag_logger.as_ref()));
+    log_backend.run_forever(log_recv);
+
     let (audio_send, audio_recv) = channel();
-    let mut backend = try!(make_backend(args.flag_backend.as_ref(),
-                                        audio_recv));
+    let mut backend = try!(make_vm_backend(args.flag_backend.as_ref(),
+                                           log::Logger::new(log_send.clone()),
+                                           audio_recv));
 
     loop {
         let mut txt = String::new();
@@ -107,7 +129,8 @@ fn run_app(args: &Args) -> Result<(), err::JezErr> {
         let res = vm::Machine::run(audio_send.clone(),
                                    host_send.clone(),
                                    host_recv,
-                                   &prog);
+                                   &prog,
+                                   log::Logger::new(log_send.clone()));
         match res {
             Ok(reload) => {
                 if !reload {

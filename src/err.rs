@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum SysErr {
     UnknownBackend,
     UnreachableBackend,
@@ -32,7 +32,7 @@ impl fmt::Display for SysErr {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum ParseErr {
     InvalidInput,
     UnknownToken(usize, usize),
@@ -72,7 +72,7 @@ impl fmt::Display for ParseErr {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum RuntimeErr {
     UnknownKeyword(u64),
     NotImplemented,
@@ -108,7 +108,7 @@ impl fmt::Display for RuntimeErr {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum JezErr {
     ParseErr(ParseErr),
     RuntimeErr(RuntimeErr),

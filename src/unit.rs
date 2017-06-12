@@ -54,13 +54,13 @@ impl Into<Option<(usize, usize)>> for Value {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum EventValue {
     Trigger(f64),
     Curve(Curve),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Event {
     pub track: u32,
     pub onset: f64,
@@ -69,7 +69,7 @@ pub struct Event {
 }
 
 /// Inter-unit messages
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum Message {
     SeqEvent(Event),
     /// Sent from units to the machine

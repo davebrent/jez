@@ -1,10 +1,11 @@
 use std::convert::From;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use err::{JezErr, SysErr};
 use lang::Program;
+use log::Logger;
 use mpu::Mpu;
 use spu::Spu;
 use unit::{Message, Unit};
@@ -19,7 +20,8 @@ impl Machine {
     pub fn run(backend: Sender<Message>,
                bus_send: Sender<Message>,
                bus_recv: Receiver<Message>,
-               prog: &Program)
+               prog: &Program,
+               logger: Logger)
                -> Result<bool, JezErr> {
         let (spu, spu_recv) = channel();
         let (mpu, mpu_recv) = channel();
@@ -51,7 +53,9 @@ impl Machine {
             None => None,
         };
 
+        let start = Instant::now();
         while let Ok(msg) = bus_recv.recv() {
+            logger.log(Instant::now() - start, "vm", &msg);
             match msg {
                 Message::Stop => {
                     mpu.send(Message::Stop).unwrap();

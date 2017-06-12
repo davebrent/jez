@@ -1,8 +1,9 @@
 use std::sync::mpsc::Receiver;
+use std::time::Instant;
 
 use err::SysErr;
+use log::Logger;
 use unit::Message;
-
 use jack::prelude::{AsyncClient, Client, client_options, JackControl,
                     MidiOutPort, MidiOutSpec, NotificationHandler,
                     ProcessHandler, ProcessScope, Port, RawMidi};
@@ -16,6 +17,8 @@ impl NotificationHandler for Notifier {}
 struct Processor {
     channel: Receiver<Message>,
     midi_out_port: Port<MidiOutSpec>,
+    logger: Logger,
+    start: Instant,
 }
 
 impl ProcessHandler for Processor {
@@ -23,6 +26,8 @@ impl ProcessHandler for Processor {
         let mut out_port = MidiOutPort::new(&mut self.midi_out_port, ps);
 
         while let Ok(msg) = self.channel.try_recv() {
+            let time = Instant::now() - self.start;
+            self.logger.log(time, "backend", &msg);
             match msg {
                 Message::MidiNoteOn(chn, pitch, vel) => {
                     let midi = RawMidi {
@@ -58,7 +63,9 @@ pub struct Jack {
 }
 
 impl Jack {
-    pub fn new(channel: Receiver<Message>) -> Result<Self, SysErr> {
+    pub fn new(logger: Logger,
+               channel: Receiver<Message>)
+               -> Result<Self, SysErr> {
         match Client::new("jez", client_options::NO_START_SERVER) {
             Err(_) => Err(SysErr::UnreachableBackend),
             Ok((client, _)) => {
@@ -70,6 +77,8 @@ impl Jack {
                 let processor = Processor {
                     channel: channel,
                     midi_out_port: midi_out_port,
+                    logger: logger,
+                    start: Instant::now(),
                 };
 
                 let ac = AsyncClient::new(client, notifier, processor).unwrap();
