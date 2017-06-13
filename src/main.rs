@@ -8,7 +8,6 @@ mod spu;
 mod unit;
 mod vm;
 
-
 extern crate docopt;
 extern crate jack;
 extern crate rand;

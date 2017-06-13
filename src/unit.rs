@@ -11,19 +11,12 @@ use math::Curve;
 /// Represents all the values possible that can go on the stack
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Value {
-    /// All numbers are floats
     Number(f64),
-    /// A hashed string
     Symbol(u64),
-    /// Used for representing lists, a range of values on the heap
     Pair(usize, usize),
-    /// An immutable pair
     Tuple(usize, usize),
-    /// Interpreter instructions
     Instruction(Instr),
-    /// Special value of nothing
     Null,
-    /// Cubic bezier curve
     Curve(Curve),
 }
 
@@ -68,33 +61,25 @@ pub struct Event {
     pub value: EventValue,
 }
 
-/// Inter-unit messages
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum Message {
-    SeqEvent(Event),
-    /// Sent from units to the machine
     Error(u8, JezErr),
-    /// Sent from the machine to units, used for reloading
+    MidiCtl(u8, u8, u8),
+    MidiNoteOff(u8, u8),
+    MidiNoteOn(u8, u8, u8),
+    SeqEvent(Event),
     Stop,
     Reload,
-    MidiNoteOn(u8, u8, u8),
-    MidiNoteOff(u8, u8),
-    MidiCtl(u8, u8, u8),
 }
 
 pub type InterpResult = Result<(), RuntimeErr>;
 pub type Keyword = fn(&mut InterpState) -> InterpResult;
 
-/// Basic interpreter state
 #[derive(Debug)]
 pub struct InterpState {
-    /// Program counter, into a slice of instructions
     pub pc: usize,
-    /// Main stack for computation
     pub stack: Vec<Value>,
-    /// Second stack OR heap memory
     pub heap: Vec<Value>,
-    /// Variable mapping table, points into `heap` by default
     pub vars: HashMap<u64, usize>,
     save_point: usize,
 }
