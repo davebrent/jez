@@ -24,7 +24,7 @@ use std::io;
 use std::io::{Read, Write};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use docopt::Docopt;
 
@@ -40,6 +40,7 @@ Usage:
 Options:
   -h --help         Show this screen.
   --watch           Reload input file on changes.
+  --time=MS         Length of time (in milliseconds) to run for.
   --backend=NAME    Specify the backend (either 'jack' OR 'debug').
   --logger=NAME     Logging backend (either 'console' OR 'file').
 ";
@@ -48,9 +49,24 @@ Options:
 struct Args {
     flag_backend: String,
     flag_logger: String,
+    flag_time: String,
     flag_watch: bool,
     flag_version: bool,
     arg_file: String,
+}
+
+fn start_timer(millis: f64, channel: Sender<unit::Message>) {
+    let start = Instant::now();
+    let end = math::millis_to_dur(millis);
+    let res = Duration::new(0, 1000000);
+
+    thread::spawn(move || loop {
+                      if start.elapsed() >= end {
+                          channel.send(unit::Message::Stop).unwrap();
+                          return;
+                      }
+                      thread::sleep(res);
+                  });
 }
 
 fn watch_file(filepath: String,
@@ -123,6 +139,13 @@ fn run_app(args: &Args) -> Result<(), err::JezErr> {
         let (host_send, host_recv) = channel();
         if args.flag_watch {
             watch_file(args.arg_file.clone(), prog.clone(), host_send.clone());
+        }
+
+        if !args.flag_time.is_empty() {
+            match args.flag_time.parse::<f64>() {
+                Ok(time) => start_timer(time, host_send.clone()),
+                Err(_) => return Err(From::from(err::RuntimeErr::InvalidArgs)),
+            }
         }
 
         let res = vm::Machine::run(audio_send.clone(),
