@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::Into;
 
 use err::RuntimeErr;
-use lang::Instr;
+use lang::{hash_str, Instr};
 use math::Curve;
 
 
@@ -46,7 +46,6 @@ impl Into<Option<(usize, usize)>> for Value {
 }
 
 pub type InterpResult = Result<(), RuntimeErr>;
-pub type Keyword = fn(&mut InterpState) -> InterpResult;
 
 #[derive(Debug)]
 pub struct InterpState {
@@ -194,37 +193,71 @@ pub fn print(state: &mut InterpState) -> InterpResult {
     Ok(())
 }
 
-/// An `Interpreter` provides a method for evaluating keywords
-pub trait Interpreter {
-    fn eval(&mut self, word: u64, state: &mut InterpState) -> InterpResult;
+pub type BuiltInKeyword = fn(&mut InterpState) -> InterpResult;
+pub type ExtKeyword<S> = fn(&mut S, &mut InterpState) -> InterpResult;
+pub enum Keyword<S> {
+    BuiltIn(BuiltInKeyword),
+    Extension(ExtKeyword<S>),
 }
 
-/// Evaluate instructions, calling back to an `Interpreter` for evaling keywords
-///
-/// The `InterpState`'s program counter is updated automatically upon each
-/// iteration, any keywords that manipulate it therefore have to take this into
-/// account.
-pub fn eval<T>(instrs: &[Instr],
-               state: &mut InterpState,
-               interp: &mut T)
-               -> InterpResult
-    where T: Interpreter
-{
-    state.pc = 0;
-    while state.pc < instrs.len() {
-        let instr = instrs[state.pc];
-        match instr {
-            Instr::LoadNumber(num) => load_number(num as f64, state),
-            Instr::LoadString(_) => Err(RuntimeErr::NotImplemented),
-            Instr::Null => load_null(state),
-            Instr::LoadSymbol(sym) => load_symbol(sym, state),
-            Instr::StoreVar(name) => store_var(name, state),
-            Instr::LoadVar(name) => load_var(name, state),
-            Instr::ListBegin => list_begin(state),
-            Instr::ListEnd => list_end(state),
-            Instr::Keyword(word) => interp.eval(word, state),
-        }?;
-        state.pc += 1;
+pub struct Interpreter<S> {
+    pub data: S,
+    pub state: InterpState,
+    words: HashMap<u64, Keyword<S>>,
+}
+
+impl<S> Interpreter<S> {
+    pub fn new(exts: HashMap<&'static str, ExtKeyword<S>>,
+               data: S)
+               -> Interpreter<S> {
+        let mut words = HashMap::new();
+        words.insert(hash_str("add"), Keyword::BuiltIn(add));
+        words.insert(hash_str("divide"), Keyword::BuiltIn(divide));
+        words.insert(hash_str("multiply"), Keyword::BuiltIn(multiply));
+        words.insert(hash_str("print"), Keyword::BuiltIn(print));
+        words.insert(hash_str("subtract"), Keyword::BuiltIn(subtract));
+
+        for (word, func) in &exts {
+            words.insert(hash_str(word), Keyword::Extension(*func));
+        }
+
+        Interpreter {
+            words: words,
+            data: data,
+            state: InterpState::new(),
+        }
     }
-    Ok(())
+
+    pub fn eval(&mut self, instrs: &[Instr]) -> InterpResult {
+        self.state.pc = 0;
+        while self.state.pc < instrs.len() {
+            let instr = instrs[self.state.pc];
+            match instr {
+                Instr::LoadNumber(num) => {
+                    load_number(num as f64, &mut self.state)
+                }
+                Instr::LoadString(_) => Err(RuntimeErr::NotImplemented),
+                Instr::Null => load_null(&mut self.state),
+                Instr::LoadSymbol(sym) => load_symbol(sym, &mut self.state),
+                Instr::StoreVar(name) => store_var(name, &mut self.state),
+                Instr::LoadVar(name) => load_var(name, &mut self.state),
+                Instr::ListBegin => list_begin(&mut self.state),
+                Instr::ListEnd => list_end(&mut self.state),
+                Instr::Keyword(word) => {
+                    if let Some(keyword) = self.words.get(&word) {
+                        match *keyword {
+                            Keyword::BuiltIn(func) => func(&mut self.state),
+                            Keyword::Extension(func) => {
+                                func(&mut self.data, &mut self.state)
+                            }
+                        }
+                    } else {
+                        Err(RuntimeErr::UnknownKeyword(word))
+                    }
+                }
+            }?;
+            self.state.pc += 1;
+        }
+        Ok(())
+    }
 }

@@ -7,9 +7,8 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 use err::RuntimeErr;
-use interp::{add, divide, eval, InterpResult, InterpState, Interpreter,
-             Keyword, multiply, print, subtract};
-use lang::{hash_str, Instr};
+use interp::{Interpreter, InterpResult, InterpState};
+use lang::Instr;
 use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 use unit::{Event, EventValue, Message, Unit};
 
@@ -19,54 +18,9 @@ use self::words::{ctrlout, event_duration, event_track, event_value, noteout};
 
 type MpuKeyword = fn(&mut MidiState, &mut InterpState) -> InterpResult;
 
-pub struct MpuInterp {
-    built_ins: HashMap<u64, Keyword>,
-    mpu_words: HashMap<u64, MpuKeyword>,
-    midi_state: MidiState,
-}
-
-impl MpuInterp {
-    pub fn new() -> MpuInterp {
-        let mut built_ins: HashMap<u64, Keyword> = HashMap::new();
-        built_ins.insert(hash_str("add"), add);
-        built_ins.insert(hash_str("divide"), divide);
-        built_ins.insert(hash_str("multiply"), multiply);
-        built_ins.insert(hash_str("print"), print);
-        built_ins.insert(hash_str("subtract"), subtract);
-
-        let mut mpu_words: HashMap<u64, MpuKeyword> = HashMap::new();
-        mpu_words.insert(hash_str("ctrlout"), ctrlout);
-        mpu_words.insert(hash_str("event_duration"), event_duration);
-        mpu_words.insert(hash_str("event_track"), event_track);
-        mpu_words.insert(hash_str("event_value"), event_value);
-        mpu_words.insert(hash_str("noteout"), noteout);
-
-        MpuInterp {
-            built_ins: built_ins,
-            mpu_words: mpu_words,
-            midi_state: MidiState::new(),
-        }
-    }
-}
-
-impl Interpreter for MpuInterp {
-    fn eval(&mut self, word: u64, state: &mut InterpState) -> InterpResult {
-        match self.built_ins.get(&word) {
-            Some(func) => func(state),
-            None => {
-                match self.mpu_words.get(&word) {
-                    None => Err(RuntimeErr::UnknownKeyword(word)),
-                    Some(func) => func(&mut self.midi_state, state),
-                }
-            }
-        }
-    }
-}
-
 pub struct Mpu {
     id: u8,
-    interp_state: InterpState,
-    interp: MpuInterp,
+    interp: Interpreter<MidiState>,
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
     instrs_out_note: Vec<Instr>,
@@ -96,10 +50,16 @@ impl Mpu {
             None => Vec::new(),
         };
 
+        let mut words: HashMap<&'static str, MpuKeyword> = HashMap::new();
+        words.insert("ctrlout", ctrlout);
+        words.insert("event_duration", event_duration);
+        words.insert("event_track", event_track);
+        words.insert("event_value", event_value);
+        words.insert("noteout", noteout);
+
         Some(Mpu {
                  id: id,
-                 interp_state: InterpState::new(),
-                 interp: MpuInterp::new(),
+                 interp: Interpreter::new(words, MidiState::new()),
                  channel: channel,
                  input_channel: input_channel,
                  instrs_out_note: instrs_out_note,
@@ -112,17 +72,17 @@ impl Mpu {
     fn handle_trg_event(&mut self, event: Event) {
         let instrs = self.instrs_out_note.as_slice();
 
-        self.interp_state.reset();
-        self.interp.midi_state.event = event;
+        self.interp.state.reset();
+        self.interp.data.event = event;
 
-        match eval(instrs, &mut self.interp_state, &mut self.interp) {
+        match self.interp.eval(instrs) {
             Err(err) => {
                 self.channel
                     .send(Message::Error(self.id, From::from(err)))
                     .unwrap();
             }
             Ok(_) => {
-                match self.interp.midi_state.message {
+                match self.interp.data.message {
                     MidiMessage::None => return,
                     MidiMessage::Note {
                         channel: chan,
@@ -160,17 +120,17 @@ impl Mpu {
     fn handle_ctl_event(&mut self, event: Event, curve: Curve) {
         let instrs = self.instrs_out_ctrl.as_slice();
 
-        self.interp_state.reset();
-        self.interp.midi_state.event = event;
+        self.interp.state.reset();
+        self.interp.data.event = event;
 
-        match eval(instrs, &mut self.interp_state, &mut self.interp) {
+        match self.interp.eval(instrs) {
             Err(err) => {
                 self.channel
                     .send(Message::Error(self.id, From::from(err)))
                     .unwrap();
             }
             Ok(_) => {
-                match self.interp.midi_state.message {
+                match self.interp.data.message {
                     MidiMessage::None => return,
                     MidiMessage::Ctrl {
                         channel: chan,
