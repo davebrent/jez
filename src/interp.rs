@@ -193,6 +193,28 @@ pub fn print(state: &mut InterpState) -> InterpResult {
     Ok(())
 }
 
+/// Drop the top value on the stack
+pub fn drop(state: &mut InterpState) -> InterpResult {
+    state.stack.pop().unwrap();
+    Ok(())
+}
+
+/// Duplicate the top value on the stack
+pub fn duplicate(state: &mut InterpState) -> InterpResult {
+    let val = *state.stack.last().unwrap();
+    state.stack.push(val);
+    Ok(())
+}
+
+/// Swap the top two values on the stack
+pub fn swap(state: &mut InterpState) -> InterpResult {
+    let a = state.stack.pop().unwrap();
+    let b = state.stack.pop().unwrap();
+    state.stack.push(a);
+    state.stack.push(b);
+    Ok(())
+}
+
 pub type BuiltInKeyword = fn(&mut InterpState) -> InterpResult;
 pub type ExtKeyword<S> = fn(&mut S, &mut InterpState) -> InterpResult;
 pub enum Keyword<S> {
@@ -216,6 +238,9 @@ impl<S> Interpreter<S> {
         words.insert(hash_str("multiply"), Keyword::BuiltIn(multiply));
         words.insert(hash_str("print"), Keyword::BuiltIn(print));
         words.insert(hash_str("subtract"), Keyword::BuiltIn(subtract));
+        words.insert(hash_str("drop"), Keyword::BuiltIn(drop));
+        words.insert(hash_str("dup"), Keyword::BuiltIn(duplicate));
+        words.insert(hash_str("swap"), Keyword::BuiltIn(swap));
 
         for (word, func) in &exts {
             words.insert(hash_str(word), Keyword::Extension(*func));
@@ -259,5 +284,63 @@ impl<S> Interpreter<S> {
             self.state.pc += 1;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+
+    #[test]
+    fn test_addition() {
+        let instrs = [Instr::LoadNumber(3.2),
+                      Instr::LoadNumber(2.8),
+                      Instr::Keyword(hash_str("add"))];
+        let mut interp = Interpreter::new(HashMap::new(), ());
+        interp.eval(&instrs).unwrap();
+        let val: Option<f64> = interp.state.stack.pop().unwrap().into();
+        let val = val.unwrap();
+        assert_eq!(val, 6.0);
+    }
+
+    #[test]
+    fn test_subtraction() {
+        let instrs = [Instr::LoadNumber(2.0),
+                      Instr::LoadNumber(3.0),
+                      Instr::Keyword(hash_str("subtract"))];
+        let mut interp = Interpreter::new(HashMap::new(), ());
+        interp.eval(&instrs).unwrap();
+        let val: Option<f64> = interp.state.stack.pop().unwrap().into();
+        let val = val.unwrap();
+        assert_eq!(val, -1.0);
+    }
+
+    #[test]
+    fn test_variables() {
+        let instrs = [Instr::LoadNumber(3.0),
+                      Instr::StoreVar(hash_str("foo")),
+                      Instr::LoadNumber(2.0),
+                      Instr::LoadVar(hash_str("foo"))];
+        let mut interp = Interpreter::new(HashMap::new(), ());
+        interp.eval(&instrs).unwrap();
+        let val: Option<f64> = interp.state.stack.pop().unwrap().into();
+        let val = val.unwrap();
+        assert_eq!(val, 3.0);
+    }
+
+    #[test]
+    fn test_swap() {
+        let instrs = [Instr::LoadNumber(3.0),
+                      Instr::LoadNumber(2.0),
+                      Instr::Keyword(hash_str("swap"))];
+        let mut interp = Interpreter::new(HashMap::new(), ());
+        interp.eval(&instrs).unwrap();
+        let a: Option<f64> = interp.state.stack.pop().unwrap().into();
+        let a = a.unwrap();
+        assert_eq!(a, 3.0);
+        let b: Option<f64> = interp.state.stack.pop().unwrap().into();
+        let b = b.unwrap();
+        assert_eq!(b, 2.0);
     }
 }
