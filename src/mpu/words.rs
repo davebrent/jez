@@ -1,5 +1,6 @@
 use err::RuntimeErr;
-use unit::{EventValue, InterpState, InterpResult, Value};
+use interp::{InterpState, InterpResult, Value};
+use unit::EventValue;
 
 use super::state::{MidiState, MidiMessage};
 

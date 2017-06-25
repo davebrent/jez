@@ -1,7 +1,8 @@
 use rand::{Rng, StdRng};
 
 use err::RuntimeErr;
-use unit::{Event, EventValue, InterpState, InterpResult, Value};
+use interp::{InterpState, InterpResult, Value};
+use unit::{Event, EventValue};
 use math::path_to_curve;
 
 use super::seq::{SeqState, SeqTrack};

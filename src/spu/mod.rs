@@ -7,10 +7,11 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 use err::RuntimeErr;
+use interp::{add, divide, eval, InterpState, InterpResult, Interpreter,
+             Keyword, multiply, print, subtract};
 use lang::{hash_str, Instr};
 use math::millis_to_dur;
-use unit::{add, divide, eval, Event, InterpState, InterpResult, Interpreter,
-           Keyword, Message, multiply, print, subtract, Unit};
+use unit::{Event, Message, Unit};
 
 use self::seq::SeqState;
 use self::words::{binlist, cycle, degrade, every, graycode, hopjump, linear,

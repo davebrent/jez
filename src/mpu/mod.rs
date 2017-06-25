@@ -7,10 +7,11 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 use err::RuntimeErr;
+use interp::{add, divide, eval, InterpResult, InterpState, Interpreter,
+             Keyword, multiply, print, subtract};
 use lang::{hash_str, Instr};
 use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
-use unit::{add, divide, eval, Event, EventValue, InterpResult, InterpState,
-           Interpreter, Keyword, Message, multiply, print, subtract, Unit};
+use unit::{Event, EventValue, Message, Unit};
 
 use self::state::{MidiMessage, MidiState};
 use self::words::{ctrlout, event_duration, event_track, event_value, noteout};
