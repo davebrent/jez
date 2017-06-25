@@ -11,9 +11,6 @@ use spu::Spu;
 use unit::{Message, Unit};
 
 
-const MPU_ID: u8 = 0;
-const SPU_ID: u8 = 1;
-
 pub struct Machine;
 
 impl Machine {
@@ -26,7 +23,7 @@ impl Machine {
         let (spu, spu_recv) = channel();
         let (mpu, mpu_recv) = channel();
 
-        let spu_thread = match Spu::new(SPU_ID,
+        let spu_thread = match Spu::new("spu",
                                         prog.section("spu"),
                                         bus_send.clone(),
                                         spu_recv) {
@@ -39,7 +36,7 @@ impl Machine {
             None => None,
         };
 
-        let mpu_thread = match Mpu::new(MPU_ID,
+        let mpu_thread = match Mpu::new("mpu",
                                         prog.section("mpu_out_note"),
                                         prog.section("mpu_out_ctrl"),
                                         bus_send.clone(),

@@ -19,7 +19,7 @@ use self::words::{ctrlout, event_duration, event_track, event_value, noteout};
 type MpuKeyword = fn(&mut MidiState, &mut InterpState) -> InterpResult;
 
 pub struct Mpu {
-    id: u8,
+    id: &'static str,
     interp: Interpreter<MidiState>,
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
@@ -30,7 +30,7 @@ pub struct Mpu {
 }
 
 impl Mpu {
-    pub fn new(id: u8,
+    pub fn new(id: &'static str,
                instrs_out_note: Option<&[Instr]>,
                instrs_out_ctrl: Option<&[Instr]>,
                channel: Sender<Message>,
@@ -248,7 +248,8 @@ mod tests {
 
         let (in_tx, in_rx) = channel();
         let (out_tx, out_rx) = channel();
-        let mut mpu = Mpu::new(0, Some(&instrs), None, out_tx, in_rx).unwrap();
+        let mut mpu = Mpu::new("mpu", Some(&instrs), None, out_tx, in_rx)
+            .unwrap();
 
         in_tx
             .send(Message::SeqEvent(Event {
@@ -298,7 +299,8 @@ mod tests {
 
         let (in_tx, in_rx) = channel();
         let (out_tx, out_rx) = channel();
-        let mut mpu = Mpu::new(0, Some(&instrs), None, out_tx, in_rx).unwrap();
+        let mut mpu = Mpu::new("mpu", Some(&instrs), None, out_tx, in_rx)
+            .unwrap();
 
         in_tx
             .send(Message::SeqEvent(Event {
@@ -338,7 +340,8 @@ mod tests {
         let instrs = [];
         let (in_tx, in_rx) = channel();
         let (out_tx, _) = channel();
-        let mut mpu = Mpu::new(0, Some(&instrs), None, out_tx, in_rx).unwrap();
+        let mut mpu = Mpu::new("mpu", Some(&instrs), None, out_tx, in_rx)
+            .unwrap();
         in_tx.send(Message::Stop).unwrap();
         mpu.run_forever(Duration::new(0, 1000000));
         assert_eq!(true, true);

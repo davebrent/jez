@@ -21,7 +21,7 @@ pub struct Event {
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum Message {
-    Error(u8, JezErr),
+    Error(&'static str, JezErr),
     MidiCtl(u8, u8, u8),
     MidiNoteOff(u8, u8),
     MidiNoteOn(u8, u8, u8),

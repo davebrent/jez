@@ -102,7 +102,7 @@ impl Track {
 
 /// Sequencer processing unit
 pub struct Spu {
-    id: u8,
+    id: &'static str,
     interp: Interpreter<SeqState>,
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
@@ -112,7 +112,7 @@ pub struct Spu {
 
 impl Spu {
     /// Returns a new SPU if there are instructions to execute
-    pub fn new(id: u8,
+    pub fn new(id: &'static str,
                instrs: Option<&[Instr]>,
                channel: Sender<Message>,
                input_channel: Receiver<Message>)
