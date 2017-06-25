@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use err::RuntimeErr;
 use interp::{InterpState, InterpResult, Interpreter};
-use lang::Instr;
+use lang::{Instr, Program};
 use math::millis_to_dur;
 use unit::{Event, Message, Unit};
 
@@ -113,11 +113,11 @@ pub struct Spu {
 impl Spu {
     /// Returns a new SPU if there are instructions to execute
     pub fn new(id: &'static str,
-               instrs: Option<&[Instr]>,
+               prog: &Program,
                channel: Sender<Message>,
                input_channel: Receiver<Message>)
                -> Option<Self> {
-
+        let instrs = prog.section(id);
         match instrs {
             None => None,
             Some(instrs) => {

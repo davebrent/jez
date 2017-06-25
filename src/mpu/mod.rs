@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use err::RuntimeErr;
 use interp::{Interpreter, InterpResult, InterpState};
-use lang::Instr;
+use lang::{Instr, Program};
 use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 use unit::{Event, EventValue, Message, Unit};
 
@@ -31,21 +31,23 @@ pub struct Mpu {
 
 impl Mpu {
     pub fn new(id: &'static str,
-               instrs_out_note: Option<&[Instr]>,
-               instrs_out_ctrl: Option<&[Instr]>,
+               prog: &Program,
                channel: Sender<Message>,
                input_channel: Receiver<Message>)
                -> Option<Self> {
-        if instrs_out_note.is_none() && instrs_out_ctrl.is_none() {
+        let out_note = prog.section(format!("{}_{}", id, "out_note").as_str());
+        let out_ctrl = prog.section(format!("{}_{}", id, "out_ctrl").as_str());
+
+        if out_note.is_none() && out_ctrl.is_none() {
             return None;
         }
 
-        let instrs_out_note = match instrs_out_note {
+        let out_note = match out_note {
             Some(instrs) => instrs.to_vec(),
             None => Vec::new(),
         };
 
-        let instrs_out_ctrl = match instrs_out_ctrl {
+        let out_ctrl = match out_ctrl {
             Some(instrs) => instrs.to_vec(),
             None => Vec::new(),
         };
@@ -62,8 +64,8 @@ impl Mpu {
                  interp: Interpreter::new(words, MidiState::new()),
                  channel: channel,
                  input_channel: input_channel,
-                 instrs_out_note: instrs_out_note,
-                 instrs_out_ctrl: instrs_out_ctrl,
+                 instrs_out_note: out_note,
+                 instrs_out_ctrl: out_ctrl,
                  off_events: Vec::new(),
                  ctl_events: Vec::new(),
              })
@@ -232,7 +234,6 @@ mod tests {
 
     use std::sync::mpsc::channel;
 
-    use lang::{hash_str, Instr};
     use math::millis_to_dur;
     use unit::{Event, EventValue, Message};
 
@@ -240,16 +241,15 @@ mod tests {
     #[test]
     fn test_simple_note_off_events() {
         // Tests the note events for two scheduled events
-        let instrs = [Instr::Keyword(hash_str("event_value")),
-                      Instr::LoadNumber(127.0),
-                      Instr::Keyword(hash_str("event_duration")),
-                      Instr::LoadNumber(1.0),
-                      Instr::Keyword(hash_str("noteout"))];
+        let prog = Program::new("
+        mpu_out_note:
+            event_value 127 event_duration 1 noteout
+        ")
+                .unwrap();
 
         let (in_tx, in_rx) = channel();
         let (out_tx, out_rx) = channel();
-        let mut mpu = Mpu::new("mpu", Some(&instrs), None, out_tx, in_rx)
-            .unwrap();
+        let mut mpu = Mpu::new("mpu", &prog, out_tx, in_rx).unwrap();
 
         in_tx
             .send(Message::SeqEvent(Event {
@@ -291,16 +291,15 @@ mod tests {
     fn test_flush_single_note_off() {
         // Tests that a note off event is sent, if the same note has been
         // newly triggered, so that the new event is not cut short
-        let instrs = [Instr::Keyword(hash_str("event_value")),
-                      Instr::LoadNumber(127.0),
-                      Instr::Keyword(hash_str("event_duration")),
-                      Instr::LoadNumber(1.0),
-                      Instr::Keyword(hash_str("noteout"))];
+        let prog = Program::new("
+        mpu_out_note:
+            event_value 127 event_duration 1 noteout
+        ")
+                .unwrap();
 
         let (in_tx, in_rx) = channel();
         let (out_tx, out_rx) = channel();
-        let mut mpu = Mpu::new("mpu", Some(&instrs), None, out_tx, in_rx)
-            .unwrap();
+        let mut mpu = Mpu::new("mpu", &prog, out_tx, in_rx).unwrap();
 
         in_tx
             .send(Message::SeqEvent(Event {
@@ -337,11 +336,10 @@ mod tests {
 
     #[test]
     fn test_stopping() {
-        let instrs = [];
+        let prog = Program::new("mpu_out_note:").unwrap();
         let (in_tx, in_rx) = channel();
         let (out_tx, _) = channel();
-        let mut mpu = Mpu::new("mpu", Some(&instrs), None, out_tx, in_rx)
-            .unwrap();
+        let mut mpu = Mpu::new("mpu", &prog, out_tx, in_rx).unwrap();
         in_tx.send(Message::Stop).unwrap();
         mpu.run_forever(Duration::new(0, 1000000));
         assert_eq!(true, true);

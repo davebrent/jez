@@ -23,32 +23,27 @@ impl Machine {
         let (spu, spu_recv) = channel();
         let (mpu, mpu_recv) = channel();
 
-        let spu_thread = match Spu::new("spu",
-                                        prog.section("spu"),
-                                        bus_send.clone(),
-                                        spu_recv) {
-            Some(mut unit) => {
-                Some(thread::spawn(move || {
-                                       let res = Duration::new(0, 1000000);
-                                       unit.run_forever(res);
-                                   }))
-            }
-            None => None,
-        };
+        let spu_thread =
+            match Spu::new("spu", prog, bus_send.clone(), spu_recv) {
+                Some(mut unit) => {
+                    Some(thread::spawn(move || {
+                                           let res = Duration::new(0, 1000000);
+                                           unit.run_forever(res);
+                                       }))
+                }
+                None => None,
+            };
 
-        let mpu_thread = match Mpu::new("mpu",
-                                        prog.section("mpu_out_note"),
-                                        prog.section("mpu_out_ctrl"),
-                                        bus_send.clone(),
-                                        mpu_recv) {
-            Some(mut unit) => {
-                Some(thread::spawn(move || {
-                                       let res = Duration::new(0, 1000000);
-                                       unit.run_forever(res);
-                                   }))
-            }
-            None => None,
-        };
+        let mpu_thread =
+            match Mpu::new("mpu", prog, bus_send.clone(), mpu_recv) {
+                Some(mut unit) => {
+                    Some(thread::spawn(move || {
+                                           let res = Duration::new(0, 1000000);
+                                           unit.run_forever(res);
+                                       }))
+                }
+                None => None,
+            };
 
         let start = Instant::now();
         while let Ok(msg) = bus_recv.recv() {
