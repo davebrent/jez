@@ -1,218 +1,282 @@
 use std::collections::HashMap;
-use std::convert::Into;
 
 use err::RuntimeErr;
 use lang::{hash_str, Instr};
 use math::Curve;
 
 
-/// Represents all the values possible that can go on the stack
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Value {
+    Null,
     Number(f64),
     Symbol(u64),
     Pair(usize, usize),
     Tuple(usize, usize),
     Instruction(Instr),
-    Null,
     Curve(Curve),
 }
 
-impl Into<Option<f64>> for Value {
-    fn into(self) -> Option<f64> {
-        match self {
-            Value::Number(num) => Some(num),
-            _ => None,
+impl Value {
+    pub fn as_num(&self) -> Result<f64, RuntimeErr> {
+        match *self {
+            Value::Number(num) => Ok(num),
+            _ => Err(RuntimeErr::InvalidArgs),
         }
     }
 }
 
-impl Into<Option<u64>> for Value {
-    fn into(self) -> Option<u64> {
-        match self {
-            Value::Symbol(sym) => Some(sym),
-            _ => None,
-        }
-    }
+pub type InterpResult = Result<Option<Value>, RuntimeErr>;
+
+#[derive(Debug)]
+struct StackFrame {
+    stack: Vec<Value>,
+    locals: HashMap<u64, usize>,
+    ret_addr: usize,
 }
 
-impl Into<Option<(usize, usize)>> for Value {
-    fn into(self) -> Option<(usize, usize)> {
-        match self {
-            Value::Pair(a, b) => Some((a, b)),
-            _ => None,
+impl StackFrame {
+    pub fn new(ret_addr: usize) -> StackFrame {
+        StackFrame {
+            stack: Vec::new(),
+            ret_addr: ret_addr,
+            locals: HashMap::new(),
         }
     }
-}
 
-pub type InterpResult = Result<(), RuntimeErr>;
+    pub fn last(&self) -> Result<Value, RuntimeErr> {
+        match self.stack.last() {
+            Some(val) => Ok(*val),
+            None => Err(RuntimeErr::StackExhausted),
+        }
+    }
+
+    pub fn pop(&mut self) -> Result<Value, RuntimeErr> {
+        match self.stack.pop() {
+            Some(val) => Ok(val),
+            None => Err(RuntimeErr::StackExhausted),
+        }
+    }
+
+    pub fn push(&mut self, val: Value) -> Result<(), RuntimeErr> {
+        self.stack.push(val);
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 pub struct InterpState {
-    pub pc: usize,
-    pub stack: Vec<Value>,
-    pub heap: Vec<Value>,
-    pub vars: HashMap<u64, usize>,
-    save_point: usize,
+    heap: Vec<Value>,
+    pc: usize,
+    globals: HashMap<u64, usize>,
+    frames: Vec<StackFrame>,
+    exit: bool,
 }
 
 impl InterpState {
     pub fn new() -> InterpState {
         InterpState {
             pc: 0,
-            stack: vec![],
             heap: vec![],
-            vars: HashMap::new(),
-            save_point: 0,
+            globals: HashMap::new(),
+            frames: vec![],
+            exit: false,
         }
     }
 
-    // /// All values pushed to the heap after this point may be truncated
-    // pub fn set_save_point(&mut self) {
-    //     self.save_point = self.heap.len();
-    // }
-
-    /// Remove all values from the heap above the save point
-    pub fn reset(&mut self) {
-        self.heap.truncate(self.save_point);
+    fn frame(&self) -> Result<&StackFrame, RuntimeErr> {
+        match self.frames.last() {
+            None => Err(RuntimeErr::StackExhausted),
+            Some(frame) => Ok(frame),
+        }
     }
-}
 
-/// Put the Null value onto the stack
-pub fn load_null(state: &mut InterpState) -> InterpResult {
-    state.stack.push(Value::Null);
-    Ok(())
-}
+    fn frame_mut(&mut self) -> Result<&mut StackFrame, RuntimeErr> {
+        match self.frames.last_mut() {
+            None => Err(RuntimeErr::StackExhausted),
+            Some(frame) => Ok(frame),
+        }
+    }
 
-/// Put a number onto the stack
-pub fn load_number(num: f64, state: &mut InterpState) -> InterpResult {
-    state.stack.push(Value::Number(num));
-    Ok(())
-}
+    pub fn heap_slice_mut(&mut self,
+                          start: usize,
+                          end: usize)
+                          -> Result<&mut [Value], RuntimeErr> {
+        if start > end || end > self.heap_len() {
+            return Err(RuntimeErr::InvalidArgs);
+        }
+        Ok(&mut self.heap[start..end])
+    }
 
-/// Puts a symbol value onto the stack
-pub fn load_symbol(num: u64, state: &mut InterpState) -> InterpResult {
-    state.stack.push(Value::Symbol(num));
-    Ok(())
-}
+    pub fn heap_get(&self, ptr: usize) -> Result<Value, RuntimeErr> {
+        match self.heap.get(ptr) {
+            Some(val) => Ok(*val),
+            None => Err(RuntimeErr::InvalidArgs),
+        }
+    }
 
-/// Move a value onto the heap and store it against a name
-pub fn store_var(name: u64, state: &mut InterpState) -> InterpResult {
-    let ptr = state.heap.len();
-    let val = state.stack.pop().unwrap();
-    state.heap.push(val);
-    state.vars.insert(name, ptr);
-    Ok(())
-}
+    pub fn heap_len(&self) -> usize {
+        self.heap.len()
+    }
 
-/// Load a variable value back onto the stack
-pub fn load_var(name: u64, state: &mut InterpState) -> InterpResult {
-    let ptr = &state.vars[&name];
-    state.stack.push(state.heap[*ptr]);
-    Ok(())
-}
+    pub fn heap_push(&mut self, val: Value) -> usize {
+        self.heap.push(val);
+        self.heap_len()
+    }
 
-/// Marker for `list_end` to stop traversing the stack
-pub fn list_begin(state: &mut InterpState) -> InterpResult {
-    state.stack.push(Value::Instruction(Instr::ListBegin));
-    Ok(())
-}
+    pub fn call(&mut self, args: usize, pc: usize) -> InterpResult {
+        // Push a new stack frame copying across any arguments, if any, from
+        // the previous frame
+        let mut frame = StackFrame::new(self.pc);
+        if args != 0 {
+            let caller = try!(self.frame_mut());
+            for _ in 0..args {
+                try!(frame.push(try!(caller.pop())));
+            }
+        }
+        self.frames.push(frame);
+        // Account for implicit increment of pc
+        self.pc = pc - 1;
+        Ok(None)
+    }
 
-/// Replaces stack values with a pair pointing to the values on the heap
-pub fn list_end(state: &mut InterpState) -> InterpResult {
-    let start = state.heap.len();
-    loop {
-        // Loop back through the stack, moving objects to the heap, until a
-        // 'ListBegin' instruction is reached then, store the range on the stack
-        match state.stack.pop() {
-            None => return Err(RuntimeErr::StackExhausted),
-            Some(val) => {
-                match val {
-                    Value::Instruction(instr) => {
-                        match instr {
-                            Instr::ListBegin => {
-                                let end = state.heap.len();
-                                let pair = Value::Pair(start, end);
-                                state.heap[start..end].reverse();
-                                state.stack.push(pair);
-                                return Ok(());
-                            }
-                            _ => state.heap.push(val),
-                        }
-                    }
-                    _ => state.heap.push(val),
+    pub fn ret(&mut self) -> InterpResult {
+        match self.frames.pop() {
+            None => Err(RuntimeErr::StackExhausted),
+            Some(mut frame) => {
+                // If this is the last stack frame, return the 'top of stack'
+                // value as the final result. Otherwise 'None' and continue
+                // evaluating instructions
+                let res = try!(frame.pop());
+                if self.frames.is_empty() {
+                    self.exit = true;
+                    Ok(Some(res))
+                } else {
+                    try!(self.push(res));
+                    self.pc = frame.ret_addr;
+                    Ok(None)
                 }
             }
         }
     }
+
+    pub fn last(&self) -> Result<Value, RuntimeErr> {
+        let frame = try!(self.frame());
+        Ok(try!(frame.last()))
+    }
+
+    pub fn pop(&mut self) -> Result<Value, RuntimeErr> {
+        let mut frame = try!(self.frame_mut());
+        Ok(try!(frame.pop()))
+    }
+
+    pub fn pop_num(&mut self) -> Result<f64, RuntimeErr> {
+        match try!(self.pop()) {
+            Value::Number(num) => Ok(num),
+            _ => Err(RuntimeErr::InvalidArgs),
+        }
+    }
+
+    pub fn pop_pair(&mut self) -> Result<(usize, usize), RuntimeErr> {
+        match try!(self.pop()) {
+            Value::Pair(start, end) => Ok((start, end)),
+            _ => Err(RuntimeErr::InvalidArgs),
+        }
+    }
+
+    pub fn last_pair(&mut self) -> Result<(usize, usize), RuntimeErr> {
+        match try!(self.last()) {
+            Value::Pair(start, end) => Ok((start, end)),
+            _ => Err(RuntimeErr::InvalidArgs),
+        }
+    }
+
+    pub fn push(&mut self, val: Value) -> InterpResult {
+        match self.frames.last_mut() {
+            None => Err(RuntimeErr::StackExhausted),
+            Some(frame) => {
+                try!(frame.push(val));
+                Ok(None)
+            }
+        }
+    }
+
+    pub fn store(&mut self, name: u64, val: Value) -> Result<(), RuntimeErr> {
+        let ptr = self.heap_len();
+        self.heap_push(val);
+        match self.frames.last_mut() {
+            Some(frame) => frame.locals.insert(name, ptr),
+            None => self.globals.insert(name, ptr),
+        };
+        Ok(())
+    }
+
+    pub fn lookup(&mut self, name: u64) -> Result<Value, RuntimeErr> {
+        let ptr = match self.frame() {
+            Ok(frame) => frame.locals.get(&name),
+            Err(_) => self.globals.get(&name),
+        };
+        match ptr {
+            Some(ptr) => self.heap_get(*ptr),
+            None => Err(RuntimeErr::InvalidArgs),
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.heap.clear();
+    }
 }
 
-/// Add top two stack values
-pub fn add(state: &mut InterpState) -> InterpResult {
-    let rhs: Option<f64> = state.stack.pop().unwrap().into();
-    let lhs: Option<f64> = state.stack.pop().unwrap().into();
-    state
-        .stack
-        .push(Value::Number(lhs.unwrap() + rhs.unwrap()));
-    Ok(())
+fn add(state: &mut InterpState) -> InterpResult {
+    let rhs = try!(state.pop_num());
+    let lhs = try!(state.pop_num());
+    try!(state.push(Value::Number(lhs + rhs)));
+    Ok(None)
 }
 
-/// Subtract top two stack values
-pub fn subtract(state: &mut InterpState) -> InterpResult {
-    let rhs: Option<f64> = state.stack.pop().unwrap().into();
-    let lhs: Option<f64> = state.stack.pop().unwrap().into();
-    state
-        .stack
-        .push(Value::Number(lhs.unwrap() - rhs.unwrap()));
-    Ok(())
+fn subtract(state: &mut InterpState) -> InterpResult {
+    let rhs = try!(state.pop_num());
+    let lhs = try!(state.pop_num());
+    try!(state.push(Value::Number(lhs - rhs)));
+    Ok(None)
 }
 
-/// Multiply top two stack values
-pub fn multiply(state: &mut InterpState) -> InterpResult {
-    let rhs: Option<f64> = state.stack.pop().unwrap().into();
-    let lhs: Option<f64> = state.stack.pop().unwrap().into();
-    state
-        .stack
-        .push(Value::Number(lhs.unwrap() * rhs.unwrap()));
-    Ok(())
+fn multiply(state: &mut InterpState) -> InterpResult {
+    let rhs = try!(state.pop_num());
+    let lhs = try!(state.pop_num());
+    try!(state.push(Value::Number(lhs * rhs)));
+    Ok(None)
 }
 
-/// Divide top two stack values
-pub fn divide(state: &mut InterpState) -> InterpResult {
-    let rhs: Option<f64> = state.stack.pop().unwrap().into();
-    let lhs: Option<f64> = state.stack.pop().unwrap().into();
-    state
-        .stack
-        .push(Value::Number(lhs.unwrap() / rhs.unwrap()));
-    Ok(())
+fn divide(state: &mut InterpState) -> InterpResult {
+    let rhs = try!(state.pop_num());
+    let lhs = try!(state.pop_num());
+    try!(state.push(Value::Number(lhs / rhs)));
+    Ok(None)
 }
 
-/// Print top stack value
-pub fn print(state: &mut InterpState) -> InterpResult {
-    println!("{:?}", state.stack.pop().unwrap());
-    Ok(())
+fn print(state: &mut InterpState) -> InterpResult {
+    let val = try!(state.last());
+    println!("{:?}", val);
+    Ok(None)
 }
 
-/// Drop the top value on the stack
-pub fn drop(state: &mut InterpState) -> InterpResult {
-    state.stack.pop().unwrap();
-    Ok(())
+fn drop(state: &mut InterpState) -> InterpResult {
+    try!(state.pop());
+    Ok(None)
 }
 
-/// Duplicate the top value on the stack
-pub fn duplicate(state: &mut InterpState) -> InterpResult {
-    let val = *state.stack.last().unwrap();
-    state.stack.push(val);
-    Ok(())
+fn duplicate(state: &mut InterpState) -> InterpResult {
+    let val = try!(state.last());
+    try!(state.push(val));
+    Ok(None)
 }
 
-/// Swap the top two values on the stack
-pub fn swap(state: &mut InterpState) -> InterpResult {
-    let a = state.stack.pop().unwrap();
-    let b = state.stack.pop().unwrap();
-    state.stack.push(a);
-    state.stack.push(b);
-    Ok(())
+fn swap(state: &mut InterpState) -> InterpResult {
+    let a = try!(state.pop());
+    let b = try!(state.pop());
+    try!(state.push(a));
+    try!(state.push(b));
+    Ok(None)
 }
 
 pub type BuiltInKeyword = fn(&mut InterpState) -> InterpResult;
@@ -253,37 +317,85 @@ impl<S> Interpreter<S> {
         }
     }
 
-    pub fn eval(&mut self, instrs: &[Instr]) -> InterpResult {
-        self.state.pc = 0;
-        while self.state.pc < instrs.len() {
-            let instr = instrs[self.state.pc];
-            match instr {
-                Instr::LoadNumber(num) => {
-                    load_number(num as f64, &mut self.state)
-                }
-                Instr::LoadString(_) => Err(RuntimeErr::NotImplemented),
-                Instr::Null => load_null(&mut self.state),
-                Instr::LoadSymbol(sym) => load_symbol(sym, &mut self.state),
-                Instr::StoreVar(name) => store_var(name, &mut self.state),
-                Instr::LoadVar(name) => load_var(name, &mut self.state),
-                Instr::ListBegin => list_begin(&mut self.state),
-                Instr::ListEnd => list_end(&mut self.state),
-                Instr::Keyword(word) => {
-                    if let Some(keyword) = self.words.get(&word) {
-                        match *keyword {
-                            Keyword::BuiltIn(func) => func(&mut self.state),
-                            Keyword::Extension(func) => {
-                                func(&mut self.data, &mut self.state)
+    pub fn step(&mut self, instr: Instr) -> InterpResult {
+        match instr {
+            Instr::Null => self.state.push(Value::Null),
+            Instr::LoadString(_) => Err(RuntimeErr::NotImplemented),
+            Instr::LoadNumber(n) => self.state.push(Value::Number(n as f64)),
+            Instr::LoadSymbol(s) => self.state.push(Value::Symbol(s)),
+            Instr::Call(args, pc) => self.state.call(args, pc),
+            Instr::Return => self.state.ret(),
+            Instr::StoreVar(name) => {
+                let val = try!(self.state.pop());
+                try!(self.state.store(name, val));
+                Ok(None)
+            }
+            Instr::LoadVar(name) => {
+                let val = try!(self.state.lookup(name));
+                try!(self.state.push(val));
+                Ok(None)
+            }
+            Instr::ListBegin => {
+                let val = Value::Instruction(Instr::ListBegin);
+                try!(self.state.push(val));
+                Ok(None)
+            }
+            Instr::ListEnd => {
+                let start = self.state.heap_len();
+                loop {
+                    // Loop back through the stack, moving objects to the heap,
+                    // until a 'ListBegin' instruction is reached then, store
+                    // the range on the stack
+                    let val = try!(self.state.pop());
+                    match val {
+                        Value::Instruction(instr) => {
+                            match instr {
+                                Instr::ListBegin => {
+                                    let end = self.state.heap_len();
+                                    let pair = Value::Pair(start, end);
+                                    try!(self.state.push(pair));
+                                    try!(self.state.heap_slice_mut(start, end))
+                                        .reverse();
+                                    return Ok(None);
+                                }
+                                _ => {
+                                    self.state.heap_push(val);
+                                }
                             }
                         }
-                    } else {
-                        Err(RuntimeErr::UnknownKeyword(word))
+                        _ => {
+                            self.state.heap_push(val);
+                        }
                     }
                 }
-            }?;
+            }
+            Instr::Keyword(word) => {
+                // Keywords operate on an implicit stack frame
+                if let Some(keyword) = self.words.get(&word) {
+                    match *keyword {
+                        Keyword::BuiltIn(func) => func(&mut self.state),
+                        Keyword::Extension(func) => {
+                            func(&mut self.data, &mut self.state)
+                        }
+                    }
+                } else {
+                    Err(RuntimeErr::UnknownKeyword(word))
+                }
+            }
+        }
+    }
+
+    pub fn eval(&mut self, instrs: &[Instr]) -> InterpResult {
+        self.state.pc = 0;
+        while self.state.pc < instrs.len() && !self.state.exit {
+            let instr = instrs[self.state.pc];
+            match try!(self.step(instr)) {
+                None => (),
+                Some(val) => return Ok(Some(val)),
+            }
             self.state.pc += 1;
         }
-        Ok(())
+        Ok(None)
     }
 }
 
@@ -291,56 +403,66 @@ impl<S> Interpreter<S> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_callables() {
+        let instrs = [Instr::Call(0, 1),
+                      Instr::LoadNumber(13.0),
+                      Instr::LoadNumber(12.0),
+                      Instr::Call(2, 5),
+                      Instr::Return,
+                      Instr::Keyword(hash_str("add")), // call 5
+                      Instr::Return];
+        let mut interp = Interpreter::new(HashMap::new(), ());
+        let res = interp.eval(&instrs).unwrap();
+        assert_eq!(res.unwrap(), Value::Number(25.0));
+    }
 
     #[test]
     fn test_addition() {
-        let instrs = [Instr::LoadNumber(3.2),
+        let instrs = [Instr::Call(0, 1),
+                      Instr::LoadNumber(3.2),
                       Instr::LoadNumber(2.8),
-                      Instr::Keyword(hash_str("add"))];
+                      Instr::Keyword(hash_str("add")),
+                      Instr::Return];
         let mut interp = Interpreter::new(HashMap::new(), ());
-        interp.eval(&instrs).unwrap();
-        let val: Option<f64> = interp.state.stack.pop().unwrap().into();
-        let val = val.unwrap();
-        assert_eq!(val, 6.0);
+        let res = interp.eval(&instrs).unwrap();
+        assert_eq!(res.unwrap(), Value::Number(6.0));
     }
 
     #[test]
     fn test_subtraction() {
-        let instrs = [Instr::LoadNumber(2.0),
+        let instrs = [Instr::Call(0, 1),
+                      Instr::LoadNumber(2.0),
                       Instr::LoadNumber(3.0),
-                      Instr::Keyword(hash_str("subtract"))];
+                      Instr::Keyword(hash_str("subtract")),
+                      Instr::Return];
         let mut interp = Interpreter::new(HashMap::new(), ());
-        interp.eval(&instrs).unwrap();
-        let val: Option<f64> = interp.state.stack.pop().unwrap().into();
-        let val = val.unwrap();
-        assert_eq!(val, -1.0);
+        let res = interp.eval(&instrs).unwrap();
+        assert_eq!(res.unwrap(), Value::Number(-1.0));
     }
 
     #[test]
     fn test_variables() {
-        let instrs = [Instr::LoadNumber(3.0),
+        let instrs = [Instr::Call(0, 1),
+                      Instr::LoadNumber(3.0),
                       Instr::StoreVar(hash_str("foo")),
                       Instr::LoadNumber(2.0),
-                      Instr::LoadVar(hash_str("foo"))];
+                      Instr::LoadVar(hash_str("foo")),
+                      Instr::Return];
         let mut interp = Interpreter::new(HashMap::new(), ());
-        interp.eval(&instrs).unwrap();
-        let val: Option<f64> = interp.state.stack.pop().unwrap().into();
-        let val = val.unwrap();
-        assert_eq!(val, 3.0);
+        let res = interp.eval(&instrs).unwrap();
+        assert_eq!(res.unwrap(), Value::Number(3.0));
     }
 
     #[test]
     fn test_swap() {
-        let instrs = [Instr::LoadNumber(3.0),
+        let instrs = [Instr::Call(0, 1),
+                      Instr::LoadNumber(3.0),
                       Instr::LoadNumber(2.0),
-                      Instr::Keyword(hash_str("swap"))];
+                      Instr::Keyword(hash_str("swap")),
+                      Instr::Return];
         let mut interp = Interpreter::new(HashMap::new(), ());
-        interp.eval(&instrs).unwrap();
-        let a: Option<f64> = interp.state.stack.pop().unwrap().into();
-        let a = a.unwrap();
-        assert_eq!(a, 3.0);
-        let b: Option<f64> = interp.state.stack.pop().unwrap().into();
-        let b = b.unwrap();
-        assert_eq!(b, 2.0);
+        let res = interp.eval(&instrs).unwrap();
+        assert_eq!(res.unwrap(), Value::Number(3.0));
     }
 }

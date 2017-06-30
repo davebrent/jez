@@ -10,100 +10,82 @@ use super::seq::{SeqState, SeqTrack};
 
 /// Repeat a value 'n' times
 pub fn repeat(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let times: Option<f64> = state.stack.pop().unwrap().into();
-    let times = times.unwrap() as u32;
-    let val = state.stack.pop().unwrap();
+    let times = try!(state.pop_num()) as usize;
+    let val = try!(state.pop());
     for _ in 0..times {
-        state.stack.push(val);
+        try!(state.push(val));
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Put a value on the stack every 'n' cycles
 pub fn every(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let freq: Option<f64> = state.stack.pop().unwrap().into();
-    let freq = freq.unwrap() as usize;
+    let freq = try!(state.pop_num()) as usize;
     if freq % seq.cycle.rev == 0 {
-        state.stack.pop().unwrap();
+        try!(state.pop());
     } else {
         // Remove the else clause from the stack
-        let val = state.stack.pop().unwrap();
-        state.stack.pop().unwrap();
-        state.stack.push(val);
+        let val = try!(state.pop());
+        try!(state.pop());
+        try!(state.push(val));
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Reverse a list, leaving it on the stack
 pub fn reverse(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    match *state.stack.last().unwrap() {
-        Value::Pair(start, end) => {
-            state.heap[start..end].reverse();
-            Ok(())
-        }
-        _ => Err(RuntimeErr::InvalidArgs),
-    }
+    let (start, end) = try!(state.last_pair());
+    let slice = try!(state.heap_slice_mut(start, end));
+    slice.reverse();
+    Ok(None)
 }
 
 /// Shuffle a list, leaving it on the stack
 pub fn shuffle(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    match *state.stack.last().unwrap() {
-        Value::Pair(start, end) => {
-            let mut rng = StdRng::new().unwrap();
-            rng.shuffle(&mut state.heap[start..end]);
-            Ok(())
-        }
-        _ => Err(RuntimeErr::InvalidArgs),
-    }
+    let (start, end) = try!(state.last_pair());
+    let mut rng = StdRng::new().unwrap();
+    let slice = try!(state.heap_slice_mut(start, end));
+    rng.shuffle(slice);
+    Ok(None)
 }
 
 /// Rotate a list
 pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let amount: Option<f64> = state.stack.pop().unwrap().into();
-    let amount = amount.unwrap() as usize;
-    match *state.stack.last().unwrap() {
-        Value::Pair(start, end) => {
-            let lst = &state.heap[start..end].to_vec();
-            let (a, b) = lst.split_at(lst.len() - amount);
-            let mut out = Vec::new();
-            out.extend_from_slice(b);
-            out.extend_from_slice(a);
-            state.heap[start..end].copy_from_slice(&out);
-            Ok(())
-        }
-        _ => Err(RuntimeErr::InvalidArgs),
-    }
+    let amount = try!(state.pop_num()) as usize;
+    let (start, end) = try!(state.last_pair());
+
+    let lst = try!(state.heap_slice_mut(start, end)).to_vec();
+    let (a, b) = lst.split_at(lst.len() - amount);
+    let mut out = Vec::new();
+    out.extend_from_slice(b);
+    out.extend_from_slice(a);
+    let slice = try!(state.heap_slice_mut(start, end));
+    slice.copy_from_slice(&out);
+    Ok(None)
 }
 
 /// Randomly set values to rests in a list
 pub fn degrade(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
     let mut rng = StdRng::new().unwrap();
-    match *state.stack.last().unwrap() {
-        Value::Pair(start, end) => {
-            let lst = &mut state.heap[start..end];
-            for item in lst {
-                if rng.gen() {
-                    *item = Value::Null;
-                }
-            }
-            Ok(())
+    let (start, end) = try!(state.last_pair());
+    let lst = try!(state.heap_slice_mut(start, end));
+    for item in lst {
+        if rng.gen() {
+            *item = Value::Null;
         }
-        _ => Err(RuntimeErr::InvalidArgs),
     }
+    Ok(None)
 }
 
 /// Every cycle, puts the 'next' element of a list on the stack
 pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    match state.stack.pop().unwrap() {
-        Value::Pair(start, end) => {
-            if start != end {
-                let i = seq.cycle.rev % (end - start);
-                state.stack.push(state.heap[i]);
-            }
-            Ok(())
-        }
-        _ => Err(RuntimeErr::InvalidArgs),
+    let (start, end) = try!(state.pop_pair());
+    if start != end {
+        let i = seq.cycle.rev % (end - start);
+        let v = try!(state.heap_get(i));
+        try!(state.push(v));
     }
+    Ok(None)
 }
 
 /// Reverse a list every other cycle
@@ -111,7 +93,7 @@ pub fn palindrome(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
     if seq.cycle.rev % 2 == 1 {
         return reverse(seq, state);
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Generate a rhythm using the Hop-and-jump algorithm
@@ -121,12 +103,9 @@ pub fn palindrome(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
 ///   [1]: Simha Arom. African Polyphony and Polyrhythm.
 ///        Cambridge University Press, Cambridge, England, 1991.
 pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let hopsize: Option<f64> = state.stack.pop().unwrap().into();
-    let hopsize = hopsize.unwrap() as usize;
-    let pulses: Option<f64> = state.stack.pop().unwrap().into();
-    let pulses = pulses.unwrap() as usize;
-    let onsets: Option<f64> = state.stack.pop().unwrap().into();
-    let onsets = onsets.unwrap() as usize;
+    let hopsize = try!(state.pop_num()) as usize;
+    let pulses = try!(state.pop_num()) as usize;
+    let onsets = try!(state.pop_num()) as usize;
 
     if onsets * hopsize >= pulses {
         return Err(RuntimeErr::InvalidArgs);
@@ -154,38 +133,32 @@ pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
         }
     }
 
-    let start = state.heap.len();
+    let start = state.heap_len();
     for value in &mut rhythm {
         let value = *value;
         if value == 2 {
-            state.heap.push(Value::Number(0.0));
+            state.heap_push(Value::Number(0.0));
         } else {
-            state.heap.push(Value::Number(value as f64));
+            state.heap_push(Value::Number(value as f64));
         }
     }
 
-    state.stack.push(Value::Pair(start, state.heap.len()));
-    Ok(())
+    let len = state.heap_len();
+    try!(state.push(Value::Pair(start, len)));
+    Ok(None)
 }
 
 /// Define a list of simultanious events
 pub fn simul(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    match state.stack.pop().unwrap() {
-        Value::Pair(start, end) => {
-            state.stack.push(Value::Tuple(start, end));
-            Ok(())
-        }
-        _ => Err(RuntimeErr::InvalidArgs),
-    }
+    let (start, end) = try!(state.pop_pair());
+    try!(state.push(Value::Tuple(start, end)));
+    Ok(None)
 }
 
 /// Build a track by recursively subdividing a list into a series of events
 pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let num: Option<f64> = state.stack.pop().unwrap().into();
-    let num = num.unwrap() as u32;
-
-    let dur: Option<f64> = state.stack.pop().unwrap().into();
-    let dur = dur.unwrap();
+    let num = try!(state.pop_num()) as u32;
+    let dur = try!(state.pop_num());
 
     let mut track = SeqTrack {
         num: num as usize,
@@ -194,7 +167,7 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
     };
 
     let mut visit: Vec<(f64, f64, Value)> = Vec::new();
-    visit.push((0.0, dur, state.stack.pop().unwrap()));
+    visit.push((0.0, dur, state.pop().unwrap()));
 
     while let Some((onset, dur, val)) = visit.pop() {
         match val {
@@ -221,13 +194,13 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
                 let interval = dur / (end - start) as f64;
                 let mut onset = onset;
                 for n in start..end {
-                    visit.push((onset, interval, state.heap[n]));
+                    visit.push((onset, interval, try!(state.heap_get(n))));
                     onset += interval;
                 }
             }
             Value::Tuple(start, end) => {
                 for n in start..end {
-                    visit.push((onset, dur, state.heap[n]));
+                    visit.push((onset, dur, try!(state.heap_get(n))));
                 }
             }
             _ => return Err(RuntimeErr::InvalidArgs),
@@ -235,63 +208,55 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
     }
 
     seq.tracks.push(track);
-    Ok(())
+    Ok(None)
 }
 
 /// Create a bezier curve from a linear ramp
 pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    match state.stack.pop().unwrap() {
-        Value::Pair(start, end) => {
-            if end - start != 2 {
-                return Err(RuntimeErr::InvalidArgs);
-            }
-
-            let c0: Option<f64> = state.heap[start].into();
-            let c0 = c0.unwrap();
-            let c1: Option<f64> = state.heap[start + 1].into();
-            let c1 = c1.unwrap();
-            let curve = path_to_curve(&[0.0, c0 as f64], &[1.0, c1 as f64]);
-
-            state.stack.push(Value::Curve(curve));
-
-            Ok(())
-        }
-        _ => Err(RuntimeErr::InvalidArgs),
+    let (start, end) = try!(state.pop_pair());
+    if end - start != 2 {
+        return Err(RuntimeErr::InvalidArgs);
     }
+
+    let c0 = try!(try!(state.heap_get(start)).as_num());
+    let c1 = try!(try!(state.heap_get(start + 1)).as_num());
+    let curve = path_to_curve(&[0.0, c0 as f64], &[1.0, c1 as f64]);
+    try!(state.push(Value::Curve(curve)));
+    Ok(None)
 }
 
 /// Gray code number encoding
 pub fn graycode(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let num: Option<f64> = state.stack.pop().unwrap().into();
-    let num = num.unwrap() as i64;
+    let num = try!(state.pop_num()) as i64;
     let num = (num >> 1) ^ num;
-    state.stack.push(Value::Number(num as f64));
-    Ok(())
+    try!(state.push(Value::Number(num as f64)));
+    Ok(None)
 }
 
 /// Encode a number into a binary list
 pub fn binlist(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let num: Option<f64> = state.stack.pop().unwrap().into();
-    let num = num.unwrap() as i64;
-    let n: Option<f64> = state.stack.pop().unwrap().into();
-    let n = n.unwrap() as i64;
-    let start = state.heap.len();
+    let num = try!(state.pop_num()) as i64;
+    let n = try!(state.pop_num()) as i64;
+
+    let start = state.heap_len();
     for i in 0..n {
         let val = if num & (1 << i) > 0 {
             Value::Number(1.0)
         } else {
             Value::Null
         };
-        state.heap.push(val);
+        state.heap_push(val);
     }
-    state.stack.push(Value::Pair(start, state.heap.len()));
-    Ok(())
+
+    let len = state.heap_len();
+    try!(state.push(Value::Pair(start, len)));
+    Ok(None)
 }
 
 /// Puts the current cycle revision onto the stack
 pub fn rev(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    state.stack.push(Value::Number(seq.cycle.rev as f64));
-    Ok(())
+    try!(state.push(Value::Number(seq.cycle.rev as f64)));
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -302,19 +267,14 @@ mod tests {
     fn repeat_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.stack.push(Value::Number(12.0));
-        state.stack.push(Value::Number(3.0));
+        state.call(0, 1).unwrap();
+        state.push(Value::Number(12.0)).unwrap();
+        state.push(Value::Number(3.0)).unwrap();
         repeat(&mut seq, &mut state).unwrap();
-        let a: Option<f64> = state.stack.pop().unwrap().into();
-        let a = a.unwrap();
-        let b: Option<f64> = state.stack.pop().unwrap().into();
-        let b = b.unwrap();
-        let c: Option<f64> = state.stack.pop().unwrap().into();
-        let c = c.unwrap();
-        assert_eq!(a, 12.0);
-        assert_eq!(b, 12.0);
-        assert_eq!(c, 12.0);
-        assert_eq!(state.stack.len(), 0);
+        assert_eq!(state.pop_num().unwrap(), 12.0);
+        assert_eq!(state.pop_num().unwrap(), 12.0);
+        assert_eq!(state.pop_num().unwrap(), 12.0);
+        assert_eq!(state.pop().is_err(), true);
     }
 
     #[test]
@@ -322,14 +282,13 @@ mod tests {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
         seq.cycle.rev = 3;
-        state.stack.push(Value::Number(3.14));
-        state.stack.push(Value::Number(2.17));
-        state.stack.push(Value::Number(3.0));
+        state.call(0, 1).unwrap();
+        state.push(Value::Number(3.14)).unwrap();
+        state.push(Value::Number(2.17)).unwrap();
+        state.push(Value::Number(3.0)).unwrap();
         every(&mut seq, &mut state).unwrap();
-        let a: Option<f64> = state.stack.pop().unwrap().into();
-        let a = a.unwrap();
-        assert_eq!(a, 3.14);
-        assert_eq!(state.stack.len(), 0);
+        assert_eq!(state.pop_num().unwrap(), 3.14);
+        assert_eq!(state.pop().is_err(), true);
     }
 
     #[test]
@@ -337,81 +296,60 @@ mod tests {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
         seq.cycle.rev = 3;
-        state.stack.push(Value::Number(3.14));
-        state.stack.push(Value::Number(2.17));
-        state.stack.push(Value::Number(4.0));
+        state.call(0, 1).unwrap();
+        state.push(Value::Number(3.14)).unwrap();
+        state.push(Value::Number(2.17)).unwrap();
+        state.push(Value::Number(4.0)).unwrap();
         every(&mut seq, &mut state).unwrap();
-        let a: Option<f64> = state.stack.pop().unwrap().into();
-        let a = a.unwrap();
-        assert_eq!(a, 2.17);
-        assert_eq!(state.stack.len(), 0);
+        assert_eq!(state.pop_num().unwrap(), 2.17);
+        assert_eq!(state.pop().is_err(), true);
     }
 
     #[test]
     fn reverse_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.heap.push(Value::Number(1.0));
-        state.heap.push(Value::Number(2.0));
-        state.heap.push(Value::Number(3.0));
-        state.stack.push(Value::Pair(0, 3));
+        state.call(0, 1).unwrap();
+        state.heap_push(Value::Number(1.0));
+        state.heap_push(Value::Number(2.0));
+        state.heap_push(Value::Number(3.0));
+        state.push(Value::Pair(0, 3)).unwrap();
         reverse(&mut seq, &mut state).unwrap();
-        let a: Option<f64> = state.heap.remove(0).into();
-        let a = a.unwrap();
-        let b: Option<f64> = state.heap.remove(0).into();
-        let b = b.unwrap();
-        let c: Option<f64> = state.heap.remove(0).into();
-        let c = c.unwrap();
-        assert_eq!(a, 3.0);
-        assert_eq!(b, 2.0);
-        assert_eq!(c, 1.0);
-        assert_eq!(state.stack.len(), 1);
+        let out = state.heap_slice_mut(0, 3).unwrap();
+        assert_eq!(out[0].as_num().unwrap(), 3.0);
+        assert_eq!(out[1].as_num().unwrap(), 2.0);
+        assert_eq!(out[2].as_num().unwrap(), 1.0);
     }
 
     #[test]
     fn rotate_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.heap.push(Value::Number(1.0));
-        state.heap.push(Value::Number(2.0));
-        state.heap.push(Value::Number(3.0));
-        state.stack.push(Value::Pair(0, 3));
-        state.stack.push(Value::Number(1.0));
+        state.call(0, 1).unwrap();
+        state.heap_push(Value::Number(1.0));
+        state.heap_push(Value::Number(2.0));
+        state.heap_push(Value::Number(3.0));
+        state.push(Value::Pair(0, 3)).unwrap();
+        state.push(Value::Number(1.0)).unwrap();
         rotate(&mut seq, &mut state).unwrap();
-        let a: Option<f64> = state.heap.remove(0).into();
-        let a = a.unwrap();
-        let b: Option<f64> = state.heap.remove(0).into();
-        let b = b.unwrap();
-        let c: Option<f64> = state.heap.remove(0).into();
-        let c = c.unwrap();
-        assert_eq!(a, 3.0);
-        assert_eq!(b, 1.0);
-        assert_eq!(c, 2.0);
-        assert_eq!(state.stack.len(), 1);
-    }
-
-    #[test]
-    fn hopjump_keyword() {
-        let mut state = InterpState::new();
-        let mut seq = SeqState::new();
-        state.stack.push(Value::Number(5.0));
-        state.stack.push(Value::Number(12.0));
-        state.stack.push(Value::Number(2.0));
-        hopjump(&mut seq, &mut state).unwrap();
-        assert_eq!(state.stack.len(), 1);
+        let out = state.heap_slice_mut(0, 3).unwrap();
+        assert_eq!(out[0].as_num().unwrap(), 3.0);
+        assert_eq!(out[1].as_num().unwrap(), 1.0);
+        assert_eq!(out[2].as_num().unwrap(), 2.0);
     }
 
     #[test]
     fn test_simultaneous_events() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.heap.push(Value::Number(1.0));
-        state.heap.push(Value::Number(2.0));
-        state.heap.push(Value::Number(3.0));
-        state.stack.push(Value::Pair(0, 3));
+        state.call(0, 1).unwrap();
+        state.heap_push(Value::Number(1.0));
+        state.heap_push(Value::Number(2.0));
+        state.heap_push(Value::Number(3.0));
+        state.push(Value::Pair(0, 3)).unwrap();
         simul(&mut seq, &mut state).unwrap();
-        state.stack.push(Value::Number(1000.0));
-        state.stack.push(Value::Number(0.0));
+        state.push(Value::Number(1000.0)).unwrap();
+        state.push(Value::Number(0.0)).unwrap();
         track(&mut seq, &mut state).unwrap();
 
         assert_eq!(seq.tracks[0].events,
@@ -439,28 +377,28 @@ mod tests {
     fn test_binlist() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.stack.push(Value::Number(5.0));
-        state.stack.push(Value::Number(12.0));
+        state.call(0, 1).unwrap();
+        state.push(Value::Number(5.0)).unwrap();
+        state.push(Value::Number(12.0)).unwrap();
         binlist(&mut seq, &mut state).unwrap();
-        assert_eq!(state.heap.len(), 5);
-        for expected in &[Value::Null,
-                          Value::Null,
-                          Value::Number(1.0),
-                          Value::Number(1.0),
-                          Value::Null] {
-            assert_eq!(state.heap.remove(0), *expected);
-        }
+        assert_eq!(state.heap_len(), 5);
+        let out = state.heap_slice_mut(0, 5).unwrap();
+        assert_eq!(out,
+                   &[Value::Null,
+                     Value::Null,
+                     Value::Number(1.0),
+                     Value::Number(1.0),
+                     Value::Null]);
     }
 
     #[test]
     fn test_graycode() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.stack.push(Value::Number(12.0));
+        state.call(0, 1).unwrap();
+        state.push(Value::Number(12.0)).unwrap();
         graycode(&mut seq, &mut state).unwrap();
-        let code: Option<f64> = state.stack.remove(0).into();
-        let code = code.unwrap() as i64;
-        assert_eq!(code, 10);
+        assert_eq!(state.pop_num().unwrap() as i64, 10);
     }
 
     #[test]
@@ -468,8 +406,8 @@ mod tests {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
         seq.cycle.rev = 99;
+        state.call(0, 1).unwrap();
         rev(&mut seq, &mut state).unwrap();
-        let code: Option<f64> = state.stack.remove(0).into();
-        assert_eq!(code.unwrap(), 99.0);
+        assert_eq!(state.pop_num().unwrap(), 99.0);
     }
 }

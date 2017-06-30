@@ -9,38 +9,35 @@ use super::state::{MidiState, MidiMessage};
 pub fn event_value(ms: &mut MidiState, is: &mut InterpState) -> InterpResult {
     match ms.event.value {
         EventValue::Curve(curve) => {
-            is.stack.push(Value::Curve(curve));
+            try!(is.push(Value::Curve(curve)));
         }
         EventValue::Trigger(val) => {
-            is.stack.push(Value::Number(val));
+            try!(is.push(Value::Number(val)));
         }
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Put the duration of the current event on the stack
 pub fn event_duration(ms: &mut MidiState,
                       is: &mut InterpState)
                       -> InterpResult {
-    is.stack.push(Value::Number(ms.event.dur));
-    Ok(())
+    try!(is.push(Value::Number(ms.event.dur)));
+    Ok(None)
 }
 
 /// Put the track of the current event on the stack
 pub fn event_track(ms: &mut MidiState, is: &mut InterpState) -> InterpResult {
-    is.stack.push(Value::Number(ms.event.track as f64));
-    Ok(())
+    try!(is.push(Value::Number(ms.event.track as f64)));
+    Ok(None)
 }
 
 /// Dispatch a note event
 pub fn noteout(ms: &mut MidiState, is: &mut InterpState) -> InterpResult {
-    let channel: Option<f64> = is.stack.pop().unwrap().into();
-    let channel = channel.unwrap() as u8;
-    let duration: Option<f64> = is.stack.pop().unwrap().into();
-    let velocity: Option<f64> = is.stack.pop().unwrap().into();
-    let velocity = velocity.unwrap() as u8;
-    let pitch: Option<f64> = is.stack.pop().unwrap().into();
-    let pitch = pitch.unwrap() as u8;
+    let channel = try!(is.pop_num()) as u8;
+    let duration = try!(is.pop_num());
+    let velocity = try!(is.pop_num()) as u8;
+    let pitch = try!(is.pop_num()) as u8;
 
     if channel >= 16 || pitch >= 128 || velocity >= 128 {
         return Err(RuntimeErr::InvalidArgs);
@@ -50,17 +47,15 @@ pub fn noteout(ms: &mut MidiState, is: &mut InterpState) -> InterpResult {
         channel: channel,
         pitch: pitch,
         velocity: velocity,
-        duration: duration.unwrap(),
+        duration: duration,
     };
-    Ok(())
+    Ok(None)
 }
 
 /// Dispatch a controller event
 pub fn ctrlout(ms: &mut MidiState, is: &mut InterpState) -> InterpResult {
-    let channel: Option<f64> = is.stack.pop().unwrap().into();
-    let channel = channel.unwrap() as u8;
-    let ctrl: Option<f64> = is.stack.pop().unwrap().into();
-    let ctrl = ctrl.unwrap() as u8;
+    let channel = try!(is.pop_num()) as u8;
+    let ctrl = try!(is.pop_num()) as u8;
 
     if channel >= 16 || ctrl >= 120 {
         return Err(RuntimeErr::InvalidArgs);
@@ -70,5 +65,5 @@ pub fn ctrlout(ms: &mut MidiState, is: &mut InterpState) -> InterpResult {
         channel: channel,
         ctrl: ctrl,
     };
-    Ok(())
+    Ok(None)
 }
