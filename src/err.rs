@@ -35,6 +35,7 @@ impl fmt::Display for SysErr {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum ParseErr {
     InvalidInput,
+    InvalidSyntax(usize, usize),
     UnknownToken(usize, usize),
     UnmatchedPair(usize, usize),
     UnknownVariable(usize, usize),
@@ -44,6 +45,7 @@ impl Error for ParseErr {
     fn description(&self) -> &str {
         match *self {
             ParseErr::InvalidInput => "invalid input",
+            ParseErr::InvalidSyntax(_, _) => "invalid syntax",
             ParseErr::UnknownToken(_, _) => "unknown token",
             ParseErr::UnmatchedPair(_, _) => "unmatched pair",
             ParseErr::UnknownVariable(_, _) => "unknown variable",
@@ -59,6 +61,9 @@ impl fmt::Display for ParseErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ParseErr::InvalidInput => write!(f, "invalid input"),
+            ParseErr::InvalidSyntax(line, col) => {
+                write!(f, "invalid syntax on line {} col {}", line, col)
+            }
             ParseErr::UnknownToken(line, col) => {
                 write!(f, "unknown token on line {} col {}", line, col)
             }

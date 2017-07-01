@@ -5,12 +5,15 @@ mod lang;
 mod log;
 mod math;
 mod mpu;
+mod parse;
 mod spu;
 mod unit;
 mod vm;
 
 extern crate docopt;
 extern crate jack;
+#[macro_use]
+extern crate nom;
 extern crate rand;
 extern crate regex;
 extern crate rustc_serialize;
