@@ -18,6 +18,7 @@ use std::hash::Hasher;
 use std::ops::Range;
 
 use err::ParseErr;
+use interp::Instr;
 
 
 /// Representation of the different token types
@@ -46,22 +47,6 @@ pub struct Token<'a> {
     pub col: usize,
     /// The value string of the token
     pub val: &'a str,
-}
-
-/// Instructions define a series of operations that a unit should perform
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Instr {
-    Call(usize, usize),
-    Return,
-    LoadNumber(f32),
-    LoadSymbol(u64),
-    LoadVar(u64),
-    StoreVar(u64),
-    LoadString(u64),
-    Keyword(u64),
-    ListBegin,
-    ListEnd,
-    Null,
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -1,9 +1,24 @@
 use std::collections::HashMap;
 
 use err::RuntimeErr;
-use lang::{hash_str, Instr};
+use lang::hash_str;
 use math::Curve;
 
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Instr {
+    Call(usize, usize),
+    Return,
+    LoadNumber(f32),
+    LoadSymbol(u64),
+    LoadVar(u64),
+    StoreVar(u64),
+    LoadString(u64),
+    Keyword(u64),
+    ListBegin,
+    ListEnd,
+    Null,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Value {

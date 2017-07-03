@@ -7,8 +7,8 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 use err::RuntimeErr;
-use interp::{Interpreter, InterpResult, InterpState};
-use lang::{Instr, Program};
+use interp::{Instr, Interpreter, InterpResult, InterpState};
+use lang::Program;
 use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 use unit::{Event, EventValue, Message, Unit};
 
