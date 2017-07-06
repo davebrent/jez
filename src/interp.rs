@@ -7,6 +7,8 @@ use math::Curve;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Instr {
+    Begin(u64),
+    End(u64),
     Call(usize, usize),
     Return,
     LoadNumber(f32),
@@ -397,6 +399,7 @@ impl<S> Interpreter<S> {
                     Err(RuntimeErr::UnknownKeyword(word))
                 }
             }
+            _ => Ok(None),
         }
     }
 

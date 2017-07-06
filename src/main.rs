@@ -1,3 +1,4 @@
+mod assem;
 mod backends;
 mod err;
 mod interp;

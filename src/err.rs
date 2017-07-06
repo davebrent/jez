@@ -33,6 +33,39 @@ impl fmt::Display for SysErr {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub enum AssemErr {
+    UnsupportedVersion(u64),
+    DuplicateVariable,
+    DuplicateFunction,
+}
+
+impl Error for AssemErr {
+    fn description(&self) -> &str {
+        match *self {
+            AssemErr::UnsupportedVersion(_) => "unsupported version",
+            AssemErr::DuplicateVariable => "duplicate variable",
+            AssemErr::DuplicateFunction => "duplicate function",
+        }
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
+}
+
+impl fmt::Display for AssemErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            AssemErr::UnsupportedVersion(req) => {
+                write!(f, "unsupported version, requires '{}'", req)
+            }
+            AssemErr::DuplicateVariable => write!(f, "duplicate variable"),
+            AssemErr::DuplicateFunction => write!(f, "duplicate function"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum ParseErr {
     InvalidInput,
     InvalidSyntax(usize, usize),
@@ -115,9 +148,16 @@ impl fmt::Display for RuntimeErr {
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum JezErr {
+    AssemErr(AssemErr),
     ParseErr(ParseErr),
     RuntimeErr(RuntimeErr),
     SysErr(SysErr),
+}
+
+impl From<AssemErr> for JezErr {
+    fn from(err: AssemErr) -> JezErr {
+        JezErr::AssemErr(err)
+    }
 }
 
 impl From<ParseErr> for JezErr {
@@ -147,6 +187,7 @@ impl From<io::Error> for JezErr {
 impl Error for JezErr {
     fn description(&self) -> &str {
         match *self {
+            JezErr::AssemErr(ref err) => err.description(),
             JezErr::ParseErr(ref err) => err.description(),
             JezErr::RuntimeErr(ref err) => err.description(),
             JezErr::SysErr(ref err) => err.description(),
@@ -155,6 +196,7 @@ impl Error for JezErr {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
+            JezErr::AssemErr(ref err) => Some(err as &Error),
             JezErr::ParseErr(ref err) => Some(err as &Error),
             JezErr::RuntimeErr(ref err) => Some(err as &Error),
             JezErr::SysErr(ref err) => Some(err as &Error),
@@ -165,6 +207,7 @@ impl Error for JezErr {
 impl fmt::Display for JezErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            JezErr::AssemErr(ref err) => write!(f, "Assembly error {}", err),
             JezErr::ParseErr(ref err) => write!(f, "Parse error {}", err),
             JezErr::RuntimeErr(ref err) => write!(f, "Runtime error {}", err),
             JezErr::SysErr(ref err) => write!(f, "System error {}", err),
