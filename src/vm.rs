@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::convert::From;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use err::{JezErr, SysErr};
-use lang::Program;
+use interp::Instr;
 use log::Logger;
 use mpu::Mpu;
 use spu::Spu;
@@ -17,14 +18,27 @@ impl Machine {
     pub fn run(backend: Sender<Message>,
                bus_send: Sender<Message>,
                bus_recv: Receiver<Message>,
-               prog: &Program,
+               instrs: &[Instr],
                logger: Logger)
                -> Result<bool, JezErr> {
+        let mut funcs = HashMap::new();
+        for (pc, instr) in instrs.iter().enumerate() {
+            if let Instr::Begin(word) = *instr {
+                // FIXME: Advance past `Begin` so that functions at instr zero
+                //        are still callable.
+                //
+                // This is becuase the `call` instr is taking into account the
+                // auto incrementing of `pc` by subtracting 1, which is
+                // problematic if the callable exists at zero...
+                funcs.insert(word, pc + 1);
+            }
+        }
+
         let (spu, spu_recv) = channel();
         let (mpu, mpu_recv) = channel();
 
         let spu_thread =
-            match Spu::new("spu", prog, bus_send.clone(), spu_recv) {
+            match Spu::new("spu", instrs, &funcs, bus_send.clone(), spu_recv) {
                 Some(mut unit) => {
                     Some(thread::spawn(move || {
                                            let res = Duration::new(0, 1000000);
@@ -35,7 +49,7 @@ impl Machine {
             };
 
         let mpu_thread =
-            match Mpu::new("mpu", prog, bus_send.clone(), mpu_recv) {
+            match Mpu::new("mpu", instrs, &funcs, bus_send.clone(), mpu_recv) {
                 Some(mut unit) => {
                     Some(thread::spawn(move || {
                                            let res = Duration::new(0, 1000000);
@@ -93,7 +107,7 @@ impl Machine {
                     mpu.send(Message::SeqEvent(event)).unwrap();
                 }
                 Message::Error(unit, err) => {
-                    println!("Unit {} has crashed {}", unit, err);
+                    println!("Unit '{}' has crashed {}", unit, err);
                     return Err(err);
                 }
             }

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use err::RuntimeErr;
 use interp::{Instr, InterpState, InterpResult, Interpreter};
-use lang::Program;
+use lang::hash_str;
 use math::millis_to_dur;
 use unit::{Event, Message, Unit};
 
@@ -54,7 +54,7 @@ impl Track {
     }
 
     fn eval(&mut self,
-            instrs: &[Instr],
+            pc: usize,
             interp: &mut Interpreter<SeqState>)
             -> Result<(), RuntimeErr> {
         self.events.clear();
@@ -64,7 +64,7 @@ impl Track {
         interp.data.tracks.clear();
         interp.state.reset();
 
-        match interp.eval(instrs) {
+        match interp.eval(pc) {
             Err(err) => Err(err),
             Ok(_) => {
                 let res = interp
@@ -106,21 +106,21 @@ pub struct Spu {
     interp: Interpreter<SeqState>,
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
-    instrs: Vec<Instr>,
+    pc: usize,
     tracks: Vec<Track>,
 }
 
 impl Spu {
     /// Returns a new SPU if there are instructions to execute
     pub fn new(id: &'static str,
-               prog: &Program,
+               instrs: &[Instr],
+               funcs: &HashMap<u64, usize>,
                channel: Sender<Message>,
                input_channel: Receiver<Message>)
                -> Option<Self> {
-        let instrs = prog.section(id);
-        match instrs {
+        match funcs.get(&hash_str("spu")) {
             None => None,
-            Some(instrs) => {
+            Some(pc) => {
                 let mut words: HashMap<&'static str,
                                        SpuKeyword> = HashMap::new();
                 words.insert("binlist", binlist);
@@ -139,8 +139,9 @@ impl Spu {
                 words.insert("simul", simul);
                 words.insert("track", track);
 
-                let mut interp = Interpreter::new(words, SeqState::new());
-                match interp.eval(instrs) {
+                let mut interp =
+                    Interpreter::new(instrs.to_vec(), words, SeqState::new());
+                match interp.eval(*pc) {
                     Err(err) => {
                         let msg = Message::Error(id, From::from(err));
                         channel.send(msg).unwrap();
@@ -159,7 +160,7 @@ impl Spu {
                                  interp: interp,
                                  channel: channel,
                                  input_channel: input_channel,
-                                 instrs: instrs.to_vec(),
+                                 pc: *pc,
                                  tracks: tracks,
                              })
                     }
@@ -188,7 +189,7 @@ impl Unit for Spu {
     fn tick(&mut self, delta: &Duration) -> bool {
         for track in &mut self.tracks {
             if track.finished() {
-                match track.eval(&self.instrs, &mut self.interp) {
+                match track.eval(self.pc, &mut self.interp) {
                     Err(err) => {
                         let msg = Message::Error(self.id, From::from(err));
                         self.channel.send(msg).unwrap();

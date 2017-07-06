@@ -70,8 +70,6 @@ pub enum ParseErr {
     InvalidInput,
     InvalidSyntax(usize, usize),
     UnknownToken(usize, usize),
-    UnmatchedPair(usize, usize),
-    UnknownVariable(usize, usize),
 }
 
 impl Error for ParseErr {
@@ -80,8 +78,6 @@ impl Error for ParseErr {
             ParseErr::InvalidInput => "invalid input",
             ParseErr::InvalidSyntax(_, _) => "invalid syntax",
             ParseErr::UnknownToken(_, _) => "unknown token",
-            ParseErr::UnmatchedPair(_, _) => "unmatched pair",
-            ParseErr::UnknownVariable(_, _) => "unknown variable",
         }
     }
 
@@ -100,12 +96,6 @@ impl fmt::Display for ParseErr {
             ParseErr::UnknownToken(line, col) => {
                 write!(f, "unknown token on line {} col {}", line, col)
             }
-            ParseErr::UnmatchedPair(line, col) => {
-                write!(f, "unmatched pair on line {} col {}", line, col)
-            }
-            ParseErr::UnknownVariable(line, col) => {
-                write!(f, "unknown variable on line {} col {}", line, col)
-            }
         }
     }
 }
@@ -113,7 +103,6 @@ impl fmt::Display for ParseErr {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum RuntimeErr {
     UnknownKeyword(u64),
-    NotImplemented,
     InvalidArgs,
     StackExhausted,
 }
@@ -122,7 +111,6 @@ impl Error for RuntimeErr {
     fn description(&self) -> &str {
         match *self {
             RuntimeErr::UnknownKeyword(_) => "unknown keyword",
-            RuntimeErr::NotImplemented => "not implemented",
             RuntimeErr::InvalidArgs => "invalid arguments",
             RuntimeErr::StackExhausted => "stack exhausted",
         }
@@ -139,7 +127,6 @@ impl fmt::Display for RuntimeErr {
             RuntimeErr::UnknownKeyword(hash) => {
                 write!(f, "encountered unknown keyword (hash = {})", hash)
             }
-            RuntimeErr::NotImplemented => write!(f, "keyword not implemented"),
             RuntimeErr::InvalidArgs => write!(f, "invalid arguments"),
             RuntimeErr::StackExhausted => write!(f, "stack exhausted"),
         }

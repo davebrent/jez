@@ -75,8 +75,9 @@ fn start_timer(millis: f64, channel: Sender<unit::Message>) {
 }
 
 fn watch_file(filepath: String,
-              prog: lang::Program,
+              instrs: &[interp::Instr],
               channel: Sender<unit::Message>) {
+    let instrs = instrs.to_vec();
     thread::spawn(move || {
         let dur = Duration::new(1, 0);
         let meta_data = fs::metadata(filepath.clone()).unwrap();
@@ -91,8 +92,8 @@ fn watch_file(filepath: String,
                 if let Ok(mut fp) = fs::File::open(filepath.clone()) {
                     let mut txt = String::new();
                     if fp.read_to_string(&mut txt).is_ok() {
-                        if let Ok(next) = lang::Program::new(txt.as_str()) {
-                            if prog != next {
+                        if let Ok(next) = make_program(txt.as_str()) {
+                            if instrs != next {
                                 channel.send(unit::Message::Reload).unwrap();
                                 return;
                             }
@@ -104,6 +105,12 @@ fn watch_file(filepath: String,
             thread::sleep(dur);
         }
     });
+}
+
+fn make_program(txt: &str) -> Result<Vec<interp::Instr>, err::JezErr> {
+    let dirs = try!(parse::parser(txt));
+    let instrs = try!(assem::assemble(&dirs));
+    Ok(instrs)
 }
 
 fn make_log_backend(name: &str) -> Result<Box<log::LogBackend>, err::JezErr> {
@@ -140,10 +147,10 @@ fn run_app(args: &Args) -> Result<(), err::JezErr> {
         let mut fp = try!(fs::File::open(args.arg_file.clone()));
         try!(fp.read_to_string(&mut txt));
 
-        let prog = try!(lang::Program::new(txt.as_str()));
+        let instrs = try!(make_program(txt.as_str()));
         let (host_send, host_recv) = channel();
         if args.flag_watch {
-            watch_file(args.arg_file.clone(), prog.clone(), host_send.clone());
+            watch_file(args.arg_file.clone(), &instrs, host_send.clone());
         }
 
         if !args.flag_time.is_empty() {
@@ -156,7 +163,7 @@ fn run_app(args: &Args) -> Result<(), err::JezErr> {
         let res = vm::Machine::run(audio_send.clone(),
                                    host_send.clone(),
                                    host_recv,
-                                   &prog,
+                                   &instrs,
                                    log::Logger::new(log_send.clone()));
         match res {
             Ok(reload) => {

@@ -15,7 +15,6 @@ pub enum Instr {
     LoadSymbol(u64),
     LoadVar(u64),
     StoreVar(u64),
-    LoadString(u64),
     Keyword(u64),
     ListBegin,
     ListEnd,
@@ -306,11 +305,13 @@ pub enum Keyword<S> {
 pub struct Interpreter<S> {
     pub data: S,
     pub state: InterpState,
+    instrs: Vec<Instr>,
     words: HashMap<u64, Keyword<S>>,
 }
 
 impl<S> Interpreter<S> {
-    pub fn new(exts: HashMap<&'static str, ExtKeyword<S>>,
+    pub fn new(instrs: Vec<Instr>,
+               exts: HashMap<&'static str, ExtKeyword<S>>,
                data: S)
                -> Interpreter<S> {
         let mut words = HashMap::new();
@@ -328,6 +329,7 @@ impl<S> Interpreter<S> {
         }
 
         Interpreter {
+            instrs: instrs,
             words: words,
             data: data,
             state: InterpState::new(),
@@ -337,7 +339,6 @@ impl<S> Interpreter<S> {
     pub fn step(&mut self, instr: Instr) -> InterpResult {
         match instr {
             Instr::Null => self.state.push(Value::Null),
-            Instr::LoadString(_) => Err(RuntimeErr::NotImplemented),
             Instr::LoadNumber(n) => self.state.push(Value::Number(n as f64)),
             Instr::LoadSymbol(s) => self.state.push(Value::Symbol(s)),
             Instr::Call(args, pc) => self.state.call(args, pc),
@@ -403,10 +404,10 @@ impl<S> Interpreter<S> {
         }
     }
 
-    pub fn eval(&mut self, instrs: &[Instr]) -> InterpResult {
-        self.state.pc = 0;
-        while self.state.pc < instrs.len() && !self.state.exit {
-            let instr = instrs[self.state.pc];
+    pub fn eval(&mut self, pc: usize) -> InterpResult {
+        try!(self.state.call(0, pc));
+        while self.state.pc < self.instrs.len() && !self.state.exit {
+            let instr = self.instrs[self.state.pc];
             match try!(self.step(instr)) {
                 None => (),
                 Some(val) => return Ok(Some(val)),
@@ -423,64 +424,63 @@ mod tests {
 
     #[test]
     fn test_callables() {
-        let instrs = [Instr::Call(0, 1),
-                      Instr::LoadNumber(13.0),
-                      Instr::LoadNumber(12.0),
-                      Instr::Call(2, 5),
-                      Instr::Return,
-                      Instr::Keyword(hash_str("add")), // call 5
-                      Instr::Return];
-        let mut interp = Interpreter::new(HashMap::new(), ());
-        let res = interp.eval(&instrs).unwrap();
+        let instrs = vec![Instr::Begin(1),
+                          Instr::LoadNumber(13.0),
+                          Instr::LoadNumber(12.0),
+                          Instr::Call(2, 6),
+                          Instr::Return,
+                          Instr::End(1),
+                          Instr::Begin(2),
+                          Instr::Keyword(hash_str("add")),
+                          Instr::Return,
+                          Instr::End(2)];
+        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(25.0));
     }
 
     #[test]
     fn test_addition() {
-        let instrs = [Instr::Call(0, 1),
-                      Instr::LoadNumber(3.2),
-                      Instr::LoadNumber(2.8),
-                      Instr::Keyword(hash_str("add")),
-                      Instr::Return];
-        let mut interp = Interpreter::new(HashMap::new(), ());
-        let res = interp.eval(&instrs).unwrap();
+        let instrs = vec![Instr::LoadNumber(3.2),
+                          Instr::LoadNumber(2.8),
+                          Instr::Keyword(hash_str("add")),
+                          Instr::Return];
+        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(6.0));
     }
 
     #[test]
     fn test_subtraction() {
-        let instrs = [Instr::Call(0, 1),
-                      Instr::LoadNumber(2.0),
-                      Instr::LoadNumber(3.0),
-                      Instr::Keyword(hash_str("subtract")),
-                      Instr::Return];
-        let mut interp = Interpreter::new(HashMap::new(), ());
-        let res = interp.eval(&instrs).unwrap();
+        let instrs = vec![Instr::LoadNumber(2.0),
+                          Instr::LoadNumber(3.0),
+                          Instr::Keyword(hash_str("subtract")),
+                          Instr::Return];
+        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(-1.0));
     }
 
     #[test]
     fn test_variables() {
-        let instrs = [Instr::Call(0, 1),
-                      Instr::LoadNumber(3.0),
-                      Instr::StoreVar(hash_str("foo")),
-                      Instr::LoadNumber(2.0),
-                      Instr::LoadVar(hash_str("foo")),
-                      Instr::Return];
-        let mut interp = Interpreter::new(HashMap::new(), ());
-        let res = interp.eval(&instrs).unwrap();
+        let instrs = vec![Instr::LoadNumber(3.0),
+                          Instr::StoreVar(hash_str("foo")),
+                          Instr::LoadNumber(2.0),
+                          Instr::LoadVar(hash_str("foo")),
+                          Instr::Return];
+        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(3.0));
     }
 
     #[test]
     fn test_swap() {
-        let instrs = [Instr::Call(0, 1),
-                      Instr::LoadNumber(3.0),
-                      Instr::LoadNumber(2.0),
-                      Instr::Keyword(hash_str("swap")),
-                      Instr::Return];
-        let mut interp = Interpreter::new(HashMap::new(), ());
-        let res = interp.eval(&instrs).unwrap();
+        let instrs = vec![Instr::LoadNumber(3.0),
+                          Instr::LoadNumber(2.0),
+                          Instr::Keyword(hash_str("swap")),
+                          Instr::Return];
+        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(3.0));
     }
 }

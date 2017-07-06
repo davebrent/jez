@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use err::RuntimeErr;
 use interp::{Instr, Interpreter, InterpResult, InterpState};
-use lang::Program;
+use lang::hash_str;
 use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 use unit::{Event, EventValue, Message, Unit};
 
@@ -23,33 +23,34 @@ pub struct Mpu {
     interp: Interpreter<MidiState>,
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
-    instrs_out_note: Vec<Instr>,
-    instrs_out_ctrl: Vec<Instr>,
+    instrs_out_note: usize,
+    instrs_out_ctrl: usize,
     off_events: Vec<(Duration, u8, u8)>,
     ctl_events: Vec<(Duration, f64, u8, u8, Curve)>,
 }
 
 impl Mpu {
     pub fn new(id: &'static str,
-               prog: &Program,
+               instrs: &[Instr],
+               funcs: &HashMap<u64, usize>,
                channel: Sender<Message>,
                input_channel: Receiver<Message>)
                -> Option<Self> {
-        let out_note = prog.section(format!("{}_{}", id, "out_note").as_str());
-        let out_ctrl = prog.section(format!("{}_{}", id, "out_ctrl").as_str());
+        let out_note = funcs.get(&hash_str("mpu_out_note"));
+        let out_ctrl = funcs.get(&hash_str("mpu_out_ctrl"));
 
         if out_note.is_none() && out_ctrl.is_none() {
             return None;
         }
 
         let out_note = match out_note {
-            Some(instrs) => instrs.to_vec(),
-            None => Vec::new(),
+            Some(pc) => *pc,
+            None => instrs.len(),
         };
 
         let out_ctrl = match out_ctrl {
-            Some(instrs) => instrs.to_vec(),
-            None => Vec::new(),
+            Some(pc) => *pc,
+            None => instrs.len(),
         };
 
         let mut words: HashMap<&'static str, MpuKeyword> = HashMap::new();
@@ -61,7 +62,9 @@ impl Mpu {
 
         Some(Mpu {
                  id: id,
-                 interp: Interpreter::new(words, MidiState::new()),
+                 interp: Interpreter::new(instrs.to_vec(),
+                                          words,
+                                          MidiState::new()),
                  channel: channel,
                  input_channel: input_channel,
                  instrs_out_note: out_note,
@@ -72,12 +75,10 @@ impl Mpu {
     }
 
     fn handle_trg_event(&mut self, event: Event) {
-        let instrs = self.instrs_out_note.as_slice();
-
         self.interp.state.reset();
         self.interp.data.event = event;
 
-        match self.interp.eval(instrs) {
+        match self.interp.eval(self.instrs_out_note) {
             Err(err) => {
                 self.channel
                     .send(Message::Error(self.id, From::from(err)))
@@ -120,12 +121,10 @@ impl Mpu {
     }
 
     fn handle_ctl_event(&mut self, event: Event, curve: Curve) {
-        let instrs = self.instrs_out_ctrl.as_slice();
-
         self.interp.state.reset();
         self.interp.data.event = event;
 
-        match self.interp.eval(instrs) {
+        match self.interp.eval(self.instrs_out_ctrl) {
             Err(err) => {
                 self.channel
                     .send(Message::Error(self.id, From::from(err)))
@@ -237,19 +236,26 @@ mod tests {
     use math::millis_to_dur;
     use unit::{Event, EventValue, Message};
 
+    fn get_test_instrs() -> (Vec<Instr>, HashMap<u64, usize>) {
+        let mut map = HashMap::new();
+        map.insert(hash_str("mpu_out_note"), 1);
+        (vec![Instr::Begin(hash_str("mpu_out_note")),
+              Instr::Keyword(hash_str("event_value")),
+              Instr::LoadNumber(127.0),
+              Instr::Keyword(hash_str("event_duration")),
+              Instr::LoadNumber(1.0),
+              Instr::Keyword(hash_str("noteout")),
+              Instr::End(hash_str("mpu_out_note"))],
+         map)
+    }
 
     #[test]
     fn test_simple_note_off_events() {
         // Tests the note events for two scheduled events
-        let prog = Program::new("
-        mpu_out_note:
-            event_value 127 event_duration 1 noteout
-        ")
-                .unwrap();
-
+        let (instrs, map) = get_test_instrs();
         let (in_tx, in_rx) = channel();
         let (out_tx, out_rx) = channel();
-        let mut mpu = Mpu::new("mpu", &prog, out_tx, in_rx).unwrap();
+        let mut mpu = Mpu::new("mpu", &instrs, &map, out_tx, in_rx).unwrap();
 
         in_tx
             .send(Message::SeqEvent(Event {
@@ -291,15 +297,10 @@ mod tests {
     fn test_flush_single_note_off() {
         // Tests that a note off event is sent, if the same note has been
         // newly triggered, so that the new event is not cut short
-        let prog = Program::new("
-        mpu_out_note:
-            event_value 127 event_duration 1 noteout
-        ")
-                .unwrap();
-
+        let (instrs, map) = get_test_instrs();
         let (in_tx, in_rx) = channel();
         let (out_tx, out_rx) = channel();
-        let mut mpu = Mpu::new("mpu", &prog, out_tx, in_rx).unwrap();
+        let mut mpu = Mpu::new("mpu", &instrs, &map, out_tx, in_rx).unwrap();
 
         in_tx
             .send(Message::SeqEvent(Event {
@@ -336,10 +337,14 @@ mod tests {
 
     #[test]
     fn test_stopping() {
-        let prog = Program::new("mpu_out_note:").unwrap();
+        let instrs = vec![Instr::Begin(hash_str("mpu_out_note")),
+                          Instr::End(hash_str("mpu_out_note"))];
+        let mut map = HashMap::new();
+        map.insert(hash_str("mpu_out_note"), 0);
+
         let (in_tx, in_rx) = channel();
         let (out_tx, _) = channel();
-        let mut mpu = Mpu::new("mpu", &prog, out_tx, in_rx).unwrap();
+        let mut mpu = Mpu::new("mpu", &instrs, &map, out_tx, in_rx).unwrap();
         in_tx.send(Message::Stop).unwrap();
         mpu.run_forever(Duration::new(0, 1000000));
         assert_eq!(true, true);
