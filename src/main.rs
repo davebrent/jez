@@ -16,7 +16,6 @@ extern crate jack;
 #[macro_use]
 extern crate nom;
 extern crate rand;
-extern crate regex;
 extern crate rustc_serialize;
 extern crate serde;
 #[macro_use]
