@@ -90,8 +90,9 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
             Value::Str(sym) => instrs.push(Instr::LoadSymbol(hash_str(sym))),
             Value::Num(num) => instrs.push(Instr::LoadNumber(num as f32)),
         };
-        instrs.push(Instr::StoreVar(hash_str(key)));
+        instrs.push(Instr::StoreGlob(hash_str(key)));
     }
+    instrs.push(Instr::Return);
     instrs.push(Instr::End(0));
     Ok(instrs)
 }
@@ -130,9 +131,10 @@ mod tests {
                           Instr::End(7664243301495174138),
                           Instr::Begin(0),
                           Instr::LoadNumber(3.9),
-                          Instr::StoreVar(4644417185603328019),
+                          Instr::StoreGlob(4644417185603328019),
                           Instr::LoadNumber(2.0),
-                          Instr::StoreVar(10025803482645881038),
+                          Instr::StoreGlob(10025803482645881038),
+                          Instr::Return,
                           Instr::End(0)];
         assert_eq!(result, instrs);
     }

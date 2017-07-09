@@ -14,6 +14,7 @@ pub enum Instr {
     LoadNumber(f32),
     LoadSymbol(u64),
     LoadVar(u64),
+    StoreGlob(u64),
     StoreVar(u64),
     Keyword(u64),
     ListBegin,
@@ -81,6 +82,7 @@ impl StackFrame {
 
 #[derive(Debug)]
 pub struct InterpState {
+    reserved: usize,
     heap: Vec<Value>,
     pc: usize,
     globals: HashMap<u64, usize>,
@@ -92,6 +94,7 @@ impl InterpState {
     pub fn new() -> InterpState {
         InterpState {
             pc: 0,
+            reserved: 0,
             heap: vec![],
             globals: HashMap::new(),
             frames: vec![],
@@ -162,7 +165,11 @@ impl InterpState {
                 // If this is the last stack frame, return the 'top of stack'
                 // value as the final result. Otherwise 'None' and continue
                 // evaluating instructions
-                let res = try!(frame.pop());
+                let res = match frame.pop() {
+                    Ok(val) => val,
+                    Err(_) => Value::Null,
+                };
+
                 if self.frames.is_empty() {
                     self.exit = true;
                     Ok(Some(res))
@@ -226,10 +233,24 @@ impl InterpState {
         Ok(())
     }
 
+    pub fn store_glob(&mut self,
+                      name: u64,
+                      val: Value)
+                      -> Result<(), RuntimeErr> {
+        let ptr = self.heap_len();
+        self.heap_push(val);
+        self.globals.insert(name, ptr);
+        Ok(())
+    }
+
     pub fn lookup(&mut self, name: u64) -> Result<Value, RuntimeErr> {
         let ptr = match self.frame() {
             Ok(frame) => frame.locals.get(&name),
-            Err(_) => self.globals.get(&name),
+            Err(_) => None,
+        };
+        let ptr = match ptr {
+            Some(ptr) => Some(ptr),
+            None => self.globals.get(&name),
         };
         match ptr {
             Some(ptr) => self.heap_get(*ptr),
@@ -238,7 +259,8 @@ impl InterpState {
     }
 
     pub fn reset(&mut self) {
-        self.heap.clear();
+        self.exit = false;
+        self.heap.truncate(self.reserved);;
     }
 }
 
@@ -328,12 +350,32 @@ impl<S> Interpreter<S> {
             words.insert(hash_str(word), Keyword::Extension(*func));
         }
 
-        Interpreter {
+        let instrs_len = instrs.len();
+        let mut inner_main = instrs.len();
+        for (pc, instr) in instrs.iter().enumerate() {
+            if let Instr::Begin(word) = *instr {
+                if word == 0 {
+                    inner_main = pc + 1;
+                    break;
+                }
+            }
+        }
+
+        let mut interpreter = Interpreter {
             instrs: instrs,
             words: words,
             data: data,
             state: InterpState::new(),
+        };
+
+        // This block is created by the assembler so must always succeed
+        if inner_main != instrs_len {
+            interpreter.eval(inner_main).unwrap();
+            interpreter.state.reserved = interpreter.state.heap.len();
+            interpreter.state.reset();
         }
+
+        interpreter
     }
 
     pub fn step(&mut self, instr: Instr) -> InterpResult {
@@ -343,6 +385,11 @@ impl<S> Interpreter<S> {
             Instr::LoadSymbol(s) => self.state.push(Value::Symbol(s)),
             Instr::Call(args, pc) => self.state.call(args, pc),
             Instr::Return => self.state.ret(),
+            Instr::StoreGlob(name) => {
+                let val = try!(self.state.pop());
+                try!(self.state.store_glob(name, val));
+                Ok(None)
+            }
             Instr::StoreVar(name) => {
                 let val = try!(self.state.pop());
                 try!(self.state.store(name, val));
@@ -482,5 +529,21 @@ mod tests {
         let mut interp = Interpreter::new(instrs, HashMap::new(), ());
         let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(3.0));
+    }
+
+    #[test]
+    fn test_block_zero() {
+        let instrs = vec![Instr::Begin(hash_str("main")),
+                          Instr::LoadVar(1337),
+                          Instr::Return,
+                          Instr::End(hash_str("main")),
+                          Instr::Begin(0),
+                          Instr::LoadNumber(200.0),
+                          Instr::StoreGlob(1337),
+                          Instr::Return,
+                          Instr::End(0)];
+        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let res = interp.eval(1).unwrap();
+        assert_eq!(res.unwrap(), Value::Number(200.0));
     }
 }
