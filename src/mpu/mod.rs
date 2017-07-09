@@ -6,9 +6,9 @@ use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
+use assem::hash_str;
 use err::RuntimeErr;
 use interp::{Instr, Interpreter, InterpResult, InterpState};
-use lang::hash_str;
 use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 use unit::{Event, EventValue, Message, Unit};
 

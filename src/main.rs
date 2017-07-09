@@ -2,7 +2,6 @@ mod assem;
 mod backends;
 mod err;
 mod interp;
-mod lang;
 mod log;
 mod math;
 mod mpu;
