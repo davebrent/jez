@@ -5,7 +5,7 @@ use err::RuntimeErr;
 use math::Curve;
 
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Instr {
     Begin(u64),
     End(u64),
@@ -22,7 +22,7 @@ pub enum Instr {
     Null,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Value {
     Null,
     Number(f64),

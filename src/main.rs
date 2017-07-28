@@ -1,35 +1,19 @@
-mod assem;
-mod backends;
-mod err;
-mod interp;
-mod log;
-mod math;
-mod mpu;
-mod parse;
-mod spu;
-mod unit;
-mod vm;
-
 extern crate docopt;
-extern crate jack;
-#[macro_use]
-extern crate nom;
-extern crate rand;
+extern crate jez;
 extern crate rustc_serialize;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
 
 use std::convert::From;
 use std::fs;
 use std::io;
 use std::io::{Read, Write};
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use docopt::Docopt;
+
+use jez::{Instr, JezErr, Logger, Machine, make_program, make_log_backend,
+          make_vm_backend, Message, millis_to_dur, RuntimeErr};
 
 
 const USAGE: &'static str = "
@@ -58,23 +42,21 @@ struct Args {
     arg_file: String,
 }
 
-fn start_timer(millis: f64, channel: Sender<unit::Message>) {
+fn start_timer(millis: f64, channel: Sender<Message>) {
     let start = Instant::now();
-    let end = math::millis_to_dur(millis);
+    let end = millis_to_dur(millis);
     let res = Duration::new(0, 1000000);
 
     thread::spawn(move || loop {
                       if start.elapsed() >= end {
-                          channel.send(unit::Message::Stop).unwrap();
+                          channel.send(Message::Stop).unwrap();
                           return;
                       }
                       thread::sleep(res);
                   });
 }
 
-fn watch_file(filepath: String,
-              instrs: &[interp::Instr],
-              channel: Sender<unit::Message>) {
+fn watch_file(filepath: String, instrs: &[Instr], channel: Sender<Message>) {
     let instrs = instrs.to_vec();
     thread::spawn(move || {
         let dur = Duration::new(1, 0);
@@ -92,7 +74,7 @@ fn watch_file(filepath: String,
                     if fp.read_to_string(&mut txt).is_ok() {
                         if let Ok(next) = make_program(txt.as_str()) {
                             if instrs != next {
-                                channel.send(unit::Message::Reload).unwrap();
+                                channel.send(Message::Reload).unwrap();
                                 return;
                             }
                         }
@@ -105,39 +87,14 @@ fn watch_file(filepath: String,
     });
 }
 
-fn make_program(txt: &str) -> Result<Vec<interp::Instr>, err::JezErr> {
-    let dirs = try!(parse::parser(txt));
-    let instrs = try!(assem::assemble(&dirs));
-    Ok(instrs)
-}
-
-fn make_log_backend(name: &str) -> Result<Box<log::LogBackend>, err::JezErr> {
-    match name {
-        "console" | "" => Ok(Box::new(log::ConsoleLogger::new())),
-        "file" => Ok(Box::new(log::FileLogger::new())),
-        _ => Err(From::from(err::SysErr::UnknownBackend)),
-    }
-}
-
-fn make_vm_backend(name: &str,
-                   logger: log::Logger,
-                   channel: Receiver<unit::Message>)
-                   -> Result<Box<backends::Backend>, err::JezErr> {
-    match name {
-        "debug" | "" => Ok(Box::new(backends::Debug::new(logger, channel))),
-        "jack" => Ok(Box::new(try!(backends::Jack::new(logger, channel)))),
-        _ => Err(From::from(err::SysErr::UnknownBackend)),
-    }
-}
-
-fn run_app(args: &Args) -> Result<(), err::JezErr> {
+fn run_app(args: &Args) -> Result<(), JezErr> {
     let (log_send, log_recv) = channel();
     let log_backend = try!(make_log_backend(args.flag_logger.as_ref()));
     log_backend.run_forever(log_recv);
 
     let (audio_send, audio_recv) = channel();
     let mut backend = try!(make_vm_backend(args.flag_backend.as_ref(),
-                                           log::Logger::new(log_send.clone()),
+                                           Logger::new(log_send.clone()),
                                            audio_recv));
 
     loop {
@@ -154,15 +111,15 @@ fn run_app(args: &Args) -> Result<(), err::JezErr> {
         if !args.flag_time.is_empty() {
             match args.flag_time.parse::<f64>() {
                 Ok(time) => start_timer(time, host_send.clone()),
-                Err(_) => return Err(From::from(err::RuntimeErr::InvalidArgs)),
+                Err(_) => return Err(From::from(RuntimeErr::InvalidArgs)),
             }
         }
 
-        let res = vm::Machine::run(audio_send.clone(),
-                                   host_send.clone(),
-                                   host_recv,
-                                   &instrs,
-                                   log::Logger::new(log_send.clone()));
+        let res = Machine::realtime(audio_send.clone(),
+                                    host_send.clone(),
+                                    host_recv,
+                                    &instrs,
+                                    Logger::new(log_send.clone()));
         match res {
             Ok(reload) => {
                 if !reload {
