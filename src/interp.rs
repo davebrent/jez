@@ -11,7 +11,7 @@ pub enum Instr {
     End(u64),
     Call(usize, usize),
     Return,
-    LoadNumber(f32),
+    LoadNumber(f64),
     LoadSymbol(u64),
     LoadVar(u64),
     StoreGlob(u64),
@@ -381,7 +381,7 @@ impl<S> Interpreter<S> {
     pub fn step(&mut self, instr: Instr) -> InterpResult {
         match instr {
             Instr::Null => self.state.push(Value::Null),
-            Instr::LoadNumber(n) => self.state.push(Value::Number(n as f64)),
+            Instr::LoadNumber(n) => self.state.push(Value::Number(n)),
             Instr::LoadSymbol(s) => self.state.push(Value::Symbol(s)),
             Instr::Call(args, pc) => self.state.call(args, pc),
             Instr::Return => self.state.ret(),

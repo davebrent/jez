@@ -65,7 +65,7 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
                         Token::Value(prim) => {
                             match prim {
                                 Value::Num(num) => {
-                                    instrs.push(Instr::LoadNumber(num as f32));
+                                    instrs.push(Instr::LoadNumber(num));
                                 }
                                 Value::Str(word) => {
                                     let sym = hash_str(word);
@@ -95,7 +95,7 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
     for key in &global_keys {
         match globals[*key] {
             Value::Str(sym) => instrs.push(Instr::LoadSymbol(hash_str(sym))),
-            Value::Num(num) => instrs.push(Instr::LoadNumber(num as f32)),
+            Value::Num(num) => instrs.push(Instr::LoadNumber(num)),
         };
         instrs.push(Instr::StoreGlob(hash_str(key)));
     }
