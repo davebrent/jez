@@ -11,6 +11,7 @@ mod unit;
 mod vm;
 
 extern crate docopt;
+#[cfg(feature = "with-jack")]
 extern crate jack;
 extern crate libc;
 #[macro_use]
@@ -45,6 +46,7 @@ pub fn make_vm_backend(name: &str,
                        -> Result<Box<backends::Backend>, err::JezErr> {
     match name {
         "debug" | "" => Ok(Box::new(backends::Debug::new(logger, channel))),
+        #[cfg(feature = "with-jack")]
         "jack" => Ok(Box::new(try!(backends::Jack::new(logger, channel)))),
         _ => Err(From::from(err::SysErr::UnknownBackend)),
     }
