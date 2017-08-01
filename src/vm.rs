@@ -180,9 +180,7 @@ impl Machine {
                 self.mpu.send(Message::SeqEvent(event)).unwrap();
                 Ok(None)
             }
-            Message::Error(_, err) => {
-                Err(err)
-            }
+            Message::Error(_, err) => Err(err),
         }
     }
 }
