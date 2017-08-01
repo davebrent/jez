@@ -21,3 +21,19 @@ fn test_curves_with_triggers() {
 
     assert!(res.is_ok());
 }
+
+#[test]
+fn test_missing_mpu_funcs() {
+    let dur = Duration::new(1, 0);
+    let dt = Duration::new(0, 1000000);
+    let res = jez::simulate(dur,
+                            dt,
+                            "
+.version 1
+
+.def spu 0:
+  [64 64 64 64] 500 1 track
+    ");
+
+    assert!(res.is_ok());
+}

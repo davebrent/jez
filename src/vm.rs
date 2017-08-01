@@ -177,8 +177,9 @@ impl Machine {
                 }
             }
             Message::SeqEvent(event) => {
-                self.mpu.send(Message::SeqEvent(event)).unwrap();
-                Ok(None)
+                match self.mpu.send(Message::SeqEvent(event)) {
+                    _ => Ok(None)
+                }
             }
             Message::Error(_, err) => Err(err),
         }
