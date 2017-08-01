@@ -23,8 +23,8 @@ pub struct Mpu {
     interp: Interpreter<MidiState>,
     channel: Sender<Message>,
     input_channel: Receiver<Message>,
-    instrs_out_note: usize,
-    instrs_out_ctrl: usize,
+    instrs_out_note: Option<usize>,
+    instrs_out_ctrl: Option<usize>,
     off_events: Vec<(Duration, u8, u8)>,
     ctl_events: Vec<(Duration, f64, u8, u8, Curve)>,
 }
@@ -36,22 +36,12 @@ impl Mpu {
                channel: Sender<Message>,
                input_channel: Receiver<Message>)
                -> Option<Self> {
-        let out_note = funcs.get(&hash_str("mpu_out_note"));
-        let out_ctrl = funcs.get(&hash_str("mpu_out_ctrl"));
+        let out_note = funcs.get(&hash_str("mpu_out_note")).cloned();
+        let out_ctrl = funcs.get(&hash_str("mpu_out_ctrl")).cloned();
 
         if out_note.is_none() && out_ctrl.is_none() {
             return None;
         }
-
-        let out_note = match out_note {
-            Some(pc) => *pc,
-            None => instrs.len(),
-        };
-
-        let out_ctrl = match out_ctrl {
-            Some(pc) => *pc,
-            None => instrs.len(),
-        };
 
         let mut words: HashMap<&'static str, MpuKeyword> = HashMap::new();
         words.insert("ctrlout", ctrlout);
@@ -75,10 +65,16 @@ impl Mpu {
     }
 
     fn handle_trg_event(&mut self, event: Event) {
+        if self.instrs_out_note.is_none() {
+            return;
+        }
+
+        let instrs = self.instrs_out_note.unwrap();
         self.interp.state.reset();
         self.interp.data.event = event;
+        self.interp.data.message = MidiMessage::None;
 
-        match self.interp.eval(self.instrs_out_note) {
+        match self.interp.eval(instrs) {
             Err(err) => {
                 self.channel
                     .send(Message::Error(self.id, From::from(err)))
@@ -121,10 +117,16 @@ impl Mpu {
     }
 
     fn handle_ctl_event(&mut self, event: Event, curve: Curve) {
+        if self.instrs_out_ctrl.is_none() {
+            return;
+        }
+
+        let instrs = self.instrs_out_ctrl.unwrap();
         self.interp.state.reset();
         self.interp.data.event = event;
+        self.interp.data.message = MidiMessage::None;
 
-        match self.interp.eval(self.instrs_out_ctrl) {
+        match self.interp.eval(instrs) {
             Err(err) => {
                 self.channel
                     .send(Message::Error(self.id, From::from(err)))
