@@ -68,17 +68,17 @@ pub fn make_program(txt: &str) -> Result<Vec<interp::Instr>, err::JezErr> {
 }
 
 #[derive(Debug, Serialize)]
-struct Simulation {
+pub struct Simulation {
     duration: Duration,
     delta: Duration,
     instructions: Vec<Instr>,
     messages: Vec<log::LogMessage>,
 }
 
-fn simulate(dur: Duration,
-            dt: Duration,
-            prog: &str)
-            -> Result<Simulation, JezErr> {
+pub fn simulate(dur: Duration,
+                dt: Duration,
+                prog: &str)
+                -> Result<Simulation, JezErr> {
     let (log_send, log_recv) = channel();
     let (audio_send, _audio_recv) = channel();
     let (host_send, host_recv) = channel();
