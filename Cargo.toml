@@ -10,7 +10,6 @@ crate-type = ["rlib", "dylib"]
 [dependencies]
 docopt = "0.7"
 jack = "0.5.0"
-jack-sys = "0.1.4"
 libc = "0.2.22"
 nom = "3.1.0"
 rand = "0.3.15"
