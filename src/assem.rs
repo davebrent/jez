@@ -56,6 +56,9 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
                         Token::Null => {
                             instrs.push(Instr::Null);
                         }
+                        Token::Symbol(var) => {
+                            instrs.push(Instr::LoadSymbol(hash_str(var)));
+                        }
                         Token::Assignment(var) => {
                             instrs.push(Instr::StoreVar(hash_str(var)));
                         }

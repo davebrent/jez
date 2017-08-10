@@ -19,6 +19,7 @@ pub enum Token<'a> {
     ListBegin,
     ListEnd,
     Null,
+    Symbol(&'a str),
     Value(Value<'a>),
     Variable(&'a str),
 }
@@ -75,6 +76,12 @@ named!(variable<Token>, do_parse!(
     >> (Token::Variable(sym))
 ));
 
+named!(symbol<Token>, do_parse!(
+    char!('\'')
+    >> sym: string
+    >> (Token::Symbol(sym))
+));
+
 named!(assignment<Token>, do_parse!(
     char!('=')
     >> opt!(multispace)
@@ -97,6 +104,7 @@ named!(token<Token>, do_parse!(
         | char!('[') => { |c| Token::ListBegin }
         | char!(']') => { |c| Token::ListEnd }
         | char!('~') => { |c| Token::Null }
+        | symbol
         | variable
         | assignment
         | value => { |v| Token::Value(v) }
@@ -286,6 +294,12 @@ mod tests {
     fn test_token_variable() {
         let s = token(b"$foo");
         assert_eq!(s.unwrap(), (&b""[..], Token::Variable("foo")));
+    }
+
+    #[test]
+    fn test_token_symbol() {
+        let s = token(b"'foo");
+        assert_eq!(s.unwrap(), (&b""[..], Token::Symbol("foo")));
     }
 
     #[test]
