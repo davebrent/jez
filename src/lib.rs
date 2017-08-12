@@ -4,10 +4,7 @@ mod err;
 mod interp;
 mod log;
 mod math;
-mod mpu;
 mod parse;
-mod spu;
-mod unit;
 mod vm;
 
 extern crate docopt;
@@ -32,18 +29,17 @@ use std::mem;
 use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
 
-pub use unit::Message;
 pub use interp::Instr;
 pub use err::JezErr;
 pub use err::RuntimeErr;
-pub use vm::Machine;
+pub use vm::{Control, Machine, Command};
 pub use log::Logger;
 pub use math::millis_to_dur;
 
 
 pub fn make_vm_backend(name: &str,
                        logger: log::Logger,
-                       channel: Receiver<unit::Message>)
+                       channel: Receiver<Command>)
                        -> Result<Box<Any>, err::JezErr> {
     match name {
         "debug" | "" => Ok(Box::new(backends::Debug::new(logger, channel))),
@@ -70,10 +66,10 @@ pub fn make_program(txt: &str) -> Result<Vec<interp::Instr>, err::JezErr> {
 
 #[derive(Debug, Serialize)]
 pub struct Simulation {
-    duration: Duration,
-    delta: Duration,
-    instructions: Vec<Instr>,
-    messages: Vec<log::LogMessage>,
+    pub duration: Duration,
+    pub delta: Duration,
+    pub instructions: Vec<Instr>,
+    pub messages: Vec<log::LogMessage>,
 }
 
 pub fn simulate(dur: Duration,
@@ -85,14 +81,13 @@ pub fn simulate(dur: Duration,
     let (host_send, host_recv) = channel();
 
     let instrs = try!(make_program(prog));
-    try!(Machine::simulate(dur,
-                           dt,
-                           audio_send.clone(),
-                           host_send.clone(),
-                           host_recv,
-                           &instrs,
-                           Logger::new(log_send.clone())));
+    let mut machine = Machine::new(audio_send.clone(),
+                                   host_send.clone(),
+                                   host_recv,
+                                   &instrs,
+                                   Logger::new(log_send.clone()));
 
+    try!(machine.exec(dur, dt));
     let mut msgs = Vec::new();
     while let Ok(msg) = log_recv.try_recv() {
         msgs.push(msg);

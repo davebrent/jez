@@ -2,14 +2,13 @@ use rand::{Rng, StdRng};
 
 use err::RuntimeErr;
 use interp::{InterpState, InterpResult, Value};
-use unit::{Event, EventValue};
 use math::path_to_curve;
 
-use super::seq::{SeqState, SeqTrack};
-
+use super::interp::ExtState;
+use super::msgs::{Event, Destination, EventValue};
 
 /// Repeat a value 'n' times
-pub fn repeat(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn repeat(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let times = try!(state.pop_num()) as usize;
     let val = try!(state.pop());
     for _ in 0..times {
@@ -19,9 +18,9 @@ pub fn repeat(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Put a value on the stack every 'n' cycles
-pub fn every(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn every(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let freq = try!(state.pop_num()) as usize;
-    if freq % seq.cycle.rev == 0 {
+    if freq % seq.revision == 0 {
         try!(state.pop());
     } else {
         // Remove the else clause from the stack
@@ -33,7 +32,7 @@ pub fn every(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Reverse a list, leaving it on the stack
-pub fn reverse(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn reverse(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.last_pair());
     let slice = try!(state.heap_slice_mut(start, end));
     slice.reverse();
@@ -41,7 +40,7 @@ pub fn reverse(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Shuffle a list, leaving it on the stack
-pub fn shuffle(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn shuffle(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.last_pair());
     let mut rng = StdRng::new().unwrap();
     let slice = try!(state.heap_slice_mut(start, end));
@@ -50,7 +49,7 @@ pub fn shuffle(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Rotate a list
-pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn rotate(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let amount = try!(state.pop_num()) as usize;
     let (start, end) = try!(state.last_pair());
 
@@ -65,7 +64,7 @@ pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Randomly set values to rests in a list
-pub fn degrade(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn degrade(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let mut rng = StdRng::new().unwrap();
     let (start, end) = try!(state.last_pair());
     let lst = try!(state.heap_slice_mut(start, end));
@@ -78,10 +77,10 @@ pub fn degrade(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Every cycle, puts the 'next' element of a list on the stack
-pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn cycle(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.pop_pair());
     if start != end {
-        let i = seq.cycle.rev % (end - start);
+        let i = seq.revision % (end - start);
         let v = try!(state.heap_get(i));
         try!(state.push(v));
     }
@@ -89,8 +88,8 @@ pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Reverse a list every other cycle
-pub fn palindrome(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    if seq.cycle.rev % 2 == 1 {
+pub fn palindrome(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    if seq.revision % 2 == 1 {
         return reverse(seq, state);
     }
     Ok(None)
@@ -102,7 +101,7 @@ pub fn palindrome(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
 ///
 ///   [1]: Simha Arom. African Polyphony and Polyrhythm.
 ///        Cambridge University Press, Cambridge, England, 1991.
-pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn hopjump(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let hopsize = try!(state.pop_num()) as usize;
     let pulses = try!(state.pop_num()) as usize;
     let onsets = try!(state.pop_num()) as usize;
@@ -149,46 +148,53 @@ pub fn hopjump(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Define a list of simultanious events
-pub fn simul(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn simul(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.pop_pair());
     try!(state.push(Value::Tuple(start, end)));
     Ok(None)
 }
 
-/// Build a track by recursively subdividing a list into a series of events
-pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    let num = try!(state.pop_num()) as u32;
+/// Define a list of track functions
+pub fn tracks(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let (start, end) = try!(state.pop_pair());
+    for (i, ptr) in (start..end).enumerate() {
+        let sym = try!(try!(state.heap_get(ptr)).as_sym());
+        seq.tracks.push((i, sym));
+    }
+    Ok(None)
+}
+
+/// Output midi events
+pub fn midiout(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let extra = try!(state.pop_num()) as u8;
+    let chan = try!(state.pop_num()) as u8;
     let dur = try!(state.pop_num());
 
-    let mut track = SeqTrack {
-        num: num as usize,
-        events: Vec::new(),
-        dur: dur,
-    };
+    seq.duration = dur;
 
     let mut visit: Vec<(f64, f64, Value)> = Vec::new();
-    visit.push((0.0, dur, state.pop().unwrap()));
+    visit.push((0.0, dur, try!(state.pop())));
 
     while let Some((onset, dur, val)) = visit.pop() {
         match val {
             Value::Curve(points) => {
                 let event = Event {
-                    track: num,
+                    dest: Destination::Midi(chan, extra),
                     onset: onset,
                     dur: dur,
                     value: EventValue::Curve(points),
                 };
-                track.events.push(event);
+                seq.events.push(event);
             }
             Value::Null => (),
             Value::Number(val) => {
                 let event = Event {
-                    track: num,
+                    dest: Destination::Midi(chan, extra),
                     onset: onset,
                     dur: dur,
                     value: EventValue::Trigger(val),
                 };
-                track.events.push(event);
+                seq.events.push(event);
             }
             Value::Pair(start, end) => {
                 let interval = dur / (end - start) as f64;
@@ -207,12 +213,11 @@ pub fn track(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
         }
     }
 
-    seq.tracks.push(track);
     Ok(None)
 }
 
 /// Create a bezier curve from a linear ramp
-pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn linear(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.pop_pair());
     if end - start != 2 {
         return Err(RuntimeErr::InvalidArgs);
@@ -226,7 +231,7 @@ pub fn linear(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Gray code number encoding
-pub fn graycode(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn graycode(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let num = try!(state.pop_num()) as i64;
     let num = (num >> 1) ^ num;
     try!(state.push(Value::Number(num as f64)));
@@ -234,7 +239,7 @@ pub fn graycode(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Encode a number into a binary list
-pub fn binlist(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
+pub fn binlist(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let num = try!(state.pop_num()) as i64;
     let n = try!(state.pop_num()) as i64;
 
@@ -254,8 +259,8 @@ pub fn binlist(_: &mut SeqState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Puts the current cycle revision onto the stack
-pub fn rev(seq: &mut SeqState, state: &mut InterpState) -> InterpResult {
-    try!(state.push(Value::Number(seq.cycle.rev as f64)));
+pub fn rev(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    try!(state.push(Value::Number(seq.revision as f64)));
     Ok(None)
 }
 
@@ -266,7 +271,7 @@ mod tests {
     #[test]
     fn repeat_keyword() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
+        let mut seq = ExtState::new();
         state.call(0, 1).unwrap();
         state.push(Value::Number(12.0)).unwrap();
         state.push(Value::Number(3.0)).unwrap();
@@ -280,8 +285,8 @@ mod tests {
     #[test]
     fn every_keyword_true() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
-        seq.cycle.rev = 3;
+        let mut seq = ExtState::new();
+        seq.revision = 3;
         state.call(0, 1).unwrap();
         state.push(Value::Number(3.14)).unwrap();
         state.push(Value::Number(2.17)).unwrap();
@@ -294,8 +299,8 @@ mod tests {
     #[test]
     fn every_keyword_false() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
-        seq.cycle.rev = 3;
+        let mut seq = ExtState::new();
+        seq.revision = 3;
         state.call(0, 1).unwrap();
         state.push(Value::Number(3.14)).unwrap();
         state.push(Value::Number(2.17)).unwrap();
@@ -308,7 +313,7 @@ mod tests {
     #[test]
     fn reverse_keyword() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
+        let mut seq = ExtState::new();
         state.call(0, 1).unwrap();
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
@@ -324,7 +329,7 @@ mod tests {
     #[test]
     fn rotate_keyword() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
+        let mut seq = ExtState::new();
         state.call(0, 1).unwrap();
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
@@ -341,7 +346,7 @@ mod tests {
     #[test]
     fn test_simultaneous_events() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
+        let mut seq = ExtState::new();
         state.call(0, 1).unwrap();
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
@@ -350,23 +355,24 @@ mod tests {
         simul(&mut seq, &mut state).unwrap();
         state.push(Value::Number(1000.0)).unwrap();
         state.push(Value::Number(0.0)).unwrap();
-        track(&mut seq, &mut state).unwrap();
+        state.push(Value::Number(127.0)).unwrap();
+        midiout(&mut seq, &mut state).unwrap();
 
-        assert_eq!(seq.tracks[0].events,
+        assert_eq!(seq.events,
                    [Event {
-                        track: 0,
+                        dest: Destination::Midi(0, 127),
                         onset: 0.0,
                         dur: 1000.0,
                         value: EventValue::Trigger(3.0),
                     },
                     Event {
-                        track: 0,
+                        dest: Destination::Midi(0, 127),
                         onset: 0.0,
                         dur: 1000.0,
                         value: EventValue::Trigger(2.0),
                     },
                     Event {
-                        track: 0,
+                        dest: Destination::Midi(0, 127),
                         onset: 0.0,
                         dur: 1000.0,
                         value: EventValue::Trigger(1.0),
@@ -376,7 +382,7 @@ mod tests {
     #[test]
     fn test_binlist() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
+        let mut seq = ExtState::new();
         state.call(0, 1).unwrap();
         state.push(Value::Number(5.0)).unwrap();
         state.push(Value::Number(12.0)).unwrap();
@@ -394,7 +400,7 @@ mod tests {
     #[test]
     fn test_graycode() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
+        let mut seq = ExtState::new();
         state.call(0, 1).unwrap();
         state.push(Value::Number(12.0)).unwrap();
         graycode(&mut seq, &mut state).unwrap();
@@ -404,8 +410,8 @@ mod tests {
     #[test]
     fn test_rev() {
         let mut state = InterpState::new();
-        let mut seq = SeqState::new();
-        seq.cycle.rev = 99;
+        let mut seq = ExtState::new();
+        seq.revision = 99;
         state.call(0, 1).unwrap();
         rev(&mut seq, &mut state).unwrap();
         assert_eq!(state.pop_num().unwrap(), 99.0);

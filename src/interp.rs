@@ -40,6 +40,13 @@ impl Value {
             _ => Err(RuntimeErr::InvalidArgs),
         }
     }
+
+    pub fn as_sym(&self) -> Result<u64, RuntimeErr> {
+        match *self {
+            Value::Symbol(sym) => Ok(sym),
+            _ => Err(RuntimeErr::InvalidArgs),
+        }
+    }
 }
 
 pub type InterpResult = Result<Option<Value>, RuntimeErr>;
@@ -319,6 +326,7 @@ fn swap(state: &mut InterpState) -> InterpResult {
 
 pub type BuiltInKeyword = fn(&mut InterpState) -> InterpResult;
 pub type ExtKeyword<S> = fn(&mut S, &mut InterpState) -> InterpResult;
+
 pub enum Keyword<S> {
     BuiltIn(BuiltInKeyword),
     Extension(ExtKeyword<S>),

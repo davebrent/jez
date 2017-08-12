@@ -12,8 +12,9 @@ use std::time::{Duration, Instant};
 
 use docopt::Docopt;
 
-use jez::{Instr, JezErr, Logger, Machine, make_program, make_log_backend,
-          make_vm_backend, Message, millis_to_dur, RuntimeErr};
+use jez::{Control, Instr, JezErr, Logger, Machine, make_program,
+          make_log_backend, make_vm_backend, Command, millis_to_dur,
+          RuntimeErr};
 
 
 const USAGE: &'static str = "
@@ -42,21 +43,21 @@ struct Args {
     arg_file: String,
 }
 
-fn start_timer(millis: f64, channel: Sender<Message>) {
+fn start_timer(millis: f64, channel: Sender<Command>) {
     let start = Instant::now();
     let end = millis_to_dur(millis);
     let res = Duration::new(0, 1000000);
 
     thread::spawn(move || loop {
                       if start.elapsed() >= end {
-                          channel.send(Message::Stop).unwrap();
+                          channel.send(Command::Stop).unwrap();
                           return;
                       }
                       thread::sleep(res);
                   });
 }
 
-fn watch_file(filepath: String, instrs: &[Instr], channel: Sender<Message>) {
+fn watch_file(filepath: String, instrs: &[Instr], channel: Sender<Command>) {
     let instrs = instrs.to_vec();
     thread::spawn(move || {
         let dur = Duration::new(1, 0);
@@ -74,7 +75,7 @@ fn watch_file(filepath: String, instrs: &[Instr], channel: Sender<Message>) {
                     if fp.read_to_string(&mut txt).is_ok() {
                         if let Ok(next) = make_program(txt.as_str()) {
                             if instrs != next {
-                                channel.send(Message::Reload).unwrap();
+                                channel.send(Command::Reload).unwrap();
                                 return;
                             }
                         }
@@ -93,9 +94,9 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
     log_backend.run_forever(log_recv);
 
     let (audio_send, audio_recv) = channel();
-    let mut backend = try!(make_vm_backend(args.flag_backend.as_ref(),
-                                           Logger::new(log_send.clone()),
-                                           audio_recv));
+    let mut _backend = try!(make_vm_backend(args.flag_backend.as_ref(),
+                                            Logger::new(log_send.clone()),
+                                            audio_recv));
 
     loop {
         let mut txt = String::new();
@@ -115,21 +116,15 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
             }
         }
 
-        let res = Machine::realtime(audio_send.clone(),
-                                    host_send.clone(),
-                                    host_recv,
-                                    &instrs,
-                                    Logger::new(log_send.clone()));
-        match res {
-            Ok(reload) => {
-                if !reload {
-                    return Ok(());
-                }
-                backend.drain();
-            }
-            Err(err) => {
-                return Err(err);
-            }
+        let mut machine = Machine::new(audio_send.clone(),
+                                       host_send.clone(),
+                                       host_recv,
+                                       &instrs,
+                                       Logger::new(log_send.clone()));
+
+        match try!(machine.exec_realtime()) {
+            Control::Stop => return Ok(()),
+            _ => continue,
         }
     }
 }

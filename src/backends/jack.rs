@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use err::SysErr;
 use log::Logger;
-use unit::Message;
+use unit::Command;
 use jack::prelude::{AsyncClient, Client, client_options, JackControl,
                     MidiOutPort, MidiOutSpec, NotificationHandler,
                     ProcessHandler, ProcessScope, Port, RawMidi};
@@ -13,7 +13,7 @@ struct Notifier;
 impl NotificationHandler for Notifier {}
 
 struct Processor {
-    channel: Receiver<Message>,
+    channel: Receiver<Command>,
     midi_out_port: Port<MidiOutSpec>,
     logger: Logger,
     start: Instant,
@@ -27,21 +27,21 @@ impl ProcessHandler for Processor {
             let time = Instant::now() - self.start;
             self.logger.log(time, "backend", &msg);
             match msg {
-                Message::MidiNoteOn(chn, pitch, vel) => {
+                Command::MidiNoteOn(chn, pitch, vel) => {
                     let midi = RawMidi {
                         time: 0,
                         bytes: &[144 + chn, pitch, vel],
                     };
                     out_port.write(&midi).unwrap();
                 }
-                Message::MidiNoteOff(chn, pitch) => {
+                Command::MidiNoteOff(chn, pitch) => {
                     let midi = RawMidi {
                         time: 0,
                         bytes: &[128 + chn, pitch, 0],
                     };
                     out_port.write(&midi).unwrap();
                 }
-                Message::MidiCtl(chn, ctl, val) => {
+                Command::MidiCtl(chn, ctl, val) => {
                     let midi = RawMidi {
                         time: 0,
                         bytes: &[176 + chn, ctl, val],
@@ -62,7 +62,7 @@ pub struct Jack {
 
 impl Jack {
     pub fn new(logger: Logger,
-               channel: Receiver<Message>)
+               channel: Receiver<Command>)
                -> Result<Self, SysErr> {
         match Client::new("jez", client_options::NO_START_SERVER) {
             Err(_) => Err(SysErr::UnreachableBackend),

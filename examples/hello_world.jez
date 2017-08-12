@@ -1,7 +1,7 @@
 .version 1
 
-.def spu 0:
-  [48 48 48 ~] degrade 500 0 track
+.def t1 0:
+  [48 48 48 ~] degrade 500 0 127 midiout
 
-.def mpu_out_note 0:
-  event_value 127 event_duration 1 noteout
+.def main 0:
+  ['t1] tracks

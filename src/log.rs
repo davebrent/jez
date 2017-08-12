@@ -9,14 +9,14 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Sender, Receiver};
 use std::thread;
 use std::time::Duration;
-use unit::Message;
+use vm::Command;
 
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct LogMessage {
     pub time: Duration,
     pub tag: &'static str,
-    pub data: Message,
+    pub data: Command,
 }
 
 pub trait LogBackend {
@@ -89,7 +89,7 @@ impl Logger {
         Logger { channel: channel }
     }
 
-    pub fn log(&self, time: Duration, tag: &'static str, msg: &Message) {
+    pub fn log(&self, time: Duration, tag: &'static str, msg: &Command) {
         let msg = LogMessage {
             time: time,
             tag: tag,

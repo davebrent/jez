@@ -3,13 +3,13 @@ use std::thread;
 use std::time::Instant;
 
 use log::Logger;
-use unit::Message;
+use vm::Command;
 
 
 pub struct Debug;
 
 impl Debug {
-    pub fn new(logger: Logger, channel: Receiver<Message>) -> Self {
+    pub fn new(logger: Logger, channel: Receiver<Command>) -> Self {
         thread::spawn(move || {
                           let start = Instant::now();
                           while let Ok(msg) = channel.recv() {
