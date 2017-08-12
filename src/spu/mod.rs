@@ -95,7 +95,7 @@ impl Track {
                 self.events.push(event);
                 break;
             }
-            self.channel.send(Message::SeqEvent(event)).unwrap();
+            self.channel.send(Message::SeqEvent(event)).ok();
         }
     }
 }
@@ -144,7 +144,7 @@ impl Spu {
                 match interp.eval(*pc) {
                     Err(err) => {
                         let msg = Message::Error(id, From::from(err));
-                        channel.send(msg).unwrap();
+                        channel.send(msg).ok();
                         None
                     }
                     Ok(_) => {
@@ -192,7 +192,7 @@ impl Unit for Spu {
                 match track.eval(self.pc, &mut self.interp) {
                     Err(err) => {
                         let msg = Message::Error(self.id, From::from(err));
-                        self.channel.send(msg).unwrap();
+                        self.channel.send(msg).ok();
                         return true;
                     }
                     _ => {

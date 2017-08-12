@@ -78,7 +78,7 @@ impl Mpu {
             Err(err) => {
                 self.channel
                     .send(Message::Error(self.id, From::from(err)))
-                    .unwrap();
+                    .ok();
             }
             Ok(_) => {
                 match self.interp.data.message {
@@ -95,7 +95,7 @@ impl Mpu {
                         if len != self.off_events.len() {
                             self.channel
                                 .send(Message::MidiNoteOff(chan, ptch))
-                                .unwrap();
+                                .ok();
                         }
 
                         self.off_events.push((millis_to_dur(dur), chan, ptch));
@@ -103,13 +103,13 @@ impl Mpu {
                             .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
                         self.channel
                             .send(Message::MidiNoteOn(chan, ptch, vel))
-                            .unwrap();
+                            .ok();
                     }
                     _ => {
                         let err = RuntimeErr::InvalidArgs;
                         self.channel
                             .send(Message::Error(self.id, From::from(err)))
-                            .unwrap();
+                            .ok();
                     }
                 }
             }
@@ -130,7 +130,7 @@ impl Mpu {
             Err(err) => {
                 self.channel
                     .send(Message::Error(self.id, From::from(err)))
-                    .unwrap();
+                    .ok();
             }
             Ok(_) => {
                 match self.interp.data.message {
@@ -144,13 +144,13 @@ impl Mpu {
                         self.ctl_events.push((dur, 0.0, chan, ctl, curve));
                         self.ctl_events
                             .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-                        self.channel.send(msg).unwrap();
+                        self.channel.send(msg).ok();
                     }
                     _ => {
                         let err = RuntimeErr::InvalidArgs;
                         self.channel
                             .send(Message::Error(self.id, From::from(err)))
-                            .unwrap();
+                            .ok();
                     }
                 }
             }
@@ -166,7 +166,7 @@ impl Mpu {
             let t = evt.1;
             let val = point_on_curve(t, &evt.4);
             let msg = Message::MidiCtl(evt.2, evt.3, val[1] as u8);
-            self.channel.send(msg).unwrap();
+            self.channel.send(msg).ok();
         }
 
         self.ctl_events.retain(|&evt| evt.1 < 1.0);
@@ -188,7 +188,7 @@ impl Mpu {
                 break;
             } else {
                 let msg = Message::MidiNoteOff(chan, pitch);
-                self.channel.send(msg).unwrap();
+                self.channel.send(msg).ok();
             }
         }
     }
@@ -197,7 +197,7 @@ impl Mpu {
         while let Some((_, chan, pitch)) = self.off_events.pop() {
             self.channel
                 .send(Message::MidiNoteOff(chan, pitch))
-                .unwrap();
+                .ok();
         }
     }
 }

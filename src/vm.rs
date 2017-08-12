@@ -143,13 +143,13 @@ impl Machine {
     fn cycle(&mut self, msg: Message) -> Result<Option<bool>, JezErr> {
         match msg {
             Message::Stop => {
-                self.mpu.send(Message::Stop).unwrap();
-                self.spu.send(Message::Stop).unwrap();
+                self.mpu.send(Message::Stop).ok();
+                self.spu.send(Message::Stop).ok();
                 Ok(Some(false))
             }
             Message::Reload => {
-                self.mpu.send(Message::Stop).unwrap();
-                self.spu.send(Message::Stop).unwrap();
+                self.mpu.send(Message::Stop).ok();
+                self.spu.send(Message::Stop).ok();
                 Ok(Some(true))
             }
             Message::MidiNoteOn(chan, pitch, vel) => {
@@ -177,9 +177,8 @@ impl Machine {
                 }
             }
             Message::SeqEvent(event) => {
-                match self.mpu.send(Message::SeqEvent(event)) {
-                    _ => Ok(None)
-                }
+                self.mpu.send(Message::SeqEvent(event)).ok();
+                Ok(None)
             }
             Message::Error(_, err) => Err(err),
         }
