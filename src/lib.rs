@@ -26,6 +26,7 @@ use libc::{c_char, c_double};
 use std::ffi::{CStr, CString};
 use std::str;
 
+use std::any::Any;
 use std::convert::From;
 use std::mem;
 use std::sync::mpsc::{channel, Receiver};
@@ -43,7 +44,7 @@ pub use math::millis_to_dur;
 pub fn make_vm_backend(name: &str,
                        logger: log::Logger,
                        channel: Receiver<unit::Message>)
-                       -> Result<Box<backends::Backend>, err::JezErr> {
+                       -> Result<Box<Any>, err::JezErr> {
     match name {
         "debug" | "" => Ok(Box::new(backends::Debug::new(logger, channel))),
         #[cfg(feature = "with-jack")]

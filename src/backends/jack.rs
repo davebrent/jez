@@ -8,8 +8,6 @@ use jack::prelude::{AsyncClient, Client, client_options, JackControl,
                     MidiOutPort, MidiOutSpec, NotificationHandler,
                     ProcessHandler, ProcessScope, Port, RawMidi};
 
-use super::base::Backend;
-
 
 struct Notifier;
 impl NotificationHandler for Notifier {}
@@ -86,8 +84,4 @@ impl Jack {
             }
         }
     }
-}
-
-impl Backend for Jack {
-    fn drain(&mut self) {}
 }

@@ -5,8 +5,6 @@ use std::time::Instant;
 use log::Logger;
 use unit::Message;
 
-use super::base::Backend;
-
 
 pub struct Debug;
 
@@ -21,8 +19,4 @@ impl Debug {
                       });
         Debug {}
     }
-}
-
-impl Backend for Debug {
-    fn drain(&mut self) {}
 }
