@@ -4,8 +4,7 @@ use std::hash::Hasher;
 
 use err::AssemErr;
 use interp::Instr;
-use parse::{Token, Directive, Value};
-
+use super::parse::{Token, Directive, Value};
 
 pub fn hash_str(text: &str) -> u64 {
     let mut hasher = DefaultHasher::new();

@@ -1,10 +1,9 @@
-mod assem;
 mod backends;
 mod err;
 mod interp;
+mod lang;
 mod log;
 mod math;
-mod parse;
 mod vm;
 
 extern crate docopt;
@@ -59,8 +58,8 @@ pub fn make_log_backend(name: &str)
 }
 
 pub fn make_program(txt: &str) -> Result<Vec<interp::Instr>, err::JezErr> {
-    let dirs = try!(parse::parser(txt));
-    let instrs = try!(assem::assemble(&dirs));
+    let dirs = try!(lang::parser(txt));
+    let instrs = try!(lang::assemble(&dirs));
     Ok(instrs)
 }
 

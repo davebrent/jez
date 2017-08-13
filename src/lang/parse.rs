@@ -5,7 +5,6 @@ use nom::{IResult, double, space, multispace, digit};
 
 use err::ParseErr;
 
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Value<'a> {
     Num(f64),

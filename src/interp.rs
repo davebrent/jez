@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use assem::hash_str;
+use lang::hash_str;
 use err::RuntimeErr;
 use math::Curve;
 

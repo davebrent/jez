@@ -10,9 +10,9 @@ use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 use std::time::Duration;
 
-use assem::hash_str;
 use err::{JezErr, SysErr, RuntimeErr};
 use interp::{Instr, Interpreter};
+use lang::hash_str;
 use log::Logger;
 
 use self::interp::{ExtKeyword, ExtState};
