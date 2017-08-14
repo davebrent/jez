@@ -3,13 +3,17 @@ use std::thread;
 use std::time::Instant;
 
 use log::Logger;
-use vm::Command;
+use vm::{AudioBlock, Command};
+use memory::RingBuffer;
 
 
 pub struct Debug;
 
 impl Debug {
-    pub fn new(logger: Logger, channel: Receiver<Command>) -> Self {
+    pub fn new(_: RingBuffer<AudioBlock>,
+               logger: Logger,
+               channel: Receiver<Command>)
+               -> Self {
         thread::spawn(move || {
                           let start = Instant::now();
                           while let Ok(msg) = channel.recv() {

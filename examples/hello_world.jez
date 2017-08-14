@@ -1,7 +1,0 @@
-.version 1
-
-.def t1 0:
-  [48 48 48 ~] degrade 500 0 127 midiout
-
-.def main 0:
-  ['t1] tracks

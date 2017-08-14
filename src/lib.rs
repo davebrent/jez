@@ -4,6 +4,7 @@ mod interp;
 mod lang;
 mod log;
 mod math;
+mod memory;
 mod vm;
 
 extern crate docopt;
@@ -31,19 +32,21 @@ use std::time::Duration;
 pub use interp::Instr;
 pub use err::JezErr;
 pub use err::RuntimeErr;
-pub use vm::{Control, Machine, Command};
+pub use vm::{AudioBlock, Control, Machine, Command};
 pub use log::Logger;
 pub use math::millis_to_dur;
+pub use memory::RingBuffer;
 
 
 pub fn make_vm_backend(name: &str,
+                       rb: RingBuffer<AudioBlock>,
                        logger: log::Logger,
                        channel: Receiver<Command>)
                        -> Result<Box<Any>, err::JezErr> {
     match name {
-        "debug" | "" => Ok(Box::new(backends::Debug::new(logger, channel))),
+        "debug" | "" => Ok(Box::new(backends::Debug::new(rb, logger, channel))),
         #[cfg(feature = "with-jack")]
-        "jack" => Ok(Box::new(try!(backends::Jack::new(logger, channel)))),
+        "jack" => Ok(Box::new(try!(backends::Jack::new(rb, logger, channel)))),
         _ => Err(From::from(err::SysErr::UnknownBackend)),
     }
 }
@@ -75,12 +78,15 @@ pub fn simulate(dur: Duration,
                 dt: Duration,
                 prog: &str)
                 -> Result<Simulation, JezErr> {
+    let ring = RingBuffer::new(64, AudioBlock::new(64));
+
     let (log_send, log_recv) = channel();
     let (audio_send, _audio_recv) = channel();
     let (host_send, host_recv) = channel();
 
     let instrs = try!(make_program(prog));
-    let mut machine = Machine::new(audio_send.clone(),
+    let mut machine = Machine::new(ring,
+                                   audio_send.clone(),
                                    host_send.clone(),
                                    host_recv,
                                    &instrs,

@@ -1,11 +1,14 @@
 use rand::{Rng, StdRng};
+use std::rc::Rc;
 
 use err::RuntimeErr;
 use interp::{InterpState, InterpResult, Value};
+use lang::hash_str;
 use math::path_to_curve;
 
 use super::interp::ExtState;
 use super::msgs::{Event, Destination, EventValue};
+use super::synths::WaveTable;
 
 /// Repeat a value 'n' times
 pub fn repeat(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
@@ -164,13 +167,11 @@ pub fn tracks(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
-/// Output midi events
-pub fn midiout(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    let extra = try!(state.pop_num()) as u8;
-    let chan = try!(state.pop_num()) as u8;
-    let dur = try!(state.pop_num());
-
-    seq.duration = dur;
+fn subdivide(state: &mut InterpState,
+             dur: f64,
+             dest: Destination)
+             -> Result<Vec<Event>, RuntimeErr> {
+    let mut output = Vec::new();
 
     let mut visit: Vec<(f64, f64, Value)> = Vec::new();
     visit.push((0.0, dur, try!(state.pop())));
@@ -179,22 +180,22 @@ pub fn midiout(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
         match val {
             Value::Curve(points) => {
                 let event = Event {
-                    dest: Destination::Midi(chan, extra),
+                    dest: dest,
                     onset: onset,
                     dur: dur,
                     value: EventValue::Curve(points),
                 };
-                seq.events.push(event);
+                output.push(event);
             }
             Value::Null => (),
             Value::Number(val) => {
                 let event = Event {
-                    dest: Destination::Midi(chan, extra),
+                    dest: dest,
                     onset: onset,
                     dur: dur,
                     value: EventValue::Trigger(val),
                 };
-                seq.events.push(event);
+                output.push(event);
             }
             Value::Pair(start, end) => {
                 let interval = dur / (end - start) as f64;
@@ -213,6 +214,18 @@ pub fn midiout(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
         }
     }
 
+    Ok(output)
+}
+
+/// Output midi events
+pub fn midiout(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let extra = try!(state.pop_num()) as u8;
+    let chan = try!(state.pop_num()) as u8;
+    let dur = try!(state.pop_num());
+    let mut events =
+        try!(subdivide(state, dur, Destination::Midi(chan, extra)));
+    seq.duration = dur;
+    seq.events.append(&mut events);
     Ok(None)
 }
 
@@ -261,6 +274,53 @@ pub fn binlist(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
 /// Puts the current cycle revision onto the stack
 pub fn rev(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     try!(state.push(Value::Number(seq.revision as f64)));
+    Ok(None)
+}
+
+pub fn channels(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    seq.audio.settings.channels = try!(state.pop_num()) as f32;
+    Ok(None)
+}
+
+pub fn block_size(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    seq.audio.settings.block_size = try!(state.pop_num()) as f32;
+    Ok(None)
+}
+
+pub fn sample_rate(seq: &mut ExtState,
+                   state: &mut InterpState)
+                   -> InterpResult {
+    seq.audio.settings.sample_rate = try!(state.pop_num()) as f32;
+    Ok(None)
+}
+
+pub fn wave_table(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let len = try!(state.pop_num());
+    let wave = try!(try!(state.pop()).as_sym());
+    let id = try!(try!(state.pop()).as_sym());
+
+    let mut synth = WaveTable::new(len as usize);
+    if wave == hash_str("noise") {
+        synth.noise();
+    } else if wave == hash_str("sine") {
+        synth.sine();
+    } else {
+        return Err(RuntimeErr::InvalidArgs);
+    }
+
+    seq.audio.synths.insert(id, Rc::new(synth));
+    Ok(None)
+}
+
+/// Output synth events
+pub fn synthout(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let param = try!(try!(state.pop()).as_sym());
+    let synth = try!(try!(state.pop()).as_sym());
+    let dur = try!(state.pop_num());
+    let mut events =
+        try!(subdivide(state, dur, Destination::Synth(synth, param)));
+    seq.duration = dur;
+    seq.events.append(&mut events);
     Ok(None)
 }
 
