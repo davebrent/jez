@@ -19,7 +19,7 @@ use log::Logger;
 use memory::RingBuffer;
 
 use self::interp::{ExtKeyword, ExtState};
-pub use self::msgs::{Event, Destination, Command};
+pub use self::msgs::{Event, EventValue, Destination, Command};
 pub use self::audio::AudioBlock;
 use self::audio::AudioProcessor;
 use self::midi::MidiProcessor;
@@ -212,7 +212,9 @@ impl Machine {
                     Signal::Audio => self.handle_audio_signal(&time),
                     Signal::Bus => self.handle_bus_signal(&time, signals),
                     Signal::Midi => self.handle_midi_signal(&time),
-                    Signal::Event(event) => self.handle_event_signal(event),
+                    Signal::Event(event) => {
+                        self.handle_event_signal(&time, event)
+                    },
                     Signal::Track(num, rev, func) => {
                         self.handle_track_signal(signals, num, rev, func)
                     }
@@ -236,7 +238,7 @@ impl Machine {
                          signals: &mut SignalState)
                          -> Result<Control, JezErr> {
         while let Ok(msg) = self.bus_recv.try_recv() {
-            self.logger.log(*elapsed, "vm", &msg);
+            self.logger.log_cmd(*elapsed, "vm", &msg);
             match msg {
                 Command::Stop => {
                     signals.output.send(TimeEvent::Stop).ok();
@@ -262,7 +264,11 @@ impl Machine {
     }
 
     // Route sequenced events
-    fn handle_event_signal(&mut self, event: Event) -> Result<Control, JezErr> {
+    fn handle_event_signal(&mut self,
+                           elapsed: &Duration,
+                           event: Event)
+                           -> Result<Control, JezErr> {
+        self.logger.log_event(*elapsed, "vm", &event);
         match event.dest {
             Destination::Midi(_, _) => {
                 self.midi.process(event);

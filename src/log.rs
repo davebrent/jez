@@ -9,14 +9,19 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Sender, Receiver};
 use std::thread;
 use std::time::Duration;
-use vm::Command;
+use vm::{Command, Event};
 
+#[derive(Clone, Debug, Serialize)]
+pub enum LogData {
+    Event(Event),
+    Command(Command),
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct LogMessage {
     pub time: Duration,
     pub tag: &'static str,
-    pub data: Command,
+    pub data: LogData,
 }
 
 pub trait LogBackend {
@@ -89,12 +94,21 @@ impl Logger {
         Logger { channel: channel }
     }
 
-    pub fn log(&self, time: Duration, tag: &'static str, msg: &Command) {
+    pub fn log_event(&self, time: Duration, tag: &'static str, evt: &Event) {
         let msg = LogMessage {
             time: time,
             tag: tag,
-            data: *msg,
+            data: LogData::Event(*evt),
         };
-        self.channel.send(msg).unwrap();
+        self.channel.send(msg).ok();
+    }
+
+    pub fn log_cmd(&self, time: Duration, tag: &'static str, cmd: &Command) {
+        let msg = LogMessage {
+            time: time,
+            tag: tag,
+            data: LogData::Command(*cmd),
+        };
+        self.channel.send(msg).ok();
     }
 }

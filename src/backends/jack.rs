@@ -69,7 +69,7 @@ impl Processor {
 
         while let Ok(msg) = self.channel.try_recv() {
             let time = Instant::now() - self.start;
-            self.logger.log(time, "backend", &msg);
+            self.logger.log_cmd(time, "backend", &msg);
 
             match msg {
                 Command::AudioSettings(channels, block_size, _) => {

@@ -1,16 +1,36 @@
 extern crate jez;
 use std::time::Duration;
-use jez::{Command, Simulation};
+use jez::{Command, Destination, Event, EventValue, Simulation, LogData};
+
+fn filter_commands(sim: &Simulation) -> Vec<Command> {
+    let out: Vec<Command> = Vec::new();
+    sim.messages.iter().fold(out, |mut out, msg| {
+        if let LogData::Command(cmd) = msg.data {
+            out.push(cmd);
+        }
+        out
+    })
+}
+
+fn filter_events(sim: &Simulation) -> Vec<Event> {
+    let out: Vec<Event> = Vec::new();
+    sim.messages.iter().fold(out, |mut out, msg| {
+        if let LogData::Event(evt) = msg.data {
+            out.push(evt);
+        }
+        out
+    })
+}
 
 fn filter_midi_notes(sim: &Simulation, on: bool) -> Vec<Command> {
-    sim.messages
+    filter_commands(sim)
         .iter()
-        .map(|l| l.data)
-        .filter(|&msg| match msg {
-                    Command::MidiNoteOn(_, _, _) => on,
-                    Command::MidiNoteOff(_, _) => !on,
-                    _ => false,
-                })
+        .filter(|&cmd| match *cmd {
+            Command::MidiNoteOn(_, _, _) => on,
+            Command::MidiNoteOff(_, _) => !on,
+            _ => false
+        })
+        .cloned()
         .collect()
 }
 
@@ -45,4 +65,47 @@ fn test_simple_program() {
                     Command::MidiNoteOff(1, 66),
                     Command::MidiNoteOff(1, 68),
                     Command::MidiNoteOff(1, 70)]);
+}
+
+#[test]
+fn test_log_events() {
+    let dur = Duration::new(0, 250_000_000);
+    let dt = Duration::new(0, 1_000_000);
+    let res = jez::simulate(dur,
+                            dt,
+                            "
+.version 1
+
+.def t1 0:
+  [64 ~ 68 ~ 48] 250 1 127 midiout
+
+.def main 0:
+  ['t1] tracks
+    ");
+
+    let sim = res.unwrap();
+    let events = filter_events(&sim);
+
+    let a = Event{
+        dest: Destination::Midi(1, 127),
+        onset: 0.0,
+        dur: 50.0,
+        value: EventValue::Trigger(64.0),
+    };
+
+    let b = Event{
+        dest: Destination::Midi(1, 127),
+        onset: 100.0,
+        dur: 50.0,
+        value: EventValue::Trigger(68.0),
+    };
+
+    let c = Event{
+        dest: Destination::Midi(1, 127),
+        onset: 200.0,
+        dur: 50.0,
+        value: EventValue::Trigger(48.0),
+    };
+
+    assert_eq!(events, vec![a, b, c]);
 }

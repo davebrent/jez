@@ -18,7 +18,7 @@ impl Debug {
                           let start = Instant::now();
                           while let Ok(msg) = channel.recv() {
                               let time = Instant::now() - start;
-                              logger.log(time, "backend", &msg);
+                              logger.log_cmd(time, "backend", &msg);
                           }
                       });
         Debug {}

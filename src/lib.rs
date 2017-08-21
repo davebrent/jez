@@ -32,8 +32,9 @@ use std::time::Duration;
 pub use interp::Instr;
 pub use err::JezErr;
 pub use err::RuntimeErr;
-pub use vm::{AudioBlock, Control, Machine, Command};
-pub use log::Logger;
+pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
+             Machine};
+pub use log::{Logger, LogData};
 pub use math::millis_to_dur;
 pub use memory::RingBuffer;
 
