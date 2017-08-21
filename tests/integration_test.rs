@@ -16,8 +16,8 @@ fn filter_midi_notes(sim: &Simulation, on: bool) -> Vec<Command> {
 
 #[test]
 fn test_simple_program() {
-    let dur = Duration::new(0, 250000000);
-    let dt = Duration::new(0, 1000000);
+    let dur = Duration::new(0, 250_000_000);
+    let dt = Duration::new(0, 1_000_000);
     let res = jez::simulate(dur,
                             dt,
                             "

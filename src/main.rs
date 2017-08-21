@@ -46,7 +46,7 @@ struct Args {
 fn start_timer(millis: f64, channel: Sender<Command>) {
     let start = Instant::now();
     let end = millis_to_dur(millis);
-    let res = Duration::new(0, 1000000);
+    let res = Duration::new(0, 1_000_000);
 
     thread::spawn(move || loop {
                       if start.elapsed() >= end {

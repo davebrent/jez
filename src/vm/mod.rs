@@ -140,7 +140,7 @@ impl Machine {
     pub fn exec_realtime(&mut self) -> Result<Control, JezErr> {
         let (mut signals, mut timers) = try!(self.setup());
         let handle = thread::spawn(move || {
-                                       let res = Duration::new(0, 1000000);
+                                       let res = Duration::new(0, 1_000_000);
                                        timers.run_forever(res);
                                    });
 

@@ -195,7 +195,7 @@ impl InterpState {
     }
 
     pub fn pop(&mut self) -> Result<Value, RuntimeErr> {
-        let mut frame = try!(self.frame_mut());
+        let frame = try!(self.frame_mut());
         Ok(try!(frame.pop()))
     }
 
