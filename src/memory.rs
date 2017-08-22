@@ -1,5 +1,5 @@
-use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard, RwLockReadGuard};
 use std::clone::Clone;
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct RingState {
@@ -17,7 +17,8 @@ pub struct RingBuffer<T> {
 }
 
 impl<T> RingBuffer<T>
-    where T: Clone
+where
+    T: Clone,
 {
     pub fn new(len: usize, value: T) -> RingBuffer<T> {
         let mut buff = Vec::with_capacity(len);
@@ -72,8 +73,8 @@ impl<T> RingBuffer<T>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vm::AudioBlock;
     use std::thread;
+    use vm::AudioBlock;
 
     #[test]
     fn test_threads() {
@@ -81,10 +82,10 @@ mod tests {
         let mut producer = rb.clone();
 
         let res = thread::spawn(move || {
-                                    assert!(producer.advance_write().is_some());
-                                    assert!(producer.advance_write().is_some());
-                                    assert!(producer.advance_write().is_some());
-                                });
+            assert!(producer.advance_write().is_some());
+            assert!(producer.advance_write().is_some());
+            assert!(producer.advance_write().is_some());
+        });
 
         res.join().unwrap();
         assert!(rb.advance_read().is_some());

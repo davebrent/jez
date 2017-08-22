@@ -1,22 +1,22 @@
 use std::time::Duration;
 
-
 pub type Point = [f64; 2];
 pub type Curve = [f64; 8];
-
 
 /// Create a cubic bezier curve from two points
 pub fn path_to_curve(p0: &Point, p1: &Point) -> Curve {
     let xt = (p1[0] - p0[0]) * (1.0 / 3.0);
     let yt = (p1[1] - p0[1]) * (1.0 / 3.0);
-    [p0[0],
-     p0[1],
-     p0[0] + xt,
-     p0[1] + yt,
-     p0[0] + (xt * 2.0),
-     p0[1] + (yt * 2.0),
-     p1[0],
-     p1[1]]
+    [
+        p0[0],
+        p0[1],
+        p0[0] + xt,
+        p0[1] + yt,
+        p0[0] + (xt * 2.0),
+        p0[1] + (yt * 2.0),
+        p1[0],
+        p1[1],
+    ]
 }
 
 /// Compute point 't' on a cubic bezier curve

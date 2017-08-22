@@ -1,15 +1,16 @@
 use std::clone::Clone;
 use std::fmt::Debug;
 use std::sync::mpsc::{Receiver, Sender};
-use std::time::{Duration, Instant};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use math::millis_to_dur;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]
 pub enum TimeEvent<T>
-    where T: Clone + Debug
+where
+    T: Clone + Debug,
 {
     Stop,
     Timer(Duration, T),
@@ -19,7 +20,8 @@ pub enum TimeEvent<T>
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Timer<T>
-    where T: Clone + Debug
+where
+    T: Clone + Debug,
 {
     pub dur: Duration,
     pub elapsed: Duration,
@@ -30,7 +32,8 @@ struct Timer<T>
 
 #[derive(Debug)]
 pub struct TimerUnit<T>
-    where T: Clone + Debug
+where
+    T: Clone + Debug,
 {
     input: Receiver<TimeEvent<T>>,
     output: Sender<TimeEvent<T>>,
@@ -40,7 +43,8 @@ pub struct TimerUnit<T>
 }
 
 impl<T> TimerUnit<T>
-    where T: Clone + Debug
+where
+    T: Clone + Debug,
 {
     pub fn new(output: Sender<TimeEvent<T>>,
                input: Receiver<TimeEvent<T>>)
@@ -84,32 +88,31 @@ impl<T> TimerUnit<T>
         let dur = millis_to_dur(dur);
         let elapsed = self.elapsed;
         self.push_timer(Timer {
-                            dur: dur,
-                            dispatched_at: elapsed + dur,
-                            elapsed: Duration::new(0, 0),
-                            data: data,
-                            recurring: false,
-                        });
+            dur: dur,
+            dispatched_at: elapsed + dur,
+            elapsed: Duration::new(0, 0),
+            data: data,
+            recurring: false,
+        });
     }
 
     pub fn interval(&mut self, dur: f64, data: T) {
         let dur = millis_to_dur(dur);
         let elapsed = self.elapsed;
         self.push_timer(Timer {
-                            dur: dur,
-                            dispatched_at: elapsed + dur,
-                            elapsed: Duration::new(0, 0),
-                            data: data,
-                            recurring: true,
-                        });
+            dur: dur,
+            dispatched_at: elapsed + dur,
+            elapsed: Duration::new(0, 0),
+            data: data,
+            recurring: true,
+        });
     }
 
     fn push_timer(&mut self, timer: Timer<T>) {
         self.timers.push(timer);
-        self.timers
-            .sort_by(|a, b| {
-                         b.dispatched_at.partial_cmp(&a.dispatched_at).unwrap()
-                     });
+        self.timers.sort_by(|a, b| {
+            b.dispatched_at.partial_cmp(&a.dispatched_at).unwrap()
+        });
     }
 
     pub fn tick(&mut self, delta: &Duration) -> bool {

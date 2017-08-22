@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 
+use super::parse::{Directive, Token, Value};
 use err::AssemErr;
 use interp::Instr;
-use super::parse::{Token, Directive, Value};
 
 pub fn hash_str(text: &str) -> u64 {
     let mut hasher = DefaultHasher::new();
@@ -116,35 +116,47 @@ mod tests {
         globs.insert("b", Value::Num(2.0));
         globs.insert("a", Value::Num(3.9));
 
-        let dirs = vec![Directive::Version(1),
-                        Directive::Globals(globs),
-                        Directive::Func("bar",
-                                        1,
-                                        vec![Token::Value(Value::Num(2.7)),
-                                             Token::Value(Value::Str("add"))]),
-                        Directive::Func("foo",
-                                        1,
-                                        vec![Token::Value(Value::Num(3.6)),
-                                             Token::Value(Value::Str("bar"))])];
+        let dirs = vec![
+            Directive::Version(1),
+            Directive::Globals(globs),
+            Directive::Func(
+                "bar",
+                1,
+                vec![
+                    Token::Value(Value::Num(2.7)),
+                    Token::Value(Value::Str("add")),
+                ]
+            ),
+            Directive::Func(
+                "foo",
+                1,
+                vec![
+                    Token::Value(Value::Num(3.6)),
+                    Token::Value(Value::Str("bar")),
+                ]
+            ),
+        ];
 
         let result = assemble(&dirs).unwrap();
-        let instrs = vec![Instr::Begin(15647602356402206823),
-                          Instr::LoadNumber(2.7),
-                          Instr::Keyword(16243785806421205142),
-                          Instr::Return,
-                          Instr::End(15647602356402206823),
-                          Instr::Begin(7664243301495174138),
-                          Instr::LoadNumber(3.6),
-                          Instr::Call(1, 0),
-                          Instr::Return,
-                          Instr::End(7664243301495174138),
-                          Instr::Begin(0),
-                          Instr::LoadNumber(3.9),
-                          Instr::StoreGlob(4644417185603328019),
-                          Instr::LoadNumber(2.0),
-                          Instr::StoreGlob(10025803482645881038),
-                          Instr::Return,
-                          Instr::End(0)];
+        let instrs = vec![
+            Instr::Begin(15647602356402206823),
+            Instr::LoadNumber(2.7),
+            Instr::Keyword(16243785806421205142),
+            Instr::Return,
+            Instr::End(15647602356402206823),
+            Instr::Begin(7664243301495174138),
+            Instr::LoadNumber(3.6),
+            Instr::Call(1, 0),
+            Instr::Return,
+            Instr::End(7664243301495174138),
+            Instr::Begin(0),
+            Instr::LoadNumber(3.9),
+            Instr::StoreGlob(4644417185603328019),
+            Instr::LoadNumber(2.0),
+            Instr::StoreGlob(10025803482645881038),
+            Instr::Return,
+            Instr::End(0),
+        ];
         assert_eq!(result, instrs);
     }
 }

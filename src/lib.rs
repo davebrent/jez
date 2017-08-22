@@ -26,18 +26,17 @@ use std::str;
 use std::any::Any;
 use std::convert::From;
 use std::mem;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{Receiver, channel};
 use std::time::Duration;
 
-pub use interp::Instr;
 pub use err::JezErr;
 pub use err::RuntimeErr;
-pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
-             Machine};
-pub use log::{Logger, LogData};
+pub use interp::Instr;
+pub use log::{LogData, Logger};
 pub use math::millis_to_dur;
 pub use memory::RingBuffer;
-
+pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
+             Machine};
 
 pub fn make_vm_backend(name: &str,
                        rb: RingBuffer<AudioBlock>,
@@ -86,12 +85,14 @@ pub fn simulate(dur: Duration,
     let (host_send, host_recv) = channel();
 
     let instrs = try!(make_program(prog));
-    let mut machine = Machine::new(ring,
-                                   audio_send.clone(),
-                                   host_send.clone(),
-                                   host_recv,
-                                   &instrs,
-                                   Logger::new(log_send.clone()));
+    let mut machine = Machine::new(
+        ring,
+        audio_send.clone(),
+        host_send.clone(),
+        host_recv,
+        &instrs,
+        Logger::new(log_send.clone()),
+    );
 
     try!(machine.exec(dur, dt));
     let mut msgs = Vec::new();
@@ -100,11 +101,11 @@ pub fn simulate(dur: Duration,
     }
 
     Ok(Simulation {
-           duration: dur,
-           delta: dt,
-           instructions: instrs,
-           messages: msgs,
-       })
+        duration: dur,
+        delta: dt,
+        instructions: instrs,
+        messages: msgs,
+    })
 }
 
 fn to_str<'a>(s: *const c_char) -> &'a str {

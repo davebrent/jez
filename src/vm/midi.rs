@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 
-use super::msgs::{Event, Destination, EventValue, Command};
+use super::msgs::{Command, Destination, Event, EventValue};
 
 #[derive(Debug)]
 pub struct MidiProcessor {
@@ -53,19 +53,18 @@ impl MidiProcessor {
         };
 
         let len = self.off_events.len();
-        self.off_events
-            .retain(|&evt| !(evt.1 == chan && evt.2 == ptch));
+        self.off_events.retain(
+            |&evt| !(evt.1 == chan && evt.2 == ptch),
+        );
         if len != self.off_events.len() {
             self.output.send(Command::MidiNoteOff(chan, ptch)).ok();
         }
 
-        self.off_events
-            .push((millis_to_dur(event.dur), chan, ptch));
-        self.off_events
-            .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-        self.output
-            .send(Command::MidiNoteOn(chan, ptch, vel))
-            .ok();
+        self.off_events.push((millis_to_dur(event.dur), chan, ptch));
+        self.off_events.sort_by(
+            |a, b| b.0.partial_cmp(&a.0).unwrap(),
+        );
+        self.output.send(Command::MidiNoteOn(chan, ptch, vel)).ok();
     }
 
     fn handle_ctl_event(&mut self, event: Event, curve: Curve) {
@@ -78,8 +77,9 @@ impl MidiProcessor {
         let msg = Command::MidiCtl(chan, ctl, curve[0] as u8);
 
         self.ctl_events.push((dur, 0.0, chan, ctl, curve));
-        self.ctl_events
-            .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        self.ctl_events.sort_by(
+            |a, b| b.0.partial_cmp(&a.0).unwrap(),
+        );
         self.output.send(msg).ok();
     }
 

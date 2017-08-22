@@ -6,16 +6,15 @@ use std::convert::From;
 use std::fs;
 use std::io;
 use std::io::{Read, Write};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{Sender, channel};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use docopt::Docopt;
 
-use jez::{AudioBlock, Control, Instr, JezErr, Logger, Machine, make_program,
-          make_log_backend, make_vm_backend, Command, millis_to_dur,
-          RingBuffer, RuntimeErr};
-
+use jez::{AudioBlock, Command, Control, Instr, JezErr, Logger, Machine,
+          RingBuffer, RuntimeErr, make_log_backend, make_program,
+          make_vm_backend, millis_to_dur};
 
 const USAGE: &'static str = "
 Jez.
@@ -49,12 +48,12 @@ fn start_timer(millis: f64, channel: Sender<Command>) {
     let res = Duration::new(0, 1_000_000);
 
     thread::spawn(move || loop {
-                      if start.elapsed() >= end {
-                          channel.send(Command::Stop).unwrap();
-                          return;
-                      }
-                      thread::sleep(res);
-                  });
+        if start.elapsed() >= end {
+            channel.send(Command::Stop).unwrap();
+            return;
+        }
+        thread::sleep(res);
+    });
 }
 
 fn watch_file(filepath: String, instrs: &[Instr], channel: Sender<Command>) {
@@ -96,10 +95,12 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
     log_backend.run_forever(log_recv);
 
     let (audio_send, audio_recv) = channel();
-    let mut _backend = try!(make_vm_backend(args.flag_backend.as_ref(),
-                                            ring.clone(),
-                                            Logger::new(log_send.clone()),
-                                            audio_recv));
+    let mut _backend = try!(make_vm_backend(
+        args.flag_backend.as_ref(),
+        ring.clone(),
+        Logger::new(log_send.clone()),
+        audio_recv,
+    ));
 
     loop {
         let mut txt = String::new();
@@ -119,12 +120,14 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
             }
         }
 
-        let mut machine = Machine::new(ring.clone(),
-                                       audio_send.clone(),
-                                       host_send.clone(),
-                                       host_recv,
-                                       &instrs,
-                                       Logger::new(log_send.clone()));
+        let mut machine = Machine::new(
+            ring.clone(),
+            audio_send.clone(),
+            host_send.clone(),
+            host_recv,
+            &instrs,
+            Logger::new(log_send.clone()),
+        );
 
         match try!(machine.exec_realtime()) {
             Control::Stop => return Ok(()),

@@ -8,26 +8,26 @@ mod words;
 
 use std::collections::HashMap;
 use std::convert::From;
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 use std::time::Duration;
 
-use err::{JezErr, SysErr, RuntimeErr};
+use err::{JezErr, RuntimeErr, SysErr};
 use interp::{Instr, Interpreter};
 use lang::hash_str;
 use log::Logger;
 use memory::RingBuffer;
 
-use self::interp::{ExtKeyword, ExtState};
-pub use self::msgs::{Event, EventValue, Destination, Command};
 pub use self::audio::AudioBlock;
 use self::audio::AudioProcessor;
+use self::interp::{ExtKeyword, ExtState};
 use self::midi::MidiProcessor;
+pub use self::msgs::{Command, Destination, Event, EventValue};
 use self::time::{TimeEvent, TimerUnit};
 use self::words::{bin_list, block_size, channels, cycle, degrade, every,
-                  gray_code, hop_jump, linear, palindrome, repeat, revision,
-                  reverse, rotate, sample_rate, shuffle, simul, synth_out,
-                  tracks, midi_out, wave_table};
+                  gray_code, hop_jump, linear, midi_out, palindrome, repeat,
+                  reverse, revision, rotate, sample_rate, shuffle, simul,
+                  synth_out, tracks, wave_table};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -140,9 +140,9 @@ impl Machine {
     pub fn exec_realtime(&mut self) -> Result<Control, JezErr> {
         let (mut signals, mut timers) = try!(self.setup());
         let handle = thread::spawn(move || {
-                                       let res = Duration::new(0, 1_000_000);
-                                       timers.run_forever(res);
-                                   });
+            let res = Duration::new(0, 1_000_000);
+            timers.run_forever(res);
+        });
 
         while let Ok(cmd) = signals.input.recv() {
             let status = try!(self.handle_signal(cmd, &mut signals));
@@ -197,8 +197,7 @@ impl Machine {
 
     fn flush(&mut self, signals: &mut SignalState) {
         self.midi.stop();
-        self.handle_bus_signal(&Duration::new(0, 0), signals)
-            .ok();
+        self.handle_bus_signal(&Duration::new(0, 0), signals).ok();
     }
 
     // Main signal handler
@@ -214,7 +213,7 @@ impl Machine {
                     Signal::Midi => self.handle_midi_signal(&time),
                     Signal::Event(event) => {
                         self.handle_event_signal(&time, event)
-                    },
+                    }
                     Signal::Track(num, rev, func) => {
                         self.handle_track_signal(signals, num, rev, func)
                     }

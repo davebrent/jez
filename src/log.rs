@@ -6,7 +6,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 use vm::{Command, Event};
@@ -40,9 +40,9 @@ impl ConsoleLogger {
 impl LogBackend for ConsoleLogger {
     fn run_forever(&self, channel: Receiver<LogMessage>) {
         thread::spawn(move || while let Ok(msg) = channel.recv() {
-                          let millis = dur_to_millis(&msg.time);
-                          println!("{}, {}, {:?}", millis, msg.tag, msg.data);
-                      });
+            let millis = dur_to_millis(&msg.time);
+            println!("{}, {}, {:?}", millis, msg.tag, msg.data);
+        });
     }
 }
 
@@ -78,9 +78,9 @@ impl LogBackend for FileLogger {
     fn run_forever(&self, channel: Receiver<LogMessage>) {
         let mut file = fs::File::create(unique_filename("jez.log")).unwrap();
         thread::spawn(move || while let Ok(msg) = channel.recv() {
-                          let s = serde_json::to_string(&msg).unwrap() + "\n";
-                          file.write_all(s.as_bytes()).unwrap();
-                      });
+            let s = serde_json::to_string(&msg).unwrap() + "\n";
+            file.write_all(s.as_bytes()).unwrap();
+        });
     }
 }
 

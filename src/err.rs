@@ -3,7 +3,6 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum SysErr {
     UnknownBackend,

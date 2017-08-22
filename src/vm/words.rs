@@ -2,12 +2,12 @@ use rand::{Rng, StdRng};
 use std::rc::Rc;
 
 use err::RuntimeErr;
-use interp::{InterpState, InterpResult, Value};
+use interp::{InterpResult, InterpState, Value};
 use lang::hash_str;
 use math::path_to_curve;
 
 use super::interp::ExtState;
-use super::msgs::{Event, Destination, EventValue};
+use super::msgs::{Destination, Event, EventValue};
 use super::synths::WaveTable;
 
 /// Repeat a value 'n' times
@@ -418,25 +418,29 @@ mod tests {
         state.push(Value::Number(127.0)).unwrap();
         midi_out(&mut seq, &mut state).unwrap();
 
-        assert_eq!(seq.events,
-                   [Event {
-                        dest: Destination::Midi(0, 127),
-                        onset: 0.0,
-                        dur: 1000.0,
-                        value: EventValue::Trigger(3.0),
-                    },
-                    Event {
-                        dest: Destination::Midi(0, 127),
-                        onset: 0.0,
-                        dur: 1000.0,
-                        value: EventValue::Trigger(2.0),
-                    },
-                    Event {
-                        dest: Destination::Midi(0, 127),
-                        onset: 0.0,
-                        dur: 1000.0,
-                        value: EventValue::Trigger(1.0),
-                    }]);
+        assert_eq!(
+            seq.events,
+            [
+                Event {
+                    dest: Destination::Midi(0, 127),
+                    onset: 0.0,
+                    dur: 1000.0,
+                    value: EventValue::Trigger(3.0),
+                },
+                Event {
+                    dest: Destination::Midi(0, 127),
+                    onset: 0.0,
+                    dur: 1000.0,
+                    value: EventValue::Trigger(2.0),
+                },
+                Event {
+                    dest: Destination::Midi(0, 127),
+                    onset: 0.0,
+                    dur: 1000.0,
+                    value: EventValue::Trigger(1.0),
+                },
+            ]
+        );
     }
 
     #[test]
@@ -449,12 +453,16 @@ mod tests {
         bin_list(&mut seq, &mut state).unwrap();
         assert_eq!(state.heap_len(), 5);
         let out = state.heap_slice_mut(0, 5).unwrap();
-        assert_eq!(out,
-                   &[Value::Null,
-                     Value::Null,
-                     Value::Number(1.0),
-                     Value::Number(1.0),
-                     Value::Null]);
+        assert_eq!(
+            out,
+            &[
+                Value::Null,
+                Value::Null,
+                Value::Number(1.0),
+                Value::Number(1.0),
+                Value::Null,
+            ]
+        );
     }
 
     #[test]

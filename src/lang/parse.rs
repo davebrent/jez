@@ -1,7 +1,7 @@
-use std::str;
 use std::collections::HashMap;
+use std::str;
 
-use nom::{IResult, double, space, multispace, digit};
+use nom::{IResult, digit, double, multispace, space};
 
 use err::ParseErr;
 
@@ -367,19 +367,22 @@ mod tests {
     #[test]
     fn test_func_oneline() {
         let res = func(b".def foobar 12: 12.0 3.2 add\n");
-        let dir = Directive::Func("foobar",
-                                  12,
-                                  vec![
-            Token::Value(Value::Num(12.0)),
-            Token::Value(Value::Num(3.2)),
-            Token::Value(Value::Str("add"))
-        ]);
+        let dir = Directive::Func(
+            "foobar",
+            12,
+            vec![
+                Token::Value(Value::Num(12.0)),
+                Token::Value(Value::Num(3.2)),
+                Token::Value(Value::Str("add"))
+        ],
+        );
         assert_eq!(res.unwrap(), (&b""[..], dir));
     }
 
     #[test]
     fn test_func_manylines() {
-        let res = func(b".def foobar 12:\n
+        let res = func(
+            b".def foobar 12:\n
 
           12.0
 
@@ -388,15 +391,18 @@ mod tests {
            add
 
            \n
-        ");
+        ",
+        );
 
-        let dir = Directive::Func("foobar",
-                                  12,
-                                  vec![
-            Token::Value(Value::Num(12.0)),
-            Token::Value(Value::Num(3.2)),
-            Token::Value(Value::Str("add"))
-        ]);
+        let dir = Directive::Func(
+            "foobar",
+            12,
+            vec![
+                Token::Value(Value::Num(12.0)),
+                Token::Value(Value::Num(3.2)),
+                Token::Value(Value::Str("add"))
+            ],
+        );
         assert_eq!(res.unwrap(), (&b""[..], dir));
     }
 
@@ -405,25 +411,30 @@ mod tests {
         let res = directive(b".version 1  ");
         assert_eq!(res.unwrap(), (&b""[..], Directive::Version(1)));
 
-        let res = directive(b".def foo 0:
+        let res = directive(
+            b".def foo 0:
             1\n
         2\n
         add\n
-        ");
+        ",
+        );
 
-        let dir = Directive::Func("foo",
-                                  0,
-                                  vec![
-            Token::Value(Value::Num(1.0)),
-            Token::Value(Value::Num(2.0)),
-            Token::Value(Value::Str("add"))
-        ]);
+        let dir = Directive::Func(
+            "foo",
+            0,
+            vec![
+                Token::Value(Value::Num(1.0)),
+                Token::Value(Value::Num(2.0)),
+                Token::Value(Value::Str("add"))
+            ],
+        );
         assert_eq!(res.unwrap(), (&b""[..], dir));
     }
 
     #[test]
     fn test_directives() {
-        let res = directives(b"
+        let res = directives(
+            b"
 
         .version 1
 
@@ -434,7 +445,8 @@ mod tests {
                 binlist
               \t rev
 
-        ");
+        ",
+        );
 
         let mut globals = HashMap::new();
         globals.insert("a", Value::Num(2.0));
@@ -455,13 +467,15 @@ mod tests {
 
     #[test]
     fn test_directives_comments() {
-        let res = directives(b"
+        let res = directives(
+            b"
         ;Another comment
         .def foo 3:
             add binlist
             ;More comment
             rev
-        ; Even more");
+        ; Even more",
+        );
 
         let dirs = vec![
             Directive::Comment("Another comment"),
@@ -481,8 +495,10 @@ mod tests {
 
     #[test]
     fn test_incomplete() {
-        let res = parser("
-.version");
+        let res = parser(
+            "
+.version",
+        );
         assert!(res.is_err());
         match res {
             Err(err) => {
@@ -494,14 +510,16 @@ mod tests {
 
     #[test]
     fn test_line_col_nos() {
-        let res = parser("
+        let res = parser(
+            "
 .version 1
 
 .globals a=2 b=3
      @
 .def foo 3:
     add binlist rev
-        ");
+        ",
+        );
 
         assert!(res.is_err());
         match res {

@@ -1,4 +1,4 @@
-use interp::{InterpState, InterpResult};
+use interp::{InterpResult, InterpState};
 
 use super::audio::AudioContext;
 use super::msgs::Event;

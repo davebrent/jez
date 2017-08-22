@@ -1,6 +1,6 @@
-use std::f32::consts::PI;
-use std::f32::EPSILON;
 use rand::{Rng, StdRng};
+use std::f32::EPSILON;
+use std::f32::consts::PI;
 
 use lang::hash_str;
 

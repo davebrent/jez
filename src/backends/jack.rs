@@ -1,18 +1,17 @@
 use std::convert::From;
+use std::ops::DerefMut;
 use std::sync::mpsc::Receiver;
 use std::time::Instant;
-use std::ops::DerefMut;
 
-use jack::prelude::{AsyncClient, AudioOutPort, AudioOutSpec, Client, PortSpec,
-                    client_options, JackControl, JackErr, MidiOutPort,
-                    MidiOutSpec, NotificationHandler, ProcessHandler,
-                    ProcessScope, Port, RawMidi};
+use jack::prelude::{AsyncClient, AudioOutPort, AudioOutSpec, Client,
+                    JackControl, JackErr, MidiOutPort, MidiOutSpec,
+                    NotificationHandler, Port, PortSpec, ProcessHandler,
+                    ProcessScope, RawMidi, client_options};
 
 use err::SysErr;
 use log::Logger;
 use memory::RingBuffer;
 use vm::{AudioBlock, Command};
-
 
 struct Notifier;
 struct Processor {
@@ -40,7 +39,8 @@ fn make_ports<T>(prefix: &'static str,
                  client: &Client,
                  len: usize)
                  -> Result<Vec<Port<T>>, SysErr>
-    where T: PortSpec
+where
+    T: PortSpec,
 {
     let mut ports = Vec::with_capacity(len);
     for i in 1..len + 1 {
@@ -188,7 +188,7 @@ impl Jack {
         };
 
         Ok(Jack {
-               _client: try!(AsyncClient::new(client, notifier, processor)),
-           })
+            _client: try!(AsyncClient::new(client, notifier, processor)),
+        })
     }
 }
