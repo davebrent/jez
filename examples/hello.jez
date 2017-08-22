@@ -6,10 +6,10 @@
   ['t1 't2 't3] tracks
 
 .def t1 0:
-  [5000 1000] 500 'synth1 'freq synthout
+  [5000 1000] 500 'synth1 'freq synth_out
 
 .def t2 0:
-  [1 0 0 1 0 0] shuffle 1000 'synth1 'amp synthout
+  [1 0 0 1 0 0] shuffle 1000 'synth1 'amp synth_out
 
 .def t3 0:
-  [0 0.2 0.6 0.8 1] shuffle 2000 'synth1 'pan synthout
+  [0 0.2 0.6 0.8 1] shuffle 2000 'synth1 'pan synth_out

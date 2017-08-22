@@ -44,7 +44,7 @@ fn test_simple_program() {
 .version 1
 
 .def t1 0:
-  [64 66 68 70] 250 1 127 midiout
+  [64 66 68 70] 250 1 127 midi_out
 
 .def main 0:
   ['t1] tracks
@@ -77,7 +77,7 @@ fn test_log_events() {
 .version 1
 
 .def t1 0:
-  [64 ~ 68 ~ 48] 250 1 127 midiout
+  [64 ~ 68 ~ 48] 250 1 127 midi_out
 
 .def main 0:
   ['t1] tracks

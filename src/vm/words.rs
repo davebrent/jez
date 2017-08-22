@@ -104,7 +104,7 @@ pub fn palindrome(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
 ///
 ///   [1]: Simha Arom. African Polyphony and Polyrhythm.
 ///        Cambridge University Press, Cambridge, England, 1991.
-pub fn hopjump(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+pub fn hop_jump(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let hopsize = try!(state.pop_num()) as usize;
     let pulses = try!(state.pop_num()) as usize;
     let onsets = try!(state.pop_num()) as usize;
@@ -218,7 +218,7 @@ fn subdivide(state: &mut InterpState,
 }
 
 /// Output midi events
-pub fn midiout(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+pub fn midi_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let extra = try!(state.pop_num()) as u8;
     let chan = try!(state.pop_num()) as u8;
     let dur = try!(state.pop_num());
@@ -244,7 +244,7 @@ pub fn linear(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Gray code number encoding
-pub fn graycode(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+pub fn gray_code(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let num = try!(state.pop_num()) as i64;
     let num = (num >> 1) ^ num;
     try!(state.push(Value::Number(num as f64)));
@@ -252,7 +252,7 @@ pub fn graycode(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Encode a number into a binary list
-pub fn binlist(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+pub fn bin_list(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let num = try!(state.pop_num()) as i64;
     let n = try!(state.pop_num()) as i64;
 
@@ -272,7 +272,7 @@ pub fn binlist(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Puts the current cycle revision onto the stack
-pub fn rev(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+pub fn revision(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     try!(state.push(Value::Number(seq.revision as f64)));
     Ok(None)
 }
@@ -313,7 +313,7 @@ pub fn wave_table(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Output synth events
-pub fn synthout(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+pub fn synth_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let param = try!(try!(state.pop()).as_sym());
     let synth = try!(try!(state.pop()).as_sym());
     let dur = try!(state.pop_num());
@@ -416,7 +416,7 @@ mod tests {
         state.push(Value::Number(1000.0)).unwrap();
         state.push(Value::Number(0.0)).unwrap();
         state.push(Value::Number(127.0)).unwrap();
-        midiout(&mut seq, &mut state).unwrap();
+        midi_out(&mut seq, &mut state).unwrap();
 
         assert_eq!(seq.events,
                    [Event {
@@ -446,7 +446,7 @@ mod tests {
         state.call(0, 1).unwrap();
         state.push(Value::Number(5.0)).unwrap();
         state.push(Value::Number(12.0)).unwrap();
-        binlist(&mut seq, &mut state).unwrap();
+        bin_list(&mut seq, &mut state).unwrap();
         assert_eq!(state.heap_len(), 5);
         let out = state.heap_slice_mut(0, 5).unwrap();
         assert_eq!(out,
@@ -463,7 +463,7 @@ mod tests {
         let mut seq = ExtState::new();
         state.call(0, 1).unwrap();
         state.push(Value::Number(12.0)).unwrap();
-        graycode(&mut seq, &mut state).unwrap();
+        gray_code(&mut seq, &mut state).unwrap();
         assert_eq!(state.pop_num().unwrap() as i64, 10);
     }
 
@@ -473,7 +473,7 @@ mod tests {
         let mut seq = ExtState::new();
         seq.revision = 99;
         state.call(0, 1).unwrap();
-        rev(&mut seq, &mut state).unwrap();
+        revision(&mut seq, &mut state).unwrap();
         assert_eq!(state.pop_num().unwrap(), 99.0);
     }
 }

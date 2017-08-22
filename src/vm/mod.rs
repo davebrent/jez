@@ -24,10 +24,10 @@ pub use self::audio::AudioBlock;
 use self::audio::AudioProcessor;
 use self::midi::MidiProcessor;
 use self::time::{TimeEvent, TimerUnit};
-use self::words::{binlist, block_size, channels, cycle, degrade, every,
-                  graycode, hopjump, linear, palindrome, repeat, rev, reverse,
-                  rotate, sample_rate, shuffle, simul, synthout, tracks,
-                  midiout, wave_table};
+use self::words::{bin_list, block_size, channels, cycle, degrade, every,
+                  gray_code, hop_jump, linear, palindrome, repeat, revision,
+                  reverse, rotate, sample_rate, shuffle, simul, synth_out,
+                  tracks, midi_out, wave_table};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -77,27 +77,27 @@ impl Machine {
         }
 
         let mut words: HashMap<&'static str, ExtKeyword> = HashMap::new();
-        words.insert("binlist", binlist);
+        words.insert("bin_list", bin_list);
         words.insert("cycle", cycle);
         words.insert("degrade", degrade);
         words.insert("every", every);
-        words.insert("graycode", graycode);
-        words.insert("hopjump", hopjump);
+        words.insert("gray_code", gray_code);
+        words.insert("hop_jump", hop_jump);
         words.insert("linear", linear);
         words.insert("palindrome", palindrome);
         words.insert("repeat", repeat);
-        words.insert("rev", rev);
+        words.insert("revision", revision);
         words.insert("reverse", reverse);
         words.insert("rotate", rotate);
         words.insert("shuffle", shuffle);
         words.insert("simul", simul);
-        words.insert("midiout", midiout);
+        words.insert("midi_out", midi_out);
         words.insert("tracks", tracks);
         words.insert("channels", channels);
         words.insert("block_size", block_size);
         words.insert("sample_rate", sample_rate);
         words.insert("wave_table", wave_table);
-        words.insert("synthout", synthout);
+        words.insert("synth_out", synth_out);
 
         Machine {
             backend: backend,
