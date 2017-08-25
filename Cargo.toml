@@ -12,6 +12,7 @@ docopt = "0.7"
 jack = "0.5.0"
 libc = "0.2.22"
 nom = "3.1.0"
+portaudio = "0.7.0"
 rand = "0.3.15"
 rustc-serialize = "0.3"
 serde = "1.0.8"
@@ -20,3 +21,4 @@ serde_json = "1.0.2"
 
 [features]
 with-jack = []
+with-portaudio = []

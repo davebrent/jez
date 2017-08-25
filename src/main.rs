@@ -28,7 +28,7 @@ Options:
   -h --help         Show this screen.
   --watch           Reload input file on changes.
   --time=MS         Length of time (in milliseconds) to run for.
-  --backend=NAME    Specify the backend (either 'jack' OR 'debug').
+  --backend=NAME    Specify the backend (either 'debug', 'jack' OR 'portaudio').
   --logger=NAME     Logging backend (either 'console' OR 'file').
 ";
 

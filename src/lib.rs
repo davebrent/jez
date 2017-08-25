@@ -13,6 +13,7 @@ extern crate jack;
 extern crate libc;
 #[macro_use]
 extern crate nom;
+extern crate portaudio;
 extern crate rand;
 extern crate serde;
 #[macro_use]
@@ -47,6 +48,10 @@ pub fn make_vm_backend(name: &str,
         "debug" | "" => Ok(Box::new(backends::Debug::new(rb, logger, channel))),
         #[cfg(feature = "with-jack")]
         "jack" => Ok(Box::new(try!(backends::Jack::new(rb, logger, channel)))),
+        #[cfg(feature = "with-portaudio")]
+        "portaudio" => Ok(Box::new(
+            try!(backends::Portaudio::new(rb, logger, channel)),
+        )),
         _ => Err(From::from(err::SysErr::UnknownBackend)),
     }
 }
