@@ -34,7 +34,7 @@ impl SmoothParam {
     }
 
     pub fn set_val(&mut self, val: f32) {
-        if (self.target - val).abs() < EPSILON {
+        if (self.target - val).abs() > EPSILON {
             self.target = val;
             self.countdown = self.steps_to_target;
 
