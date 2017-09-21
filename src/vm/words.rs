@@ -15,7 +15,7 @@ pub fn repeat(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let times = try!(state.pop_num()) as usize;
     let val = try!(state.pop());
     for _ in 0..times {
-        try!(state.push(val));
+        try!(state.push(val.clone()));
     }
     Ok(None)
 }
@@ -62,7 +62,7 @@ pub fn rotate(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     out.extend_from_slice(b);
     out.extend_from_slice(a);
     let slice = try!(state.heap_slice_mut(start, end));
-    slice.copy_from_slice(&out);
+    slice.clone_from_slice(&out);
     Ok(None)
 }
 

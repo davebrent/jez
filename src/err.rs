@@ -103,6 +103,7 @@ impl fmt::Display for ParseErr {
 pub enum RuntimeErr {
     UnknownKeyword(u64),
     InvalidArgs,
+    InvalidString,
     StackExhausted,
 }
 
@@ -111,6 +112,7 @@ impl Error for RuntimeErr {
         match *self {
             RuntimeErr::UnknownKeyword(_) => "unknown keyword",
             RuntimeErr::InvalidArgs => "invalid arguments",
+            RuntimeErr::InvalidString => "invalid string",
             RuntimeErr::StackExhausted => "stack exhausted",
         }
     }
@@ -127,6 +129,7 @@ impl fmt::Display for RuntimeErr {
                 write!(f, "encountered unknown keyword (hash = {})", hash)
             }
             RuntimeErr::InvalidArgs => write!(f, "invalid arguments"),
+            RuntimeErr::InvalidString => write!(f, "invalid string"),
             RuntimeErr::StackExhausted => write!(f, "stack exhausted"),
         }
     }

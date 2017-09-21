@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_map::{DefaultHasher, Entry};
 use std::hash::Hasher;
 
 use super::parse::{Directive, Token, Value};
@@ -16,6 +16,9 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
     let mut globals: HashMap<&str, Value> = HashMap::new();
     let mut funcs: HashMap<u64, (usize, usize)> = HashMap::new();
     let mut instrs = Vec::new();
+
+    let mut string_map: HashMap<&str, usize> = HashMap::new();
+    let mut strings = Vec::new();
 
     if !dirs.is_empty() && *dirs.first().unwrap() != Directive::Version(1) {
         return Err(AssemErr::UnsupportedVersion(1));
@@ -64,6 +67,18 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
                         Token::Variable(var) => {
                             instrs.push(Instr::LoadVar(hash_str(var)));
                         }
+                        Token::StringLiteral(literal) => {
+                            let idx = match string_map.entry(literal) {
+                                Entry::Occupied(o) => *o.get(),
+                                Entry::Vacant(v) => {
+                                    let idx = strings.len();
+                                    v.insert(idx);
+                                    strings.push(literal);
+                                    idx
+                                }
+                            };
+                            instrs.push(Instr::LoadString(idx as u64));
+                        }
                         Token::Value(prim) => {
                             match prim {
                                 Value::Num(num) => {
@@ -90,8 +105,9 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
         }
     }
 
-    // Ensure variables are listed deterministicly
     instrs.push(Instr::Begin(0));
+
+    // Ensure variables are listed deterministicly
     let mut global_keys: Vec<&&str> = globals.keys().collect();
     global_keys.sort();
     for key in &global_keys {
@@ -101,6 +117,16 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
         };
         instrs.push(Instr::StoreGlob(hash_str(key)));
     }
+
+    // Pack string literals into the program
+    for (i, literal) in strings.iter().enumerate() {
+        let bytes = literal.as_bytes();
+        instrs.push(Instr::StoreString(i as u64, bytes.len() as u64));
+        for b in bytes {
+            instrs.push(Instr::RawData(*b));
+        }
+    }
+
     instrs.push(Instr::Return);
     instrs.push(Instr::End(0));
     Ok(instrs)
@@ -109,6 +135,50 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_strings() {
+        let dirs = vec![
+            Directive::Version(1),
+            Directive::Func(
+                "main",
+                0,
+                vec![
+                    Token::StringLiteral("abc"),
+                    Token::StringLiteral("def"),
+                    Token::StringLiteral("abc"),
+                ]
+            ),
+        ];
+
+        let result = assemble(&dirs).unwrap();
+        let instrs = vec![
+            Instr::Begin(17450787904383802648),
+            Instr::LoadString(0),
+            Instr::LoadString(1),
+            Instr::LoadString(0),
+            Instr::Return,
+            Instr::End(17450787904383802648),
+            Instr::Begin(0),
+            // abc
+            Instr::StoreString(0, 3),
+            Instr::RawData(97),
+            Instr::RawData(98),
+            Instr::RawData(99),
+            // def
+            Instr::StoreString(1, 3),
+            Instr::RawData(100),
+            Instr::RawData(101),
+            Instr::RawData(102),
+            Instr::Return,
+            Instr::End(0),
+        ];
+        assert_eq!(result, instrs);
+        let abc = String::from_utf8(vec![97, 32, 98, 32, 99]).unwrap();
+        let def = String::from_utf8(vec![100, 101, 102]).unwrap();
+        assert_eq!(abc, String::from("a b c"));
+        assert_eq!(def, String::from("def"));
+    }
 
     #[test]
     fn test_simple() {

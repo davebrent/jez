@@ -19,6 +19,7 @@ pub enum Token<'a> {
     ListEnd,
     Null,
     Symbol(&'a str),
+    StringLiteral(&'a str),
     Value(Value<'a>),
     Variable(&'a str),
 }
@@ -81,6 +82,12 @@ named!(symbol<Token>, do_parse!(
     >> (Token::Symbol(sym))
 ));
 
+named!(string_literal<Token>, do_parse!(
+    char!('"')
+    >> chars: map_res!(terminated!(is_not!("\""), tag_s!("\"")), str::from_utf8)
+    >> (Token::StringLiteral(chars))
+));
+
 named!(assignment<Token>, do_parse!(
     char!('=')
     >> opt!(multispace)
@@ -103,6 +110,7 @@ named!(token<Token>, do_parse!(
         | char!('[') => { |c| Token::ListBegin }
         | char!(']') => { |c| Token::ListEnd }
         | char!('~') => { |c| Token::Null }
+        | string_literal
         | symbol
         | variable
         | assignment
@@ -215,7 +223,7 @@ pub fn parser(txt: &str) -> Result<Vec<Directive>, ParseErr> {
 mod tests {
     use super::*;
 
-    // Strings
+    // Text
 
     #[test]
     fn test_string_underscore() {
@@ -233,6 +241,15 @@ mod tests {
     fn test_string_dotprefix() {
         let sym = string(b".foo_foo");
         assert_eq!(sym.is_err(), true);
+    }
+
+    // String literals
+
+    #[test]
+    fn test_string_literal() {
+        let txt = token(b"\"baz foo / bar\"");
+        let expected = Token::StringLiteral("baz foo / bar");
+        assert_eq!(txt.unwrap(), (&b""[..], expected));
     }
 
     // Values

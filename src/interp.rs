@@ -13,6 +13,9 @@ pub enum Instr {
     LoadNumber(f64),
     LoadSymbol(u64),
     LoadVar(u64),
+    LoadString(u64),
+    StoreString(u64, u64),
+    RawData(u8),
     StoreGlob(u64),
     StoreVar(u64),
     Keyword(u64),
@@ -21,13 +24,14 @@ pub enum Instr {
     Null,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum Value {
     Null,
     Number(f64),
     Symbol(u64),
     Pair(usize, usize),
     Tuple(usize, usize),
+    Str(String),
     Instruction(Instr),
     Curve(Curve),
 }
@@ -68,7 +72,7 @@ impl StackFrame {
 
     pub fn last(&self) -> Result<Value, RuntimeErr> {
         match self.stack.last() {
-            Some(val) => Ok(*val),
+            Some(val) => Ok(val.clone()),
             None => Err(RuntimeErr::StackExhausted),
         }
     }
@@ -134,7 +138,7 @@ impl InterpState {
 
     pub fn heap_get(&self, ptr: usize) -> Result<Value, RuntimeErr> {
         match self.heap.get(ptr) {
-            Some(val) => Ok(*val),
+            Some(val) => Ok(val.clone()),
             None => Err(RuntimeErr::InvalidArgs),
         }
     }
@@ -336,6 +340,7 @@ pub struct Interpreter<S> {
     pub state: InterpState,
     instrs: Vec<Instr>,
     words: HashMap<u64, Keyword<S>>,
+    strings: HashMap<u64, String>,
 }
 
 impl<S> Interpreter<S> {
@@ -373,6 +378,7 @@ impl<S> Interpreter<S> {
             words: words,
             data: data,
             state: InterpState::new(),
+            strings: HashMap::new(),
         };
 
         // This block is created by the assembler so must always succeed
@@ -453,6 +459,34 @@ impl<S> Interpreter<S> {
                 } else {
                     Err(RuntimeErr::UnknownKeyword(word))
                 }
+            }
+            Instr::LoadString(id) => {
+                // Look up the string and push to the stack
+                match self.strings.get(&id) {
+                    Some(string) => {
+                        try!(self.state.push(Value::Str(string.clone())));
+                        Ok(None)
+                    }
+                    None => Err(RuntimeErr::InvalidArgs),
+                }
+            }
+            Instr::StoreString(id, len) => {
+                // Pull all bytes out of the succeeding raw data instructions
+                // and interpret as a valid unicode string
+                let mut bytes = Vec::with_capacity(len as usize);
+                for i in 0..len {
+                    let pc = self.state.pc + i as usize + 1;
+                    match self.instrs[pc] {
+                        Instr::RawData(byte) => bytes.push(byte),
+                        _ => return Err(RuntimeErr::InvalidString),
+                    };
+                }
+                match String::from_utf8(bytes) {
+                    Ok(string) => self.strings.insert(id, string),
+                    Err(_) => return Err(RuntimeErr::InvalidString),
+                };
+                self.state.pc += len as usize;
+                Ok(None)
             }
             _ => Ok(None),
         }
@@ -564,5 +598,25 @@ mod tests {
         let mut interp = Interpreter::new(instrs, HashMap::new(), ());
         let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(200.0));
+    }
+
+    #[test]
+    fn test_store_strings() {
+        let instrs = vec![
+            Instr::Begin(hash_str("main")),
+            Instr::LoadString(0),
+            Instr::Return,
+            Instr::End(hash_str("main")),
+            Instr::Begin(0),
+            Instr::StoreString(0, 3),
+            Instr::RawData(97),
+            Instr::RawData(98),
+            Instr::RawData(99),
+            Instr::Return,
+            Instr::End(0),
+        ];
+        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let res = interp.eval(1).unwrap();
+        assert_eq!(res.unwrap(), Value::Str(String::from("abc")));
     }
 }
