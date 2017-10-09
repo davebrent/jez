@@ -28,8 +28,14 @@ Options:
   -h --help         Show this screen.
   --watch           Reload input file on changes.
   --time=MS         Length of time (in milliseconds) to run for.
-  --backend=NAME    Specify the backend (either 'debug', 'jack' OR 'portaudio').
+  --backend=NAME    Specify the backend.
   --logger=NAME     Logging backend (either 'console' OR 'file').
+
+Backends:
+ debug
+ jack
+ portaudio
+ osc
 ";
 
 #[derive(Debug, RustcDecodable)]

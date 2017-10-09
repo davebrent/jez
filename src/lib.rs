@@ -15,6 +15,7 @@ extern crate libc;
 extern crate nom;
 extern crate portaudio;
 extern crate rand;
+extern crate rosc;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -48,6 +49,7 @@ pub fn make_vm_backend(name: &str,
         "debug" | "" => Ok(Box::new(backends::Debug::new(rb, logger, channel))),
         #[cfg(feature = "with-jack")]
         "jack" => Ok(Box::new(try!(backends::Jack::new(rb, logger, channel)))),
+        "osc" => Ok(Box::new(try!(backends::Osc::new(rb, logger, channel)))),
         #[cfg(feature = "with-portaudio")]
         "portaudio" => Ok(Box::new(
             try!(backends::Portaudio::new(rb, logger, channel)),
