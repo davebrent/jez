@@ -8,6 +8,7 @@ name = "jez"
 crate-type = ["rlib", "dylib"]
 
 [dependencies]
+byteorder = "1.1.0"
 docopt = "0.7"
 jack = "0.5.0"
 libc = "0.2.22"

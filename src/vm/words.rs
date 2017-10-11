@@ -1,5 +1,7 @@
-use rand::{Rng, StdRng};
+use rand::{Rng, SeedableRng};
 use std::rc::Rc;
+
+use byteorder::{LittleEndian, WriteBytesExt};
 
 use err::RuntimeErr;
 use interp::{InterpResult, InterpState, Value};
@@ -42,12 +44,32 @@ pub fn reverse(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
+/// Seed the random number generator
+pub fn rand_seed(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let seed = try!(state.pop_num()) as i64;
+    let mut wtr = vec![];
+    if wtr.write_i64::<LittleEndian>(seed).is_err() {
+        return Err(RuntimeErr::InvalidArgs);
+    }
+    let seed: Vec<usize> = wtr.iter().map(|n| *n as usize).collect();
+    seq.rng.reseed(seed.as_slice());
+    Ok(None)
+}
+
+/// Push a random integer, within a range, onto the stack
+pub fn rand_range(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let max = try!(state.pop_num()) as i64;
+    let min = try!(state.pop_num()) as i64;
+    let val = seq.rng.gen_range(min, max);
+    try!(state.push(Value::Number(val as f64)));
+    Ok(None)
+}
+
 /// Shuffle a list, leaving it on the stack
-pub fn shuffle(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+pub fn shuffle(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.last_pair());
-    let mut rng = StdRng::new().unwrap();
     let slice = try!(state.heap_slice_mut(start, end));
-    rng.shuffle(slice);
+    seq.rng.shuffle(slice);
     Ok(None)
 }
 
@@ -67,12 +89,11 @@ pub fn rotate(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
 }
 
 /// Randomly set values to rests in a list
-pub fn degrade(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    let mut rng = StdRng::new().unwrap();
+pub fn degrade(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.last_pair());
     let lst = try!(state.heap_slice_mut(start, end));
     for item in lst {
-        if rng.gen() {
+        if seq.rng.gen() {
             *item = Value::Null;
         }
     }
@@ -327,6 +348,19 @@ pub fn synth_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn random_keywords() {
+        let mut state = InterpState::new();
+        let mut seq = ExtState::new();
+        state.call(0, 1).unwrap();
+        state.push(Value::Number(3.0)).unwrap();
+        rand_seed(&mut seq, &mut state).unwrap();
+        state.push(Value::Number(0.0)).unwrap();
+        state.push(Value::Number(100.0)).unwrap();
+        rand_range(&mut seq, &mut state).unwrap();
+        assert_eq!(state.pop_num().unwrap(), 31.0);
+    }
 
     #[test]
     fn repeat_keyword() {

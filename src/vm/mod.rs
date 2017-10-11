@@ -25,9 +25,9 @@ use self::midi::MidiProcessor;
 pub use self::msgs::{Command, Destination, Event, EventValue};
 use self::time::{TimeEvent, TimerUnit};
 use self::words::{bin_list, block_size, channels, cycle, degrade, every,
-                  gray_code, hop_jump, linear, midi_out, palindrome, repeat,
-                  reverse, revision, rotate, sample_rate, shuffle, simul,
-                  synth_out, tracks, wave_table};
+                  gray_code, hop_jump, linear, midi_out, palindrome,
+                  rand_range, rand_seed, repeat, reverse, revision, rotate,
+                  sample_rate, shuffle, simul, synth_out, tracks, wave_table};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -98,6 +98,8 @@ impl Machine {
         words.insert("sample_rate", sample_rate);
         words.insert("wave_table", wave_table);
         words.insert("synth_out", synth_out);
+        words.insert("rand_seed", rand_seed);
+        words.insert("rand_range", rand_range);
 
         Machine {
             backend: backend,

@@ -7,6 +7,7 @@ mod math;
 mod memory;
 mod vm;
 
+extern crate byteorder;
 extern crate docopt;
 #[cfg(feature = "with-jack")]
 extern crate jack;
