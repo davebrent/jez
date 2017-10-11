@@ -8,7 +8,8 @@ use interp::{InterpResult, InterpState, Value};
 use lang::hash_str;
 use math::path_to_curve;
 
-use super::interp::ExtState;
+use super::interp::{ExtState, Track};
+use super::markov::MarkovFilter;
 use super::msgs::{Destination, Event, EventValue};
 use super::synths::WaveTable;
 
@@ -183,7 +184,8 @@ pub fn tracks(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.pop_pair());
     for (i, ptr) in (start..end).enumerate() {
         let sym = try!(try!(state.heap_get(ptr)).as_sym());
-        seq.tracks.push((i, sym));
+        let track = Track::new(i, sym);
+        seq.tracks.push(track);
     }
     Ok(None)
 }
@@ -343,6 +345,30 @@ pub fn synth_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     seq.duration = dur;
     seq.events.append(&mut events);
     Ok(None)
+}
+
+/// Assign a markov filter to a track
+pub fn markov_filter(seq: &mut ExtState,
+                     state: &mut InterpState)
+                     -> InterpResult {
+    let capacity = try!(state.pop_num()) as usize;
+    let order = try!(state.pop_num()) as usize;
+    let sym = try!(try!(state.pop()).as_sym());
+
+    if order == 0 || capacity == 0 {
+        return Err(RuntimeErr::InvalidArgs);
+    }
+
+    match seq.tracks.iter_mut().find(
+        |ref mut track| track.func == sym,
+    ) {
+        Some(track) => {
+            let filter = MarkovFilter::new(order, capacity, seq.rng);
+            track.filters.push(Rc::new(filter));
+            Ok(None)
+        }
+        None => Err(RuntimeErr::InvalidArgs),
+    }
 }
 
 #[cfg(test)]

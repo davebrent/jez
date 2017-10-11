@@ -1,16 +1,37 @@
+use std::rc::Rc;
+
 use interp::{InterpResult, InterpState};
 
 use rand::{SeedableRng, StdRng};
 
 use super::audio::AudioContext;
+use super::filters::Filter;
 use super::msgs::Event;
 
 pub type ExtKeyword = fn(&mut ExtState, &mut InterpState) -> InterpResult;
 
+#[derive(Clone)]
+pub struct Track {
+    pub id: usize,
+    pub func: u64,
+    pub filters: Vec<Rc<Filter>>,
+}
+
+impl Track {
+    pub fn new(id: usize, func: u64) -> Track {
+        Track {
+            id: id,
+            func: func,
+            filters: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct ExtState {
     pub revision: usize,
     pub events: Vec<Event>,
-    pub tracks: Vec<(usize, u64)>,
+    pub tracks: Vec<Track>,
     pub duration: f64,
     pub audio: AudioContext,
     pub rng: StdRng,

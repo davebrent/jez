@@ -1,5 +1,7 @@
 mod audio;
+mod filters;
 mod interp;
+mod markov;
 mod msgs;
 mod midi;
 mod synths;
@@ -8,6 +10,7 @@ mod words;
 
 use std::collections::HashMap;
 use std::convert::From;
+use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 use std::time::Duration;
@@ -25,9 +28,10 @@ use self::midi::MidiProcessor;
 pub use self::msgs::{Command, Destination, Event, EventValue};
 use self::time::{TimeEvent, TimerUnit};
 use self::words::{bin_list, block_size, channels, cycle, degrade, every,
-                  gray_code, hop_jump, linear, midi_out, palindrome,
-                  rand_range, rand_seed, repeat, reverse, revision, rotate,
-                  sample_rate, shuffle, simul, synth_out, tracks, wave_table};
+                  gray_code, hop_jump, linear, markov_filter, midi_out,
+                  palindrome, rand_range, rand_seed, repeat, reverse,
+                  revision, rotate, sample_rate, shuffle, simul, synth_out,
+                  tracks, wave_table};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -100,6 +104,7 @@ impl Machine {
         words.insert("synth_out", synth_out);
         words.insert("rand_seed", rand_seed);
         words.insert("rand_range", rand_range);
+        words.insert("markov_filter", markov_filter);
 
         Machine {
             backend: backend,
@@ -189,8 +194,9 @@ impl Machine {
         timers.interval(self.audio.interval(), Signal::Audio);
 
         // Schedule track functions to be interpreted
-        for &(i, func) in &self.interp.data.tracks {
-            let cmd = TimeEvent::Timeout(0.0, Signal::Track(i, 0, func));
+        for track in &self.interp.data.tracks {
+            let track = Signal::Track(track.id, 0, track.func);
+            let cmd = TimeEvent::Timeout(0.0, track);
             signals.output.send(cmd).ok();
         }
 
@@ -302,6 +308,16 @@ impl Machine {
         self.interp.data.events.clear();
         self.interp.state.reset();
         try!(self.interp.eval(self.functions[&func]));
+
+        // Apply the tracks filters
+        let track = &mut self.interp.data.tracks[num];
+        let dur = self.interp.data.duration;
+        for filter in &mut track.filters {
+            let f = try!(Rc::get_mut(filter).ok_or(JezErr::RuntimeErr(
+                RuntimeErr::InvalidArgs,
+            )));
+            self.interp.data.events = f.apply(dur, &self.interp.data.events);
+        }
 
         // Avoid recursive scheduling of this handler
         let dur = self.interp.data.duration;
