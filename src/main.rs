@@ -19,7 +19,7 @@ const USAGE: &'static str = "
 Jez.
 
 Usage:
-  jez [options] <file>
+  jez [options] [<file>]
   jez (-h | --help)
   jez --version
 
@@ -99,12 +99,17 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
 
     loop {
         let mut txt = String::new();
-        let mut fp = try!(fs::File::open(args.arg_file.clone()));
-        try!(fp.read_to_string(&mut txt));
+
+        if args.arg_file.is_empty() {
+            try!(io::stdin().read_to_string(&mut txt));
+        } else {
+            let mut fp = try!(fs::File::open(args.arg_file.clone()));
+            try!(fp.read_to_string(&mut txt));
+        }
 
         let instrs = try!(make_program(txt.as_str()));
         let (host_send, host_recv) = channel();
-        if args.flag_watch {
+        if args.flag_watch && !args.arg_file.is_empty() {
             watch_file(args.arg_file.clone(), &instrs, host_send.clone());
         }
 
