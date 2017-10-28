@@ -2,8 +2,7 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 
 use err::SysErr;
-use memory::RingBuffer;
-use vm::{AudioBlock, Command};
+use vm::{AudioBlock, Command, RingBuffer};
 
 use portaudio as pa;
 

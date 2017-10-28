@@ -1,4 +1,4 @@
-use math::Curve;
+use super::math::Curve;
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Destination {

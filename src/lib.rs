@@ -1,8 +1,5 @@
 mod err;
-mod interp;
 mod lang;
-mod math;
-mod memory;
 mod sinks;
 mod vm;
 
@@ -31,14 +28,11 @@ use std::time::Duration;
 
 pub use err::JezErr;
 pub use err::RuntimeErr;
-pub use interp::Instr;
-pub use math::millis_to_dur;
-pub use memory::RingBuffer;
 pub use sinks::make_sink;
 pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
-             Machine};
+             Instr, Machine, RingBuffer, millis_to_dur};
 
-pub fn make_program(txt: &str) -> Result<Vec<interp::Instr>, err::JezErr> {
+pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));
     let instrs = try!(lang::assemble(&dirs));
     Ok(instrs)

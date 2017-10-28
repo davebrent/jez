@@ -4,10 +4,9 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
-use math::dur_to_millis;
-use memory::RingBuffer;
-
+use super::math::dur_to_millis;
 use super::msgs::{Command, Destination, Event, EventValue};
+use super::ring::RingBuffer;
 
 pub type Sample = f32;
 

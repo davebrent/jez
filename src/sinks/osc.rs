@@ -7,8 +7,7 @@ use rosc::{OscMessage, OscPacket, OscType};
 use rosc::encoder;
 
 use err::SysErr;
-use memory::RingBuffer;
-use vm::{AudioBlock, Command};
+use vm::{AudioBlock, Command, RingBuffer};
 
 impl From<Error> for SysErr {
     fn from(_: Error) -> SysErr {

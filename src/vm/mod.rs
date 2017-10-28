@@ -2,8 +2,10 @@ mod audio;
 mod filters;
 mod interp;
 mod markov;
+mod math;
 mod msgs;
 mod midi;
+mod ring;
 mod synths;
 mod time;
 mod words;
@@ -16,21 +18,22 @@ use std::thread;
 use std::time::Duration;
 
 use err::{JezErr, RuntimeErr, SysErr};
-use interp::{Instr, Interpreter};
 use lang::hash_str;
-use memory::RingBuffer;
 
 pub use self::audio::AudioBlock;
 use self::audio::AudioProcessor;
-use self::interp::{ExtKeyword, ExtState};
+pub use self::interp::Instr;
+use self::interp::Interpreter;
+pub use self::math::millis_to_dur;
 use self::midi::MidiProcessor;
 pub use self::msgs::{Command, Destination, Event, EventValue};
+pub use self::ring::RingBuffer;
 use self::time::{TimeEvent, TimerUnit};
-use self::words::{bin_list, block_size, channels, cycle, degrade, every,
-                  gray_code, hop_jump, linear, markov_filter, midi_out,
-                  palindrome, rand_range, rand_seed, repeat, reverse,
-                  revision, rotate, sample_rate, shuffle, simul, synth_out,
-                  tracks, wave_table};
+use self::words::{ExtKeyword, ExtState, bin_list, block_size, channels, cycle,
+                  degrade, every, gray_code, hop_jump, linear, markov_filter,
+                  midi_out, palindrome, rand_range, rand_seed, repeat,
+                  reverse, revision, rotate, sample_rate, shuffle, simul,
+                  synth_out, tracks, wave_table};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {

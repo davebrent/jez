@@ -9,8 +9,7 @@ use jack::prelude::{AsyncClient, AudioOutPort, AudioOutSpec, Client,
                     ProcessScope, RawMidi, client_options};
 
 use err::SysErr;
-use memory::RingBuffer;
-use vm::{AudioBlock, Command};
+use vm::{AudioBlock, Command, RingBuffer};
 
 struct Notifier;
 struct Processor {

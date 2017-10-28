@@ -4,7 +4,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use math::millis_to_dur;
+use super::math::millis_to_dur;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]

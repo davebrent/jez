@@ -10,8 +10,7 @@ use std::convert::From;
 use std::sync::mpsc::Receiver;
 
 use err::{JezErr, SysErr};
-use memory::RingBuffer;
-use vm::{AudioBlock, Command};
+use vm::{AudioBlock, Command, RingBuffer};
 
 pub use self::console::Console;
 #[cfg(feature = "with-jack")]

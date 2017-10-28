@@ -1,8 +1,7 @@
 use std::sync::mpsc::Receiver;
 use std::thread;
 
-use memory::RingBuffer;
-use vm::{AudioBlock, Command};
+use vm::{AudioBlock, Command, RingBuffer};
 
 pub struct Console;
 

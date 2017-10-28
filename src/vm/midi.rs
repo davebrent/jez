@@ -1,8 +1,7 @@
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
-use math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
-
+use super::math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 use super::msgs::{Command, Destination, Event, EventValue};
 
 #[derive(Debug)]
