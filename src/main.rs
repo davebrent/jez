@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use docopt::Docopt;
 
 use jez::{AudioBlock, Command, Control, Instr, JezErr, Machine, RingBuffer,
-          RuntimeErr, make_program, make_vm_backend, millis_to_dur};
+          RuntimeErr, make_program, make_sink, millis_to_dur};
 
 const USAGE: &'static str = "
 Jez.
@@ -24,13 +24,13 @@ Usage:
   jez --version
 
 Options:
-  -h --help         Show this screen.
-  --watch           Reload input file on changes.
-  --time=MS         Length of time (in milliseconds) to run for.
-  --backend=NAME    Specify the backend.
+  -h --help     Show this screen.
+  --watch       Reload input file on changes.
+  --time=MS     Length of time (in milliseconds) to run for.
+  --sink=NAME   Specify the output sink [default: console].
 
-Backends:
- debug
+Sinks:
+ console
  jack
  portaudio
  osc
@@ -38,7 +38,7 @@ Backends:
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
-    flag_backend: String,
+    flag_sink: String,
     flag_time: String,
     flag_watch: bool,
     flag_version: bool,
@@ -93,12 +93,9 @@ fn watch_file(filepath: String, instrs: &[Instr], channel: Sender<Command>) {
 fn run_app(args: &Args) -> Result<(), JezErr> {
     let ring = RingBuffer::new(64, AudioBlock::new(64));
 
-    let (back_send, back_recv) = channel();
-    let mut _backend = try!(make_vm_backend(
-        args.flag_backend.as_ref(),
-        ring.clone(),
-        back_recv,
-    ));
+    let (sink_send, sink_recv) = channel();
+    let mut _sink =
+        try!(make_sink(args.flag_sink.as_ref(), ring.clone(), sink_recv));
 
     loop {
         let mut txt = String::new();
@@ -120,7 +117,7 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
 
         let mut machine = Machine::new(
             ring.clone(),
-            back_send.clone(),
+            sink_send.clone(),
             host_send.clone(),
             host_recv,
             &instrs,

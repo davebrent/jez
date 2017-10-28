@@ -4,13 +4,13 @@ use std::thread;
 use memory::RingBuffer;
 use vm::{AudioBlock, Command};
 
-pub struct Debug;
+pub struct Console;
 
-impl Debug {
+impl Console {
     pub fn new(_: RingBuffer<AudioBlock>, channel: Receiver<Command>) -> Self {
         thread::spawn(move || while let Ok(cmd) = channel.recv() {
             println!("{:?}", cmd);
         });
-        Debug {}
+        Console {}
     }
 }

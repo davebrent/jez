@@ -1,9 +1,9 @@
-mod backends;
 mod err;
 mod interp;
 mod lang;
 mod math;
 mod memory;
+mod sinks;
 mod vm;
 
 extern crate byteorder;
@@ -25,10 +25,8 @@ use libc::{c_char, c_double};
 use std::ffi::{CStr, CString};
 use std::str;
 
-use std::any::Any;
-use std::convert::From;
 use std::mem;
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::mpsc::channel;
 use std::time::Duration;
 
 pub use err::JezErr;
@@ -36,23 +34,9 @@ pub use err::RuntimeErr;
 pub use interp::Instr;
 pub use math::millis_to_dur;
 pub use memory::RingBuffer;
+pub use sinks::make_sink;
 pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
              Machine};
-
-pub fn make_vm_backend(name: &str,
-                       rb: RingBuffer<AudioBlock>,
-                       chan: Receiver<Command>)
-                       -> Result<Box<Any>, err::JezErr> {
-    match name {
-        "debug" | "" => Ok(Box::new(backends::Debug::new(rb, chan))),
-        #[cfg(feature = "with-jack")]
-        "jack" => Ok(Box::new(try!(backends::Jack::new(rb, chan)))),
-        "osc" => Ok(Box::new(try!(backends::Osc::new(rb, chan)))),
-        #[cfg(feature = "with-portaudio")]
-        "portaudio" => Ok(Box::new(try!(backends::Portaudio::new(rb, chan)))),
-        _ => Err(From::from(err::SysErr::UnknownBackend)),
-    }
-}
 
 pub fn make_program(txt: &str) -> Result<Vec<interp::Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));
