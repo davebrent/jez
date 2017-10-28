@@ -142,7 +142,7 @@ impl AudioProcessor {
         let block_size = self.context.settings.block_size;
 
         // Time in milliseconds between each block
-        let interval = 1000.0 / (sample_rate / block_size) as f64;
+        let interval = 1000.0 / f64::from(sample_rate / block_size);
         // Run 40% quicker, to ensure backend always has enough blocks, with a
         // minimum latency of 0.5ms
         (interval * 0.6).max(0.5)

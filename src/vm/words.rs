@@ -206,7 +206,7 @@ pub fn hop_jump(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
         if value == 2 {
             state.heap_push(Value::Number(0.0));
         } else {
-            state.heap_push(Value::Number(value as f64));
+            state.heap_push(Value::Number(f64::from(value)));
         }
     }
 

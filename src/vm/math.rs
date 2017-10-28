@@ -48,7 +48,7 @@ pub fn millis_to_dur(millis: f64) -> Duration {
 
 pub fn dur_to_millis(dur: &Duration) -> f64 {
     let secs = dur.as_secs() as f64 * 1000.0;
-    let nanos = dur.subsec_nanos() as f64 / 1000000.0;
+    let nanos = f64::from(dur.subsec_nanos()) / 1000000.0;
     secs + nanos
 }
 
