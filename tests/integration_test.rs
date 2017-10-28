@@ -1,12 +1,14 @@
 extern crate jez;
-use jez::{Command, Destination, Event, EventValue, LogData, Simulation};
+
+use jez::{Command, Destination, Event, EventValue, Simulation};
 use std::time::Duration;
 
 fn filter_commands(sim: &Simulation) -> Vec<Command> {
     let out: Vec<Command> = Vec::new();
-    sim.messages.iter().fold(out, |mut out, msg| {
-        if let LogData::Command(cmd) = msg.data {
-            out.push(cmd);
+    sim.messages.iter().fold(out, |mut out, cmd| {
+        if let Command::Event(_) = *cmd {
+        } else {
+            out.push(*cmd);
         }
         out
     })
@@ -14,8 +16,8 @@ fn filter_commands(sim: &Simulation) -> Vec<Command> {
 
 fn filter_events(sim: &Simulation) -> Vec<Event> {
     let out: Vec<Event> = Vec::new();
-    sim.messages.iter().fold(out, |mut out, msg| {
-        if let LogData::Event(evt) = msg.data {
+    sim.messages.iter().fold(out, |mut out, cmd| {
+        if let Command::Event(evt) = *cmd {
             out.push(evt);
         }
         out

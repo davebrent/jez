@@ -18,7 +18,6 @@ use std::time::Duration;
 use err::{JezErr, RuntimeErr, SysErr};
 use interp::{Instr, Interpreter};
 use lang::hash_str;
-use log::Logger;
 use memory::RingBuffer;
 
 pub use self::audio::AudioBlock;
@@ -58,7 +57,6 @@ struct SignalState {
 pub struct Machine {
     backend: Sender<Command>,
     bus_recv: Receiver<Command>,
-    logger: Logger,
     functions: HashMap<u64, usize>,
     interp: Interpreter<ExtState>,
     midi: MidiProcessor,
@@ -70,8 +68,7 @@ impl Machine {
                backend: Sender<Command>,
                bus_send: Sender<Command>,
                bus_recv: Receiver<Command>,
-               instrs: &[Instr],
-               logger: Logger)
+               instrs: &[Instr])
                -> Machine {
         let mut funcs = HashMap::new();
         for (pc, instr) in instrs.iter().enumerate() {
@@ -109,7 +106,6 @@ impl Machine {
         Machine {
             backend: backend,
             bus_recv: bus_recv,
-            logger: logger,
             functions: funcs,
             interp: Interpreter::new(instrs.to_vec(), words, ExtState::new()),
             midi: MidiProcessor::new(bus_send.clone()),
@@ -205,7 +201,7 @@ impl Machine {
 
     fn flush(&mut self, signals: &mut SignalState) {
         self.midi.stop();
-        self.handle_bus_signal(&Duration::new(0, 0), signals).ok();
+        self.handle_bus_signal(signals).ok();
     }
 
     // Main signal handler
@@ -217,11 +213,9 @@ impl Machine {
             TimeEvent::Timer(time, signal) => {
                 match signal {
                     Signal::Audio => self.handle_audio_signal(&time),
-                    Signal::Bus => self.handle_bus_signal(&time, signals),
+                    Signal::Bus => self.handle_bus_signal(signals),
                     Signal::Midi => self.handle_midi_signal(&time),
-                    Signal::Event(event) => {
-                        self.handle_event_signal(&time, event)
-                    }
+                    Signal::Event(event) => self.handle_event_signal(event),
                     Signal::Track(num, rev, func) => {
                         self.handle_track_signal(signals, num, rev, func)
                     }
@@ -241,12 +235,12 @@ impl Machine {
 
     // Read internal and external commands
     fn handle_bus_signal(&mut self,
-                         elapsed: &Duration,
                          signals: &mut SignalState)
                          -> Result<Control, JezErr> {
         while let Ok(msg) = self.bus_recv.try_recv() {
-            self.logger.log_cmd(*elapsed, "vm", &msg);
             match msg {
+                Command::Event(_) => (),
+
                 Command::Stop => {
                     signals.output.send(TimeEvent::Stop).ok();
                     return Ok(Control::Stop);
@@ -271,11 +265,11 @@ impl Machine {
     }
 
     // Route sequenced events
-    fn handle_event_signal(&mut self,
-                           elapsed: &Duration,
-                           event: Event)
-                           -> Result<Control, JezErr> {
-        self.logger.log_event(*elapsed, "vm", &event);
+    fn handle_event_signal(&mut self, event: Event) -> Result<Control, JezErr> {
+        if self.backend.send(Command::Event(event)).is_err() {
+            return Err(From::from(SysErr::UnreachableBackend));
+        }
+
         match event.dest {
             Destination::Midi(_, _) => {
                 self.midi.process(event);

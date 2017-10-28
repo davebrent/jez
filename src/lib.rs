@@ -2,7 +2,6 @@ mod backends;
 mod err;
 mod interp;
 mod lang;
-mod log;
 mod math;
 mod memory;
 mod vm;
@@ -35,7 +34,6 @@ use std::time::Duration;
 pub use err::JezErr;
 pub use err::RuntimeErr;
 pub use interp::Instr;
-pub use log::{LogData, Logger};
 pub use math::millis_to_dur;
 pub use memory::RingBuffer;
 pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
@@ -43,27 +41,15 @@ pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
 
 pub fn make_vm_backend(name: &str,
                        rb: RingBuffer<AudioBlock>,
-                       logger: log::Logger,
-                       channel: Receiver<Command>)
+                       chan: Receiver<Command>)
                        -> Result<Box<Any>, err::JezErr> {
     match name {
-        "debug" | "" => Ok(Box::new(backends::Debug::new(rb, logger, channel))),
+        "debug" | "" => Ok(Box::new(backends::Debug::new(rb, chan))),
         #[cfg(feature = "with-jack")]
-        "jack" => Ok(Box::new(try!(backends::Jack::new(rb, logger, channel)))),
-        "osc" => Ok(Box::new(try!(backends::Osc::new(rb, logger, channel)))),
+        "jack" => Ok(Box::new(try!(backends::Jack::new(rb, chan)))),
+        "osc" => Ok(Box::new(try!(backends::Osc::new(rb, chan)))),
         #[cfg(feature = "with-portaudio")]
-        "portaudio" => Ok(Box::new(
-            try!(backends::Portaudio::new(rb, logger, channel)),
-        )),
-        _ => Err(From::from(err::SysErr::UnknownBackend)),
-    }
-}
-
-pub fn make_log_backend(name: &str)
-                        -> Result<Box<log::LogBackend>, err::JezErr> {
-    match name {
-        "console" | "" => Ok(Box::new(log::ConsoleLogger::new())),
-        "file" => Ok(Box::new(log::FileLogger::new())),
+        "portaudio" => Ok(Box::new(try!(backends::Portaudio::new(rb, chan)))),
         _ => Err(From::from(err::SysErr::UnknownBackend)),
     }
 }
@@ -79,7 +65,7 @@ pub struct Simulation {
     pub duration: Duration,
     pub delta: Duration,
     pub instructions: Vec<Instr>,
-    pub messages: Vec<log::LogMessage>,
+    pub messages: Vec<Command>,
 }
 
 pub fn simulate(dur: Duration,
@@ -88,23 +74,21 @@ pub fn simulate(dur: Duration,
                 -> Result<Simulation, JezErr> {
     let ring = RingBuffer::new(64, AudioBlock::new(64));
 
-    let (log_send, log_recv) = channel();
-    let (audio_send, _audio_recv) = channel();
+    let (back_send, back_recv) = channel();
     let (host_send, host_recv) = channel();
 
     let instrs = try!(make_program(prog));
     let mut machine = Machine::new(
         ring,
-        audio_send.clone(),
+        back_send.clone(),
         host_send.clone(),
         host_recv,
         &instrs,
-        Logger::new(log_send.clone()),
     );
 
     try!(machine.exec(dur, dt));
     let mut msgs = Vec::new();
-    while let Ok(msg) = log_recv.try_recv() {
+    while let Ok(msg) = back_recv.try_recv() {
         msgs.push(msg);
     }
 

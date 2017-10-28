@@ -12,9 +12,8 @@ use std::time::{Duration, Instant};
 
 use docopt::Docopt;
 
-use jez::{AudioBlock, Command, Control, Instr, JezErr, Logger, Machine,
-          RingBuffer, RuntimeErr, make_log_backend, make_program,
-          make_vm_backend, millis_to_dur};
+use jez::{AudioBlock, Command, Control, Instr, JezErr, Machine, RingBuffer,
+          RuntimeErr, make_program, make_vm_backend, millis_to_dur};
 
 const USAGE: &'static str = "
 Jez.
@@ -29,7 +28,6 @@ Options:
   --watch           Reload input file on changes.
   --time=MS         Length of time (in milliseconds) to run for.
   --backend=NAME    Specify the backend.
-  --logger=NAME     Logging backend (either 'console' OR 'file').
 
 Backends:
  debug
@@ -41,7 +39,6 @@ Backends:
 #[derive(Debug, RustcDecodable)]
 struct Args {
     flag_backend: String,
-    flag_logger: String,
     flag_time: String,
     flag_watch: bool,
     flag_version: bool,
@@ -96,16 +93,11 @@ fn watch_file(filepath: String, instrs: &[Instr], channel: Sender<Command>) {
 fn run_app(args: &Args) -> Result<(), JezErr> {
     let ring = RingBuffer::new(64, AudioBlock::new(64));
 
-    let (log_send, log_recv) = channel();
-    let log_backend = try!(make_log_backend(args.flag_logger.as_ref()));
-    log_backend.run_forever(log_recv);
-
-    let (audio_send, audio_recv) = channel();
+    let (back_send, back_recv) = channel();
     let mut _backend = try!(make_vm_backend(
         args.flag_backend.as_ref(),
         ring.clone(),
-        Logger::new(log_send.clone()),
-        audio_recv,
+        back_recv,
     ));
 
     loop {
@@ -128,11 +120,10 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
 
         let mut machine = Machine::new(
             ring.clone(),
-            audio_send.clone(),
+            back_send.clone(),
             host_send.clone(),
             host_recv,
             &instrs,
-            Logger::new(log_send.clone()),
         );
 
         match try!(machine.exec_realtime()) {

@@ -23,6 +23,7 @@ pub struct Event {
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Command {
     AudioSettings(usize, usize, usize),
+    Event(Event),
     MidiCtl(u8, u8, u8),
     MidiNoteOff(u8, u8),
     MidiNoteOn(u8, u8, u8),

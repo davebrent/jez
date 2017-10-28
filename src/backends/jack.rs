@@ -9,7 +9,6 @@ use jack::prelude::{AsyncClient, AudioOutPort, AudioOutSpec, Client,
                     ProcessScope, RawMidi, client_options};
 
 use err::SysErr;
-use log::Logger;
 use memory::RingBuffer;
 use vm::{AudioBlock, Command};
 
@@ -21,7 +20,6 @@ struct Processor {
     audio_out: Vec<Port<AudioOutSpec>>,
     block: AudioBlock,
     block_size: usize,
-    logger: Logger,
     start: Instant,
 }
 
@@ -69,7 +67,6 @@ impl Processor {
 
         while let Ok(msg) = self.channel.try_recv() {
             let time = Instant::now() - self.start;
-            self.logger.log_cmd(time, "backend", &msg);
 
             match msg {
                 Command::AudioSettings(channels, block_size, _) => {
@@ -170,7 +167,6 @@ impl ProcessHandler for Processor {
 
 impl Jack {
     pub fn new(ring: RingBuffer<AudioBlock>,
-               logger: Logger,
                channel: Receiver<Command>)
                -> Result<Self, SysErr> {
         let opts = client_options::NO_START_SERVER;
@@ -183,7 +179,6 @@ impl Jack {
             channel: channel,
             midi_out: try!(make_ports("midiout", &client, 1)),
             audio_out: Vec::new(),
-            logger: logger,
             start: Instant::now(),
         };
 

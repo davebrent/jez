@@ -7,7 +7,6 @@ use rosc::{OscMessage, OscPacket, OscType};
 use rosc::encoder;
 
 use err::SysErr;
-use log::Logger;
 use memory::RingBuffer;
 use vm::{AudioBlock, Command};
 
@@ -21,7 +20,6 @@ pub struct Osc;
 
 impl Osc {
     pub fn new(_: RingBuffer<AudioBlock>,
-               _: Logger,
                channel: Receiver<Command>)
                -> Result<Self, SysErr> {
         let sock = try!(UdpSocket::bind("127.0.0.1:34254"));

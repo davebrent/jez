@@ -2,7 +2,6 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 
 use err::SysErr;
-use log::Logger;
 use memory::RingBuffer;
 use vm::{AudioBlock, Command};
 
@@ -46,7 +45,6 @@ pub struct Portaudio;
 
 impl Portaudio {
     pub fn new(ring: RingBuffer<AudioBlock>,
-               _: Logger,
                channel: Receiver<Command>)
                -> Result<Self, SysErr> {
         thread::spawn(move || {
