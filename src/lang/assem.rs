@@ -12,124 +12,166 @@ pub fn hash_str(text: &str) -> u64 {
     hasher.finish()
 }
 
-pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
-    let mut globals: HashMap<&str, Value> = HashMap::new();
-    let mut funcs: HashMap<u64, (usize, usize)> = HashMap::new();
-    let mut instrs = Vec::new();
+struct Assembler<'a> {
+    globals: HashMap<&'a str, Value<'a>>,
+    funcs: HashMap<u64, (usize, usize)>,
+    instrs: Vec<Instr>,
+    string_map: HashMap<&'a str, usize>,
+    strings: Vec<&'a str>,
+}
 
-    let mut string_map: HashMap<&str, usize> = HashMap::new();
-    let mut strings = Vec::new();
-
-    if !dirs.is_empty() && *dirs.first().unwrap() != Directive::Version(1) {
-        return Err(AssemErr::UnsupportedVersion(1));
-    }
-
-    for dir in dirs {
-        match *dir {
-            Directive::Comment(_) |
-            Directive::Version(_) => (),
-            Directive::Globals(ref globs) => {
-                for (key, value) in globs.iter() {
-                    if globals.contains_key(key) {
-                        return Err(AssemErr::DuplicateVariable);
-                    }
-                    globals.insert(key, *value);
-                }
-            }
-            Directive::Func(name, args, ref words) => {
-                let name_sym = hash_str(name);
-                if funcs.contains_key(&name_sym) {
-                    return Err(AssemErr::DuplicateFunction);
-                }
-
-                let ilen = instrs.len();
-                funcs.insert(name_sym, (args as usize, ilen));
-                instrs.push(Instr::Begin(name_sym));
-
-                for word in words {
-                    match *word {
-                        Token::Comment(_) => (),
-                        Token::ListBegin => {
-                            instrs.push(Instr::ListBegin);
-                        }
-                        Token::ListEnd => {
-                            instrs.push(Instr::ListEnd);
-                        }
-                        Token::Null => {
-                            instrs.push(Instr::Null);
-                        }
-                        Token::Symbol(var) => {
-                            instrs.push(Instr::LoadSymbol(hash_str(var)));
-                        }
-                        Token::Assignment(var) => {
-                            instrs.push(Instr::StoreVar(hash_str(var)));
-                        }
-                        Token::Variable(var) => {
-                            instrs.push(Instr::LoadVar(hash_str(var)));
-                        }
-                        Token::StringLiteral(literal) => {
-                            let idx = match string_map.entry(literal) {
-                                Entry::Occupied(o) => *o.get(),
-                                Entry::Vacant(v) => {
-                                    let idx = strings.len();
-                                    v.insert(idx);
-                                    strings.push(literal);
-                                    idx
-                                }
-                            };
-                            instrs.push(Instr::LoadString(idx as u64));
-                        }
-                        Token::Value(prim) => {
-                            match prim {
-                                Value::Num(num) => {
-                                    instrs.push(Instr::LoadNumber(num));
-                                }
-                                Value::Str(word) => {
-                                    let sym = hash_str(word);
-
-                                    if funcs.contains_key(&sym) {
-                                        let (_args, pc) = funcs[&sym];
-                                        instrs.push(Instr::Call(_args, pc));
-                                    } else {
-                                        instrs.push(Instr::Keyword(sym));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                instrs.push(Instr::Return);
-                instrs.push(Instr::End(name_sym));
-            }
+impl<'a> Assembler<'a> {
+    pub fn new() -> Assembler<'a> {
+        Assembler {
+            globals: HashMap::new(),
+            funcs: HashMap::new(),
+            instrs: Vec::new(),
+            string_map: HashMap::new(),
+            strings: Vec::new(),
         }
     }
 
-    instrs.push(Instr::Begin(0));
+    pub fn assemble(&mut self,
+                    dirs: &'a [Directive])
+                    -> Result<Vec<Instr>, AssemErr> {
+        for directive in dirs {
+            match *directive {
+                Directive::Comment(_) => (),
+                Directive::Func(name, args, ref words) => {
+                    try!(self.emit_func(name, args, words))
+                }
+                Directive::Globals(ref globals) => {
+                    try!(self.emit_globals(globals))
+                }
+                Directive::Version(ver) => {
+                    if ver != 1 {
+                        return Err(AssemErr::UnsupportedVersion(1));
+                    }
+                }
+            }
+        }
+        self.emit_footer();
+        Ok(self.instrs.clone())
+    }
 
-    // Ensure variables are listed deterministicly
-    let mut global_keys: Vec<&&str> = globals.keys().collect();
-    global_keys.sort();
-    for key in &global_keys {
-        match globals[*key] {
-            Value::Str(sym) => instrs.push(Instr::LoadSymbol(hash_str(sym))),
-            Value::Num(num) => instrs.push(Instr::LoadNumber(num)),
+    fn emit_footer(&mut self) {
+        self.instrs.push(Instr::Begin(0));
+
+        // Pack global variables deterministicly
+        let mut global_keys: Vec<&&str> = self.globals.keys().collect();
+        global_keys.sort();
+        for key in &global_keys {
+            let instr = match self.globals[*key] {
+                Value::Str(sym) => Instr::LoadSymbol(hash_str(sym)),
+                Value::Num(num) => Instr::LoadNumber(num),
+            };
+            self.instrs.push(instr);
+            self.instrs.push(Instr::StoreGlob(hash_str(key)));
+        }
+
+        // Pack string literals
+        for (i, literal) in self.strings.iter().enumerate() {
+            let bytes = literal.as_bytes();
+            self.instrs.push(
+                Instr::StoreString(i as u64, bytes.len() as u64),
+            );
+            for b in bytes {
+                self.instrs.push(Instr::RawData(*b));
+            }
+        }
+
+        self.instrs.push(Instr::Return);
+        self.instrs.push(Instr::End(0));
+    }
+
+    fn emit_globals(&mut self,
+                    globals: &'a HashMap<&str, Value>)
+                    -> Result<(), AssemErr> {
+        for (key, value) in globals.iter() {
+            if self.globals.contains_key(key) {
+                return Err(AssemErr::DuplicateVariable);
+            }
+            self.globals.insert(key, *value);
+        }
+        Ok(())
+    }
+
+    fn emit_func(&mut self,
+                 name: &str,
+                 args: u64,
+                 words: &'a [Token])
+                 -> Result<(), AssemErr> {
+        let name = hash_str(name);
+        if self.funcs.contains_key(&name) {
+            return Err(AssemErr::DuplicateFunction);
+        }
+
+        self.funcs.insert(name, (args as usize, self.instrs.len()));
+        self.instrs.push(Instr::Begin(name));
+
+        for word in words {
+            match *word {
+                Token::Comment(_) => (),
+                Token::ListBegin => {
+                    self.instrs.push(Instr::ListBegin);
+                }
+                Token::ListEnd => {
+                    self.instrs.push(Instr::ListEnd);
+                }
+                Token::Null => {
+                    self.instrs.push(Instr::Null);
+                }
+                Token::Symbol(var) => {
+                    self.instrs.push(Instr::LoadSymbol(hash_str(var)));
+                }
+                Token::Assignment(var) => {
+                    self.instrs.push(Instr::StoreVar(hash_str(var)));
+                }
+                Token::Variable(var) => {
+                    self.instrs.push(Instr::LoadVar(hash_str(var)));
+                }
+                Token::StringLiteral(literal) => self.emit_str_lit(literal),
+                Token::Value(prim) => self.emit_value(prim),
+            }
+        }
+
+        self.instrs.push(Instr::Return);
+        self.instrs.push(Instr::End(name));
+        Ok(())
+    }
+
+    fn emit_str_lit(&mut self, literal: &'a str) {
+        let idx = match self.string_map.entry(literal) {
+            Entry::Occupied(o) => *o.get(),
+            Entry::Vacant(v) => {
+                let idx = self.strings.len();
+                v.insert(idx);
+                self.strings.push(literal);
+                idx
+            }
         };
-        instrs.push(Instr::StoreGlob(hash_str(key)));
+        self.instrs.push(Instr::LoadString(idx as u64));
     }
 
-    // Pack string literals into the program
-    for (i, literal) in strings.iter().enumerate() {
-        let bytes = literal.as_bytes();
-        instrs.push(Instr::StoreString(i as u64, bytes.len() as u64));
-        for b in bytes {
-            instrs.push(Instr::RawData(*b));
-        }
+    fn emit_value(&mut self, value: Value) {
+        let instr = match value {
+            Value::Num(num) => Instr::LoadNumber(num),
+            Value::Str(word) => {
+                let sym = hash_str(word);
+                if self.funcs.contains_key(&sym) {
+                    let (args, pc) = self.funcs[&sym];
+                    Instr::Call(args, pc)
+                } else {
+                    Instr::Keyword(sym)
+                }
+            }
+        };
+        self.instrs.push(instr);
     }
+}
 
-    instrs.push(Instr::Return);
-    instrs.push(Instr::End(0));
-    Ok(instrs)
+pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
+    Assembler::new().assemble(dirs)
 }
 
 #[cfg(test)]
