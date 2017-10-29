@@ -11,5 +11,5 @@ A stack machine for sequencing things
         ['track1] tracks
 
       .def track1 0:
-        [1 ~ 2 ~] 1000 0 127 midi_out
+        [96 ~ 64 ~] 1000 1 127 midi_out
     EOF
