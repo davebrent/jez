@@ -5,6 +5,7 @@ mod markov;
 mod math;
 mod msgs;
 mod midi;
+mod pitch;
 mod ring;
 mod synths;
 mod time;
@@ -31,9 +32,9 @@ pub use self::ring::RingBuffer;
 use self::time::{TimeEvent, TimerUnit};
 use self::words::{ExtKeyword, ExtState, bin_list, block_size, channels, cycle,
                   degrade, every, gray_code, hop_jump, linear, markov_filter,
-                  midi_out, palindrome, rand_range, rand_seed, repeat,
-                  reverse, revision, rotate, sample_rate, shuffle, simul,
-                  synth_out, tracks, wave_table};
+                  midi_out, palindrome, pitch_quantize_filter, rand_range,
+                  rand_seed, repeat, reverse, revision, rotate, sample_rate,
+                  shuffle, simul, synth_out, tracks, wave_table};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -105,6 +106,7 @@ impl Machine {
         words.insert("rand_seed", rand_seed);
         words.insert("rand_range", rand_range);
         words.insert("markov_filter", markov_filter);
+        words.insert("pitch_quantize_filter", pitch_quantize_filter);
 
         Machine {
             backend: backend,

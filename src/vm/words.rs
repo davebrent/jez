@@ -12,6 +12,7 @@ use super::interp::{InterpResult, InterpState, Value};
 use super::markov::MarkovFilter;
 use super::math::path_to_curve;
 use super::msgs::{Destination, Event, EventValue};
+use super::pitch::PitchQuantizeFilter;
 use super::synths::WaveTable;
 
 pub type ExtKeyword = fn(&mut ExtState, &mut InterpState) -> InterpResult;
@@ -412,6 +413,30 @@ pub fn markov_filter(seq: &mut ExtState,
         }
         None => Err(RuntimeErr::InvalidArgs),
     }
+}
+
+pub fn pitch_quantize_filter(seq: &mut ExtState,
+                             state: &mut InterpState)
+                             -> InterpResult {
+    let scale = try!(try!(state.pop()).as_sym());
+    let octave = try!(state.pop_num()) as usize;
+    let key = try!(try!(state.pop()).as_sym());
+    let sym = try!(try!(state.pop()).as_sym());
+
+    let track = match seq.tracks.iter_mut().find(
+        |ref mut track| track.func == sym,
+    ) {
+        Some(track) => track,
+        None => return Err(RuntimeErr::InvalidArgs),
+    };
+
+    let filter = match PitchQuantizeFilter::new(key, octave, scale) {
+        Some(filter) => filter,
+        None => return Err(RuntimeErr::InvalidArgs),
+    };
+
+    track.filters.push(Rc::new(filter));
+    Ok(None)
 }
 
 #[cfg(test)]

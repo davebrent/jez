@@ -34,7 +34,8 @@ pub enum Directive<'a> {
 
 fn string_chars(chr: u8) -> bool {
     let chr = chr as char;
-    chr.is_alphanumeric() || chr == '-' || chr == '_' || chr == '.'
+    chr.is_alphanumeric() || chr == '-' || chr == '_' || chr == '.' ||
+        chr == '#'
 }
 
 named!(string<&str>, do_parse!(
@@ -316,6 +317,12 @@ mod tests {
     fn test_token_symbol() {
         let s = token(b"'foo");
         assert_eq!(s.unwrap(), (&b""[..], Token::Symbol("foo")));
+    }
+
+    #[test]
+    fn test_token_symbol_special_chars() {
+        let s = token(b"'f#o_-o");
+        assert_eq!(s.unwrap(), (&b""[..], Token::Symbol("f#o_-o")));
     }
 
     #[test]
