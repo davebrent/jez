@@ -140,7 +140,7 @@ fn main() {
         .and_then(|d| d.decode())
         .unwrap_or_else(|e| e.exit());
     if args.flag_version {
-        println!("v0.4.0");
+        println!("v0.5.0");
         return;
     }
 
