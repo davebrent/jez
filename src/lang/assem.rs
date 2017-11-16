@@ -13,7 +13,7 @@ pub fn hash_str(text: &str) -> u64 {
 }
 
 struct Assembler<'a> {
-    globals: HashMap<&'a str, Value<'a>>,
+    globals: HashMap<&'a str, Instr>,
     funcs: HashMap<u64, (usize, usize)>,
     instrs: Vec<Instr>,
     string_map: HashMap<&'a str, usize>,
@@ -61,11 +61,7 @@ impl<'a> Assembler<'a> {
         let mut global_keys: Vec<&&str> = self.globals.keys().collect();
         global_keys.sort();
         for key in &global_keys {
-            let instr = match self.globals[*key] {
-                Value::Str(sym) => Instr::LoadSymbol(hash_str(sym)),
-                Value::Num(num) => Instr::LoadNumber(num),
-            };
-            self.instrs.push(instr);
+            self.instrs.push(self.globals[*key]);
             self.instrs.push(Instr::StoreGlob(hash_str(key)));
         }
 
@@ -91,7 +87,8 @@ impl<'a> Assembler<'a> {
             if self.globals.contains_key(key) {
                 return Err(AssemErr::DuplicateVariable);
             }
-            self.globals.insert(key, *value);
+            let instr = self.pack_value(&value);
+            self.globals.insert(key, instr);
         }
         Ok(())
     }
@@ -118,20 +115,16 @@ impl<'a> Assembler<'a> {
                 Token::ListEnd => {
                     self.instrs.push(Instr::ListEnd);
                 }
-                Token::Null => {
-                    self.instrs.push(Instr::Null);
-                }
-                Token::Symbol(var) => {
-                    self.instrs.push(Instr::LoadSymbol(hash_str(var)));
-                }
                 Token::Assignment(var) => {
                     self.instrs.push(Instr::StoreVar(hash_str(var)));
                 }
                 Token::Variable(var) => {
                     self.instrs.push(Instr::LoadVar(hash_str(var)));
                 }
-                Token::StringLiteral(literal) => self.emit_str_lit(literal),
-                Token::Value(prim) => self.emit_value(prim),
+                Token::Value(ref prim) => {
+                    let instr = self.pack_value(prim);
+                    self.instrs.push(instr);
+                },
             }
         }
 
@@ -140,23 +133,24 @@ impl<'a> Assembler<'a> {
         Ok(())
     }
 
-    fn emit_str_lit(&mut self, literal: &'a str) {
-        let idx = match self.string_map.entry(literal) {
-            Entry::Occupied(o) => *o.get(),
-            Entry::Vacant(v) => {
-                let idx = self.strings.len();
-                v.insert(idx);
-                self.strings.push(literal);
-                idx
+    fn pack_value(&mut self, value: &'a Value) -> Instr {
+        match *value {
+            Value::Null => Instr::Null,
+            Value::Number(num) => Instr::LoadNumber(num),
+            Value::StringLiteral(literal) => {
+                let idx = match self.string_map.entry(literal) {
+                    Entry::Occupied(o) => *o.get(),
+                    Entry::Vacant(v) => {
+                        let idx = self.strings.len();
+                        v.insert(idx);
+                        self.strings.push(literal);
+                        idx
+                    }
+                };
+                Instr::LoadString(idx as u64)
             }
-        };
-        self.instrs.push(Instr::LoadString(idx as u64));
-    }
-
-    fn emit_value(&mut self, value: Value) {
-        let instr = match value {
-            Value::Num(num) => Instr::LoadNumber(num),
-            Value::Str(word) => {
+            Value::Symbol(var) => Instr::LoadSymbol(hash_str(var)),
+            Value::Keyword(word) => {
                 let sym = hash_str(word);
                 if self.funcs.contains_key(&sym) {
                     let (args, pc) = self.funcs[&sym];
@@ -165,8 +159,7 @@ impl<'a> Assembler<'a> {
                     Instr::Keyword(sym)
                 }
             }
-        };
-        self.instrs.push(instr);
+        }
     }
 }
 
@@ -186,9 +179,9 @@ mod tests {
                 "main",
                 0,
                 vec![
-                    Token::StringLiteral("abc"),
-                    Token::StringLiteral("def"),
-                    Token::StringLiteral("abc"),
+                    Token::Value(Value::StringLiteral("abc")),
+                    Token::Value(Value::StringLiteral("def")),
+                    Token::Value(Value::StringLiteral("abc")),
                 ]
             ),
         ];
@@ -225,8 +218,8 @@ mod tests {
     #[test]
     fn test_simple() {
         let mut globs = HashMap::new();
-        globs.insert("b", Value::Num(2.0));
-        globs.insert("a", Value::Num(3.9));
+        globs.insert("b", Value::Number(2.0));
+        globs.insert("a", Value::Number(3.9));
 
         let dirs = vec![
             Directive::Version(1),
@@ -235,16 +228,16 @@ mod tests {
                 "bar",
                 1,
                 vec![
-                    Token::Value(Value::Num(2.7)),
-                    Token::Value(Value::Str("add")),
+                    Token::Value(Value::Number(2.7)),
+                    Token::Value(Value::Keyword("add")),
                 ]
             ),
             Directive::Func(
                 "foo",
                 1,
                 vec![
-                    Token::Value(Value::Num(3.6)),
-                    Token::Value(Value::Str("bar")),
+                    Token::Value(Value::Number(3.6)),
+                    Token::Value(Value::Keyword("bar")),
                 ]
             ),
         ];

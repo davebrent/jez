@@ -7,8 +7,11 @@ use err::ParseErr;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Value<'a> {
-    Num(f64),
-    Str(&'a str),
+    Number(f64),
+    Symbol(&'a str),
+    Keyword(&'a str),
+    StringLiteral(&'a str),
+    Null,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -17,9 +20,6 @@ pub enum Token<'a> {
     Comment(&'a str),
     ListBegin,
     ListEnd,
-    Null,
-    Symbol(&'a str),
-    StringLiteral(&'a str),
     Value(Value<'a>),
     Variable(&'a str),
 }
@@ -77,16 +77,16 @@ named!(variable<Token>, do_parse!(
     >> (Token::Variable(sym))
 ));
 
-named!(symbol<Token>, do_parse!(
+named!(symbol<Value>, do_parse!(
     char!('\'')
     >> sym: string
-    >> (Token::Symbol(sym))
+    >> (Value::Symbol(sym))
 ));
 
-named!(string_literal<Token>, do_parse!(
+named!(string_literal<Value>, do_parse!(
     char!('"')
     >> chars: map_res!(terminated!(is_not!("\""), tag_s!("\"")), str::from_utf8)
-    >> (Token::StringLiteral(chars))
+    >> (Value::StringLiteral(chars))
 ));
 
 named!(assignment<Token>, do_parse!(
@@ -99,8 +99,11 @@ named!(assignment<Token>, do_parse!(
 
 named!(value<Value>, do_parse!(
     val: alt!(
-        number => { |n| Value::Num(n) }
-        | string => { |s| Value::Str(s) }
+        number => { |n| Value::Number(n) }
+        | char!('~') => { |c| Value::Null }
+        | string_literal
+        | symbol
+        | string => { |s| Value::Keyword(s) }
     )
     >> (val)
 ));
@@ -110,9 +113,6 @@ named!(token<Token>, do_parse!(
         comment => { |c| Token::Comment(c) }
         | char!('[') => { |c| Token::ListBegin }
         | char!(']') => { |c| Token::ListEnd }
-        | char!('~') => { |c| Token::Null }
-        | string_literal
-        | symbol
         | variable
         | assignment
         | value => { |v| Token::Value(v) }
@@ -244,33 +244,49 @@ mod tests {
         assert_eq!(sym.is_err(), true);
     }
 
-    // String literals
+    // Values
 
     #[test]
-    fn test_string_literal() {
-        let txt = token(b"\"baz foo / bar\"");
-        let expected = Token::StringLiteral("baz foo / bar");
+    fn test_value_string_literal() {
+        let txt = value(b"\"baz foo / bar\"");
+        let expected = Value::StringLiteral("baz foo / bar");
         assert_eq!(txt.unwrap(), (&b""[..], expected));
     }
-
-    // Values
 
     #[test]
     fn test_value_float() {
         let sym = value(b"3.2");
-        assert_eq!(sym.unwrap(), (&b""[..], Value::Num(3.2)));
+        assert_eq!(sym.unwrap(), (&b""[..], Value::Number(3.2)));
     }
 
     #[test]
     fn test_value_int() {
         let sym = value(b"3");
-        assert_eq!(sym.unwrap(), (&b""[..], Value::Num(3.0)));
+        assert_eq!(sym.unwrap(), (&b""[..], Value::Number(3.0)));
     }
 
     #[test]
-    fn test_value_str() {
+    fn test_value_function() {
         let sym = value(b"foobar");
-        assert_eq!(sym.unwrap(), (&b""[..], Value::Str("foobar")));
+        assert_eq!(sym.unwrap(), (&b""[..], Value::Keyword("foobar")));
+    }
+
+    #[test]
+    fn test_value_null() {
+        let s = value(b"~");
+        assert_eq!(s.unwrap(), (&b""[..], Value::Null));
+    }
+
+    #[test]
+    fn test_value_symbol() {
+        let s = value(b"'foo");
+        assert_eq!(s.unwrap(), (&b""[..], Value::Symbol("foo")));
+    }
+
+    #[test]
+    fn test_value_symbol_special_chars() {
+        let s = value(b"'f#o_-o");
+        assert_eq!(s.unwrap(), (&b""[..], Value::Symbol("f#o_-o")));
     }
 
     // Comments
@@ -288,12 +304,6 @@ mod tests {
     }
 
     // Tokens
-
-    #[test]
-    fn test_token_null() {
-        let s = token(b"~");
-        assert_eq!(s.unwrap(), (&b""[..], Token::Null));
-    }
 
     #[test]
     fn test_token_list_begin() {
@@ -314,18 +324,6 @@ mod tests {
     }
 
     #[test]
-    fn test_token_symbol() {
-        let s = token(b"'foo");
-        assert_eq!(s.unwrap(), (&b""[..], Token::Symbol("foo")));
-    }
-
-    #[test]
-    fn test_token_symbol_special_chars() {
-        let s = token(b"'f#o_-o");
-        assert_eq!(s.unwrap(), (&b""[..], Token::Symbol("f#o_-o")));
-    }
-
-    #[test]
     fn test_token_assignment() {
         let s = token(b"= $foo");
         assert_eq!(s.unwrap(), (&b""[..], Token::Assignment("foo")));
@@ -336,32 +334,32 @@ mod tests {
     #[test]
     fn test_key_value() {
         let a = key_value(b"foo_foo=bar");
-        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Str("bar"))));
+        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Keyword("bar"))));
 
         let a = key_value(b"foo_foo =bar");
-        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Str("bar"))));
+        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Keyword("bar"))));
 
         let a = key_value(b"foo_foo = bar");
-        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Str("bar"))));
+        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Keyword("bar"))));
 
         let a = key_value(b"foo_foo  =  \nbar ");
-        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Str("bar"))));
+        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Keyword("bar"))));
     }
 
     #[test]
     fn test_key_value_lists() {
         let mut expected = HashMap::new();
-        expected.insert("a", Value::Num(2.0));
-        expected.insert("b", Value::Num(3.0));
-        expected.insert("c", Value::Num(1.0));
+        expected.insert("a", Value::Number(2.0));
+        expected.insert("b", Value::Number(3.0));
+        expected.insert("c", Value::Number(1.0));
 
         let res = key_value_list(b"a=2 b=3 c=1\n").unwrap();
         assert_eq!(res, (&b""[..], expected));
 
         let mut expected = HashMap::new();
-        expected.insert("a", Value::Num(2.0));
-        expected.insert("b", Value::Num(3.0));
-        expected.insert("c", Value::Num(1.0));
+        expected.insert("a", Value::Number(2.0));
+        expected.insert("b", Value::Number(3.0));
+        expected.insert("c", Value::Number(1.0));
 
         let res = key_value_list(b"a =2\n b =3\n c = 1 .");
         assert_eq!(res.unwrap(), (&b"."[..], expected));
@@ -381,8 +379,8 @@ mod tests {
     #[test]
     fn test_globals() {
         let mut expected = HashMap::new();
-        expected.insert("b", Value::Num(3.0));
-        expected.insert("a", Value::Num(2.0));
+        expected.insert("b", Value::Number(3.0));
+        expected.insert("a", Value::Number(2.0));
 
         let res = globals(b".globals b = 3.0 a = 2\n").unwrap();
         assert_eq!(res, (&b""[..], Directive::Globals(expected)));
@@ -395,9 +393,9 @@ mod tests {
             "foobar",
             12,
             vec![
-                Token::Value(Value::Num(12.0)),
-                Token::Value(Value::Num(3.2)),
-                Token::Value(Value::Str("add"))
+                Token::Value(Value::Number(12.0)),
+                Token::Value(Value::Number(3.2)),
+                Token::Value(Value::Keyword("add"))
         ],
         );
         assert_eq!(res.unwrap(), (&b""[..], dir));
@@ -422,9 +420,9 @@ mod tests {
             "foobar",
             12,
             vec![
-                Token::Value(Value::Num(12.0)),
-                Token::Value(Value::Num(3.2)),
-                Token::Value(Value::Str("add"))
+                Token::Value(Value::Number(12.0)),
+                Token::Value(Value::Number(3.2)),
+                Token::Value(Value::Keyword("add"))
             ],
         );
         assert_eq!(res.unwrap(), (&b""[..], dir));
@@ -447,9 +445,9 @@ mod tests {
             "foo",
             0,
             vec![
-                Token::Value(Value::Num(1.0)),
-                Token::Value(Value::Num(2.0)),
-                Token::Value(Value::Str("add"))
+                Token::Value(Value::Number(1.0)),
+                Token::Value(Value::Number(2.0)),
+                Token::Value(Value::Keyword("add"))
             ],
         );
         assert_eq!(res.unwrap(), (&b""[..], dir));
@@ -473,16 +471,16 @@ mod tests {
         );
 
         let mut globals = HashMap::new();
-        globals.insert("a", Value::Num(2.0));
-        globals.insert("b", Value::Num(3.0));
+        globals.insert("a", Value::Number(2.0));
+        globals.insert("b", Value::Number(3.0));
 
         let dirs = vec![
             Directive::Version(1),
             Directive::Globals(globals),
             Directive::Func("foo", 3, vec![
-                Token::Value(Value::Str("add")),
-                Token::Value(Value::Str("binlist")),
-                Token::Value(Value::Str("rev"))
+                Token::Value(Value::Keyword("add")),
+                Token::Value(Value::Keyword("binlist")),
+                Token::Value(Value::Keyword("rev"))
             ])
         ];
 
@@ -504,10 +502,10 @@ mod tests {
         let dirs = vec![
             Directive::Comment("Another comment"),
             Directive::Func("foo", 3, vec![
-                 Token::Value(Value::Str("add")),
-                 Token::Value(Value::Str("binlist")),
+                 Token::Value(Value::Keyword("add")),
+                 Token::Value(Value::Keyword("binlist")),
                  Token::Comment("More comment"),
-                 Token::Value(Value::Str("rev")),
+                 Token::Value(Value::Keyword("rev")),
                  Token::Comment(" Even more")
             ])
         ];
