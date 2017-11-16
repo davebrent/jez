@@ -70,15 +70,9 @@ impl PitchQuantizeFilter {
 
     fn quantize(&self, val: f64) -> f64 {
         let degree = val as usize;
-        let pitches: Vec<usize> = self.scale
-            .iter()
-            .map(|s| {
-                let note = s + self.key;
-                let shift = note / 12;
-                (note % 12) + ((self.octave + shift) * 12)
-            })
-            .collect();
-        pitches[degree % pitches.len()] as f64
+        let len = self.scale.len();
+        let shift = (degree / len) + self.octave;
+        (self.scale[degree % len] + self.key + (shift * 12)) as f64
     }
 }
 
@@ -112,10 +106,22 @@ mod tests {
     }
 
     #[test]
+    fn test_octave() {
+        let f = filter("C", "harmonic_minor", 1);
+        assert_eq!(f.quantize(0.0), 12.0);
+    }
+
+    #[test]
     fn test_wrap_around_pitches() {
         // D Marva = [D, D#, Eb, F#, Ab, A, B, C#]
         let f = filter("D", "marva", 0);
         assert_eq!(f.quantize(0.0) /* 1st degree */, 2.0 /* D */);
         assert_eq!(f.quantize(6.0) /* 6th degree */, 13.0 /* C# */);
+    }
+
+    #[test]
+    fn test_shifting_pitches() {
+        let f = filter("C", "harmonic_minor", 0);
+        assert_eq!(f.quantize(9.0) /* 9th degree */, 15.0 /* D# */);
     }
 }
