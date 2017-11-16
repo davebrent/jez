@@ -22,13 +22,13 @@ impl PitchQuantizeFilter {
         keys.insert(hash_str("C#"), 1);
         keys.insert(hash_str("D"), 2);
         keys.insert(hash_str("D#"), 3);
-        keys.insert(hash_str("Eb"), 4);
-        keys.insert(hash_str("E"), 5);
-        keys.insert(hash_str("F"), 6);
-        keys.insert(hash_str("F#"), 7);
-        keys.insert(hash_str("G"), 8);
-        keys.insert(hash_str("Ab"), 9);
-        keys.insert(hash_str("Bb"), 10);
+        keys.insert(hash_str("E"), 4);
+        keys.insert(hash_str("F"), 5);
+        keys.insert(hash_str("F#"), 6);
+        keys.insert(hash_str("G"), 7);
+        keys.insert(hash_str("G#"), 8);
+        keys.insert(hash_str("A"), 9);
+        keys.insert(hash_str("A#"), 10);
         keys.insert(hash_str("B"), 11);
 
         let (c, cs, d, eb, e, f, fs, g, ab, a, bb, b) =
