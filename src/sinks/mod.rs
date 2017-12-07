@@ -4,6 +4,8 @@ mod jack;
 mod osc;
 #[cfg(feature = "with-portaudio")]
 mod portaudio;
+#[cfg(feature = "with-portmidi")]
+mod portmidi;
 
 use std::any::Any;
 use std::convert::From;
@@ -18,6 +20,8 @@ pub use self::jack::Jack;
 pub use self::osc::Osc;
 #[cfg(feature = "with-portaudio")]
 pub use self::portaudio::Portaudio;
+#[cfg(feature = "with-portmidi")]
+pub use self::portmidi::Portmidi;
 
 pub fn make_sink(name: &str,
                  rb: RingBuffer<AudioBlock>,
@@ -30,6 +34,8 @@ pub fn make_sink(name: &str,
         "osc" => Ok(Box::new(try!(Osc::new(rb, channel)))),
         #[cfg(feature = "with-portaudio")]
         "portaudio" => Ok(Box::new(try!(Portaudio::new(rb, channel)))),
+        #[cfg(feature = "with-portmidi")]
+        "portmidi" => Ok(Box::new(try!(Portmidi::new(rb, channel)))),
         _ => Err(From::from(SysErr::UnknownBackend)),
     }
 }

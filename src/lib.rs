@@ -12,6 +12,8 @@ extern crate libc;
 extern crate nom;
 #[cfg(feature = "with-portaudio")]
 extern crate portaudio;
+#[cfg(feature = "with-portmidi")]
+extern crate portmidi;
 extern crate rand;
 extern crate rosc;
 extern crate serde;

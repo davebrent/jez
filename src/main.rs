@@ -33,6 +33,7 @@ Sinks:
  console
  jack
  portaudio
+ portmidi
  osc
 ";
 
