@@ -10,6 +10,7 @@ extern crate jack;
 extern crate libc;
 #[macro_use]
 extern crate nom;
+#[cfg(feature = "with-portaudio")]
 extern crate portaudio;
 extern crate rand;
 extern crate rosc;
