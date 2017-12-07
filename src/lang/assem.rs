@@ -124,7 +124,7 @@ impl<'a> Assembler<'a> {
                 Token::Value(ref prim) => {
                     let instr = self.pack_value(prim);
                     self.instrs.push(instr);
-                },
+                }
             }
         }
 
