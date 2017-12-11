@@ -303,6 +303,13 @@ fn divide(state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
+pub fn pair(state: &mut InterpState) -> InterpResult {
+    let b = try!(state.pop_num()) as usize;
+    let a = try!(state.pop_num()) as usize;
+    try!(state.push(Value::Pair(a, b)));
+    Ok(None)
+}
+
 fn print(state: &mut InterpState) -> InterpResult {
     let val = try!(state.last());
     println!("{:?}", val);
@@ -353,6 +360,7 @@ impl<S> Interpreter<S> {
         words.insert(hash_str("add"), Keyword::BuiltIn(add));
         words.insert(hash_str("divide"), Keyword::BuiltIn(divide));
         words.insert(hash_str("multiply"), Keyword::BuiltIn(multiply));
+        words.insert(hash_str("pair"), Keyword::BuiltIn(pair));
         words.insert(hash_str("print"), Keyword::BuiltIn(print));
         words.insert(hash_str("subtract"), Keyword::BuiltIn(subtract));
         words.insert(hash_str("drop"), Keyword::BuiltIn(drop));

@@ -31,10 +31,12 @@ pub use self::msgs::{Command, Destination, Event, EventValue};
 pub use self::ring::RingBuffer;
 use self::time::{TimeEvent, TimerUnit};
 use self::words::{ExtKeyword, ExtState, bin_list, block_size, channels, cycle,
-                  degrade, every, gray_code, hop_jump, linear, markov_filter,
-                  midi_out, palindrome, pitch_quantize_filter, rand_range,
-                  rand_seed, repeat, reverse, revision, rotate, sample_rate,
-                  shuffle, simul, synth_out, tracks, wave_table};
+                  degrade, every, gray_code, hop_jump, inter_onset,
+                  intersection, linear, markov_filter, midi_out, onsets,
+                  palindrome, pitch_quantize_filter, rand_range, rand_seed,
+                  range, repeat, reverse, revision, rotate, sample_rate,
+                  shuffle, sieve, simul, symmetric_difference, synth_out,
+                  tracks, union, wave_table};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -107,6 +109,13 @@ impl Machine {
         words.insert("rand_range", rand_range);
         words.insert("markov_filter", markov_filter);
         words.insert("pitch_quantize_filter", pitch_quantize_filter);
+        words.insert("range", range);
+        words.insert("sieve", sieve);
+        words.insert("intersection", intersection);
+        words.insert("union", union);
+        words.insert("symmetric_difference", symmetric_difference);
+        words.insert("inter_onset", inter_onset);
+        words.insert("onsets", onsets);
 
         Machine {
             backend: backend,

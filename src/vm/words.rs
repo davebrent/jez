@@ -1,4 +1,6 @@
 use rand::{Rng, SeedableRng, StdRng};
+use std::collections::BTreeSet;
+use std::iter;
 use std::rc::Rc;
 
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -439,6 +441,147 @@ pub fn pitch_quantize_filter(seq: &mut ExtState,
     Ok(None)
 }
 
+/// Construct a continuous integer sequence from `a` to `b`
+pub fn range(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let b = try!(state.pop_num()) as usize;
+    let a = try!(state.pop_num()) as usize;
+
+    let start = state.heap_len();
+    for i in a..b {
+        state.heap_push(Value::Number(i as f64));
+    }
+
+    let end = state.heap_len();
+    try!(state.push(Value::Pair(start, end)));
+    Ok(None)
+}
+
+/// Apply a residual class to an integer sequence
+pub fn sieve(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let (modulus, shift) = try!(state.pop_pair());
+    let (start, end) = try!(state.pop_pair());
+
+    let next_start = state.heap_len();
+    for ptr in start..end {
+        let val = try!(try!(state.heap_get(ptr)).as_num()) as usize;
+        if val % modulus == shift {
+            state.heap_push(Value::Number(val as f64));
+        }
+    }
+
+    let next_end = state.heap_len();
+    try!(state.push(Value::Pair(next_start, next_end)));
+    Ok(None)
+}
+
+/// Return a new list containing the difference between consecutive elements
+pub fn inter_onset(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let (start, end) = try!(state.pop_pair());
+    let count = end - start;
+    let heap_start = state.heap_len();
+
+    if count == 1 {
+        state.heap_push(Value::Number(0.0));
+    } else if count > 1 {
+        for i in start..end - 1 {
+            let curr = try!(try!(state.heap_get(i)).as_num());
+            let next = try!(try!(state.heap_get(i + 1)).as_num());
+            state.heap_push(Value::Number(next - curr as f64));
+        }
+    }
+
+    let end = state.heap_len();
+    try!(state.push(Value::Pair(heap_start, end)));
+    Ok(None)
+}
+
+/// Return a binary onset representation of a list
+pub fn onsets(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let (start, end) = try!(state.pop_pair());
+    let b = try!(state.pop_num()) as usize;
+    let a = try!(state.pop_num()) as usize;
+
+    let heap_start = state.heap_len();
+
+    if end - start != 0 {
+        let mut out = iter::repeat(0).take(b - a).collect::<Vec<_>>();
+        for i in start..end {
+            let val = try!(try!(state.heap_get(i)).as_num()) as usize;
+            out[val - a] = 1;
+        }
+        for val in out {
+            state.heap_push(Value::Number(f64::from(val)));
+        }
+    }
+
+    let heap_end = state.heap_len();
+    try!(state.push(Value::Pair(heap_start, heap_end)));
+    Ok(None)
+}
+
+pub fn _pop_set(state: &mut InterpState)
+                -> Result<BTreeSet<usize>, RuntimeErr> {
+    let (start, end) = try!(state.pop_pair());
+    let mut output = BTreeSet::new();
+
+    for ptr in start..end {
+        let val = try!(try!(state.heap_get(ptr)).as_num()) as usize;
+        output.insert(val);
+    }
+
+    Ok(output)
+}
+
+/// Perform the intersection ('or') of two lists
+pub fn intersection(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let a = try!(_pop_set(state));
+    let b = try!(_pop_set(state));
+    let vals: Vec<usize> = a.intersection(&b).cloned().collect();
+
+    let start = state.heap_len();
+    for val in vals {
+        state.heap_push(Value::Number(val as f64));
+    }
+
+    let end = state.heap_len();
+    try!(state.push(Value::Pair(start, end)));
+    Ok(None)
+}
+
+/// Perform the union ('and') of two lists
+pub fn union(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let a = try!(_pop_set(state));
+    let b = try!(_pop_set(state));
+    let vals: Vec<usize> = a.union(&b).cloned().collect();
+
+    let start = state.heap_len();
+    for val in vals {
+        state.heap_push(Value::Number(val as f64));
+    }
+
+    let end = state.heap_len();
+    try!(state.push(Value::Pair(start, end)));
+    Ok(None)
+}
+
+/// Perform the symmetric difference ('xor') between two lists
+pub fn symmetric_difference(_: &mut ExtState,
+                            state: &mut InterpState)
+                            -> InterpResult {
+    let a = try!(_pop_set(state));
+    let b = try!(_pop_set(state));
+    let vals: Vec<usize> = a.symmetric_difference(&b).cloned().collect();
+
+    let start = state.heap_len();
+    for val in vals {
+        state.heap_push(Value::Number(val as f64));
+    }
+
+    let end = state.heap_len();
+    try!(state.push(Value::Pair(start, end)));
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -611,5 +754,25 @@ mod tests {
         state.call(0, 1).unwrap();
         revision(&mut seq, &mut state).unwrap();
         assert_eq!(state.pop_num().unwrap(), 99.0);
+    }
+
+    #[test]
+    fn test_range() {
+        let mut state = InterpState::new();
+        let mut seq = ExtState::new();
+        state.call(0, 1).unwrap();
+        state.push(Value::Number(2.0)).unwrap();
+        state.push(Value::Number(6.0)).unwrap();
+        range(&mut seq, &mut state).unwrap();
+        let out = state.heap_slice_mut(0, 4).unwrap();
+        assert_eq!(
+            out,
+            &[
+                Value::Number(2.0),
+                Value::Number(3.0),
+                Value::Number(4.0),
+                Value::Number(5.0),
+            ]
+        );
     }
 }
