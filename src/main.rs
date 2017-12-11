@@ -24,17 +24,19 @@ Usage:
   jez --version
 
 Options:
-  -h --help     Show this screen.
+  -h, --help    Show this screen.
+  --version     Show version.
+  --verbose     Print more output.
   --watch       Reload input file on changes.
   --time=MS     Length of time (in milliseconds) to run for.
   --sink=NAME   Specify the output sink [default: console].
 
 Sinks:
- console
- jack
- portaudio
- portmidi
- osc
+  console
+  jack
+  portaudio
+  portmidi
+  osc
 ";
 
 #[derive(Debug, RustcDecodable)]
@@ -42,65 +44,87 @@ struct Args {
     flag_sink: String,
     flag_time: String,
     flag_watch: bool,
+    flag_verbose: bool,
     flag_version: bool,
     arg_file: String,
 }
 
-fn start_timer(millis: f64, channel: Sender<Command>) {
-    let start = Instant::now();
-    let end = millis_to_dur(millis);
-    let res = Duration::new(0, 1_000_000);
-
-    thread::spawn(move || loop {
-        if start.elapsed() >= end {
-            channel.send(Command::Stop).unwrap();
-            return;
-        }
-        thread::sleep(res);
-    });
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum TaskStatus {
+    Continue,
+    Completed,
 }
 
-fn watch_file(filepath: String, instrs: &[Instr], channel: Sender<Command>) {
-    let instrs = instrs.to_vec();
-    thread::spawn(move || {
-        let dur = Duration::new(1, 0);
-        let meta_data = fs::metadata(filepath.clone()).unwrap();
-        let mod_time = meta_data.modified().expect("File has been deleted");
+type Task = Box<FnMut() -> Result<TaskStatus, JezErr> + Send>;
 
-        loop {
-            let new_meta_data = fs::metadata(filepath.clone()).unwrap();
-            let new_mod_time =
-                new_meta_data.modified().expect("File has been deleted");
+/// Send a `stop` command after a specified period of time
+fn timer_task(millis: f64, channel: Sender<Command>) -> Task {
+    let start = Instant::now();
+    let end = millis_to_dur(millis);
 
-            if new_mod_time != mod_time {
-                if let Ok(mut fp) = fs::File::open(filepath.clone()) {
-                    let mut txt = String::new();
-                    if fp.read_to_string(&mut txt).is_ok() {
-                        if let Ok(next) = make_program(txt.as_str()) {
-                            if instrs != next {
-                                channel.send(Command::Reload).unwrap();
-                                return;
-                            }
-                        }
-                    }
-                }
+    Box::new(move || if start.elapsed() >= end {
+        channel.send(Command::Stop).unwrap();
+        Ok(TaskStatus::Completed)
+    } else {
+        Ok(TaskStatus::Continue)
+    })
+}
+
+/// Send a `reload` command when a program file changes
+fn watcher_task(filepath: String,
+                instrs: Vec<Instr>,
+                channel: Sender<Command>)
+                -> Result<Task, JezErr> {
+    let meta_data = try!(fs::metadata(filepath.clone()));
+    let mod_time = try!(meta_data.modified());
+
+    Ok(Box::new(move || {
+        let new_meta_data = try!(fs::metadata(filepath.clone()));
+        let new_mod_time = try!(new_meta_data.modified());
+
+        if new_mod_time != mod_time {
+            let mut txt = String::new();
+            let mut fp = try!(fs::File::open(filepath.clone()));
+            try!(fp.read_to_string(&mut txt));
+
+            if instrs != try!(make_program(txt.as_str())) {
+                channel.send(Command::Reload).unwrap();
+                return Ok(TaskStatus::Completed);
             }
-
-            thread::sleep(dur);
         }
-    });
+
+        Ok(TaskStatus::Continue)
+    }))
+}
+
+/// Run all tasks until one is completed
+fn run_until_first(tasks: Vec<Task>) {
+    let mut tasks = tasks;
+    let res = Duration::new(0, 1_000_000); // 1ms
+
+    'outer: loop {
+        for task in &mut tasks {
+            let status = match task() {
+                Ok(status) => status,
+                Err(_) => break 'outer,
+            };
+            match status {
+                TaskStatus::Continue => (),
+                TaskStatus::Completed => break 'outer,
+            };
+        }
+        thread::sleep(res);
+    }
 }
 
 fn run_app(args: &Args) -> Result<(), JezErr> {
     let ring = RingBuffer::new(64, AudioBlock::new(64));
 
     let (sink_send, sink_recv) = channel();
-    let mut _sink =
-        try!(make_sink(args.flag_sink.as_ref(), ring.clone(), sink_recv));
+    let mut _sink = try!(make_sink(&args.flag_sink, ring.clone(), sink_recv));
 
     loop {
         let mut txt = String::new();
-
         if args.arg_file.is_empty() {
             try!(io::stdin().read_to_string(&mut txt));
         } else {
@@ -109,16 +133,31 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
         }
 
         let instrs = try!(make_program(txt.as_str()));
+
         let (host_send, host_recv) = channel();
+        let mut tasks: Vec<Task> = vec![];
+
         if args.flag_watch && !args.arg_file.is_empty() {
-            watch_file(args.arg_file.clone(), &instrs, host_send.clone());
+            let task = try!(watcher_task(
+                args.arg_file.clone(),
+                instrs.clone(),
+                host_send.clone(),
+            ));
+            tasks.push(task);
         }
 
         if !args.flag_time.is_empty() {
             match args.flag_time.parse::<f64>() {
-                Ok(time) => start_timer(time, host_send.clone()),
+                Ok(time) => {
+                    let task = timer_task(time, host_send.clone());
+                    tasks.push(task);
+                }
                 Err(_) => return Err(From::from(RuntimeErr::InvalidArgs)),
             }
+        }
+
+        if !tasks.is_empty() {
+            thread::spawn(move || run_until_first(tasks));
         }
 
         let mut machine = Machine::new(
@@ -131,7 +170,11 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
 
         match try!(machine.exec_realtime()) {
             Control::Stop => return Ok(()),
-            _ => continue,
+            _ => {
+                if args.flag_verbose {
+                    println!("Reloading {}", args.arg_file);
+                }
+            }
         }
     }
 }
@@ -140,6 +183,7 @@ fn main() {
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| d.decode())
         .unwrap_or_else(|e| e.exit());
+
     if args.flag_version {
         println!("v0.5.0");
         return;
