@@ -316,6 +316,13 @@ fn print(state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
+fn print_heap(state: &mut InterpState) -> InterpResult {
+    let (start, end) = try!(state.pop_pair());
+    let slice = try!(state.heap_slice_mut(start, end));
+    println!("{:?}", slice);
+    Ok(None)
+}
+
 fn drop(state: &mut InterpState) -> InterpResult {
     try!(state.pop());
     Ok(None)
@@ -362,6 +369,7 @@ impl<S> Interpreter<S> {
         words.insert(hash_str("multiply"), Keyword::BuiltIn(multiply));
         words.insert(hash_str("pair"), Keyword::BuiltIn(pair));
         words.insert(hash_str("print"), Keyword::BuiltIn(print));
+        words.insert(hash_str("print_heap"), Keyword::BuiltIn(print_heap));
         words.insert(hash_str("subtract"), Keyword::BuiltIn(subtract));
         words.insert(hash_str("drop"), Keyword::BuiltIn(drop));
         words.insert(hash_str("dup"), Keyword::BuiltIn(duplicate));
