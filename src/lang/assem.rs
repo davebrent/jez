@@ -87,7 +87,7 @@ impl<'a> Assembler<'a> {
             if self.globals.contains_key(key) {
                 return Err(AssemErr::DuplicateVariable);
             }
-            let instr = self.pack_value(&value);
+            let instr = self.pack_value(value);
             self.globals.insert(key, instr);
         }
         Ok(())
