@@ -156,6 +156,10 @@ impl Machine {
 
     pub fn exec_realtime(&mut self) -> Result<Control, JezErr> {
         let (mut signals, mut timers) = try!(self.setup());
+        if self.interp.data.tracks.len() == 0 {
+            return Ok(Control::Stop);
+        }
+
         let handle = thread::spawn(move || {
             let res = Duration::new(0, 1_000_000);
             timers.run_forever(res);
