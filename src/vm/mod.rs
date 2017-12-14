@@ -23,7 +23,7 @@ use lang::hash_str;
 
 pub use self::audio::AudioBlock;
 use self::audio::AudioProcessor;
-pub use self::interp::Instr;
+pub use self::interp::{Instr, InterpState, Value};
 use self::interp::Interpreter;
 pub use self::math::millis_to_dur;
 use self::midi::MidiProcessor;
@@ -61,10 +61,10 @@ struct SignalState {
 }
 
 pub struct Machine {
+    pub interp: Interpreter<ExtState>,
     backend: Sender<Command>,
     bus_recv: Receiver<Command>,
     functions: HashMap<u64, usize>,
-    interp: Interpreter<ExtState>,
     midi: MidiProcessor,
     audio: AudioProcessor,
 }
@@ -179,6 +179,25 @@ impl Machine {
 
         self.flush(&mut signals);
         Ok(Control::Continue)
+    }
+
+    pub fn eval(&mut self, func: &str, rev: usize) -> Result<Value, JezErr> {
+        let func = hash_str(func);
+
+        self.interp.data.revision = rev;
+        self.interp.data.duration = 0.0;
+        self.interp.data.events.clear();
+        self.interp.state.reset();
+
+        match self.interp.eval(self.functions[&func]) {
+            Err(err) => Err(From::from(err)),
+            Ok(val) => {
+                Ok(match val {
+                    Some(val) => val,
+                    None => Value::Null,
+                })
+            }
+        }
     }
 
     fn setup(&mut self) -> Result<(SignalState, TimerUnit<Signal>), JezErr> {

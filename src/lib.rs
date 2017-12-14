@@ -31,7 +31,7 @@ pub use err::JezErr;
 pub use err::RuntimeErr;
 pub use sinks::make_sink;
 pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
-             Instr, Machine, RingBuffer, millis_to_dur};
+             Instr, InterpState, Machine, RingBuffer, Value, millis_to_dur};
 
 pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));
@@ -45,6 +45,27 @@ pub struct Simulation {
     pub delta: Duration,
     pub instructions: Vec<Instr>,
     pub messages: Vec<Command>,
+}
+
+pub fn eval(rev: usize,
+            func: &str,
+            prog: &str)
+            -> Result<(Value, InterpState), JezErr> {
+    let ring = RingBuffer::new(64, AudioBlock::new(64));
+    let (back_send, _) = channel();
+    let (host_send, host_recv) = channel();
+
+    let instrs = try!(make_program(prog));
+    let mut machine = Machine::new(
+        ring,
+        back_send.clone(),
+        host_send.clone(),
+        host_recv,
+        &instrs,
+    );
+
+    let value = try!(machine.eval(func, rev));
+    Ok((value, machine.interp.state))
 }
 
 pub fn simulate(dur: Duration,
@@ -96,6 +117,20 @@ pub extern "C" fn jez_simulate(dur: c_double,
     let dt = millis_to_dur(dt);
     let prog = to_str(prog);
     let out = simulate(dur, dt, prog);
+    let out = CString::new(serde_json::to_string(&out).unwrap()).unwrap();
+    let ptr = out.as_ptr();
+    mem::forget(out);
+    ptr
+}
+
+#[no_mangle]
+pub extern "C" fn jez_eval(rev: usize,
+                           func: *const c_char,
+                           prog: *const c_char)
+                           -> *const c_char {
+    let func = to_str(func);
+    let prog = to_str(prog);
+    let out = eval(rev, func, prog);
     let out = CString::new(serde_json::to_string(&out).unwrap()).unwrap();
     let ptr = out.as_ptr();
     mem::forget(out);

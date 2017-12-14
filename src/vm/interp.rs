@@ -55,8 +55,8 @@ impl Value {
 
 pub type InterpResult = Result<Option<Value>, RuntimeErr>;
 
-#[derive(Debug)]
-struct StackFrame {
+#[derive(Debug, Serialize)]
+pub struct StackFrame {
     stack: Vec<Value>,
     locals: HashMap<u64, usize>,
     ret_addr: usize,
@@ -91,7 +91,7 @@ impl StackFrame {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct InterpState {
     reserved: usize,
     heap: Vec<Value>,
