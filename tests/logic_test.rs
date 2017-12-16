@@ -63,3 +63,26 @@ fn test_sieves_xor() {
 
     assert_eq!(actual, expected);
 }
+
+#[test]
+fn test_onsets() {
+    let (tos, mut state) = eval(
+        0,
+        "
+.version 1
+
+.def main 0:
+  5 10 [0 1 2 7 8 10] onsets
+    ",
+    );
+
+    let (start, end) = tos.as_pair().unwrap();
+    let actual = state.heap_slice_mut(start, end).unwrap().to_vec();
+
+    let expected = vec![0, 0, 1, 1, 0]
+        .iter()
+        .map(|n| Value::Number(f64::from(*n)))
+        .collect::<Vec<_>>();
+
+    assert_eq!(actual, expected);
+}

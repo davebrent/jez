@@ -507,7 +507,9 @@ pub fn onsets(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
         let mut out = iter::repeat(0).take(b - a).collect::<Vec<_>>();
         for i in start..end {
             let val = try!(try!(state.heap_get(i)).as_num()) as usize;
-            out[val - a] = 1;
+            if a <= val && val < b {
+                out[val - a] = 1;
+            }
         }
         for val in out {
             state.heap_push(Value::Number(f64::from(val)));
