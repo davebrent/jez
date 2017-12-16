@@ -45,6 +45,13 @@ impl Value {
         }
     }
 
+    pub fn as_pair(&self) -> Result<(usize, usize), RuntimeErr> {
+        match *self {
+            Value::Pair(a, b) => Ok((a, b)),
+            _ => Err(RuntimeErr::InvalidArgs),
+        }
+    }
+
     pub fn as_sym(&self) -> Result<u64, RuntimeErr> {
         match *self {
             Value::Symbol(sym) => Ok(sym),
