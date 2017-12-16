@@ -156,7 +156,7 @@ impl Machine {
 
     pub fn exec_realtime(&mut self) -> Result<Control, JezErr> {
         let (mut signals, mut timers) = try!(self.setup());
-        if self.interp.data.tracks.len() == 0 {
+        if self.interp.data.tracks.is_empty() {
             return Ok(Control::Stop);
         }
 
