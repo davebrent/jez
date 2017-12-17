@@ -1,6 +1,7 @@
-extern crate docopt;
 extern crate jez;
-extern crate rustc_serialize;
+#[macro_use]
+extern crate serde_derive;
+extern crate docopt;
 
 use std::convert::From;
 use std::fs;
@@ -39,7 +40,7 @@ Sinks:
   osc
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     flag_sink: String,
     flag_time: String,
@@ -181,7 +182,7 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.decode())
+        .and_then(|d| d.deserialize())
         .unwrap_or_else(|e| e.exit());
 
     if args.flag_version {
