@@ -23,7 +23,6 @@ pub use self::portaudio::Portaudio;
 #[cfg(feature = "with-portmidi")]
 pub use self::portmidi::Portmidi;
 
-
 pub fn make_sink(name: &str,
                  rb: RingBuffer<AudioBlock>,
                  channel: Receiver<Command>)

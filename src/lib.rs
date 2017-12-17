@@ -6,7 +6,6 @@ mod vm;
 extern crate byteorder;
 #[cfg(feature = "with-jack")]
 extern crate jack;
-extern crate libc;
 #[macro_use]
 extern crate nom;
 #[cfg(feature = "with-portaudio")]
@@ -20,8 +19,8 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-use libc::{c_char, c_double};
 use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_double};
 use std::str;
 
 use std::mem;
@@ -33,7 +32,6 @@ pub use err::RuntimeErr;
 pub use sinks::make_sink;
 pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
              Instr, Machine, RingBuffer, millis_to_dur};
-
 
 pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));

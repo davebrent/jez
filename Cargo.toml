@@ -15,7 +15,6 @@ crate-type = ["rlib", "dylib"]
 byteorder = "1.1.0"
 docopt = { version = "0.7", optional = true }
 jack = { version = "0.5.0", optional = true }
-libc = "0.2.22"
 nom = "3.1.0"
 portaudio = { version = "0.7.0", optional = true }
 portmidi = { version = "0.2.4", optional = true }
