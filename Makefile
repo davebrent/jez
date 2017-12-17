@@ -4,4 +4,4 @@ format:
 	@rustup run nightly cargo fmt
 
 lint:
-	@rustup run nightly cargo clippy
+	@rustup run nightly cargo clippy --features="binary"

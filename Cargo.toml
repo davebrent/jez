@@ -3,26 +3,31 @@ name = "jez"
 version = "0.5.0"
 authors = ["Dave Poulter <hello@davepoulter.net>"]
 
+[[bin]]
+name = "jez"
+required-features = ["binary"]
+
 [lib]
 name = "jez"
 crate-type = ["rlib", "dylib"]
 
 [dependencies]
 byteorder = "1.1.0"
-docopt = "0.7"
-jack = "0.5.0"
+docopt = { version = "0.7", optional = true }
+jack = { version = "0.5.0", optional = true }
 libc = "0.2.22"
 nom = "3.1.0"
-portaudio = "0.7.0"
-portmidi = "0.2.4"
+portaudio = { version = "0.7.0", optional = true }
+portmidi = { version = "0.2.4", optional = true }
 rand = "0.3.15"
 rosc = "0.1.5"
-rustc-serialize = "0.3"
+rustc-serialize = { version = "0.3", optional = true }
 serde = "1.0.8"
 serde_derive = "1.0.8"
 serde_json = "1.0.2"
 
 [features]
-with-jack = []
-with-portaudio = []
-with-portmidi = []
+binary = ["docopt", "rustc-serialize"]
+with-jack = ["jack"]
+with-portaudio = ["portaudio"]
+with-portmidi = ["portmidi"]

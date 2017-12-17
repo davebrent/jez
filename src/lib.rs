@@ -4,7 +4,6 @@ mod sinks;
 mod vm;
 
 extern crate byteorder;
-extern crate docopt;
 #[cfg(feature = "with-jack")]
 extern crate jack;
 extern crate libc;
@@ -34,6 +33,7 @@ pub use err::RuntimeErr;
 pub use sinks::make_sink;
 pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
              Instr, Machine, RingBuffer, millis_to_dur};
+
 
 pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));

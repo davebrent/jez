@@ -1,9 +1,5 @@
 language: rust
 
-before_install:
-  - sudo apt-get update
-  - sudo apt-get install -qq jackd2 libjack-jackd2-dev
-
 rust:
   - stable
   - beta
