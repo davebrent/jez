@@ -1,7 +1,7 @@
 use std::convert::From;
+use std::default::Default;
 use std::ops::DerefMut;
 use std::sync::mpsc::Receiver;
-use std::time::Instant;
 
 use jack::prelude::{AsyncClient, AudioOutPort, AudioOutSpec, Client,
                     JackControl, JackErr, MidiOutPort, MidiOutSpec,
@@ -19,7 +19,6 @@ struct Processor {
     audio_out: Vec<Port<AudioOutSpec>>,
     block: AudioBlock,
     block_size: usize,
-    start: Instant,
 }
 
 pub struct Jack {
@@ -37,12 +36,12 @@ fn make_ports<T>(prefix: &'static str,
                  len: usize)
                  -> Result<Vec<Port<T>>, SysErr>
 where
-    T: PortSpec,
+    T: PortSpec + Default,
 {
     let mut ports = Vec::with_capacity(len);
     for i in 1..len + 1 {
         let name = format!("{}_{}", prefix, i);
-        match client.register_port(name.as_str(), T::default()) {
+        match client.register_port(name.as_str(), Default::default()) {
             Ok(port) => ports.push(port),
             Err(_) => return Err(SysErr::UnreachableBackend),
         };
@@ -65,8 +64,6 @@ impl Processor {
             .collect();
 
         while let Ok(msg) = self.channel.try_recv() {
-            let time = Instant::now() - self.start;
-
             match msg {
                 Command::AudioSettings(channels, block_size, _) => {
                     self.block_size = block_size;
@@ -129,7 +126,7 @@ impl Processor {
             Some(block) => {
                 // If the block is available, de-interleave the buffer into the
                 // temporary block
-                let mut dest = self.block.as_mut_slice();
+                let dest = self.block.as_mut_slice();
                 let src = block.as_slice();
 
                 for channel in 0..channels {
@@ -178,7 +175,6 @@ impl Jack {
             channel: channel,
             midi_out: try!(make_ports("midiout", &client, 1)),
             audio_out: Vec::new(),
-            start: Instant::now(),
         };
 
         Ok(Jack {
