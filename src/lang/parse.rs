@@ -38,6 +38,11 @@ fn string_chars(chr: u8) -> bool {
         chr == '#'
 }
 
+fn end_of_line(byte: u8) -> bool {
+    let c = byte as char;
+    c == '\n'
+}
+
 named!(string<&str>, do_parse!(
     opt!(multispace)
     >> not!(char!('.'))
@@ -48,9 +53,8 @@ named!(string<&str>, do_parse!(
 
 named!(comment<&str>, do_parse!(
     char!(';')
-    >> com: map_res!(
-        terminated!(is_not!("\n"), alt!(eof!() | tag_s!("\n"))),
-        str::from_utf8)
+    >> com: map_res!(take_till!(end_of_line), str::from_utf8)
+    >> opt!(complete!(multispace))
     >> (com)
 ));
 
