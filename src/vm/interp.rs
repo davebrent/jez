@@ -310,6 +310,13 @@ fn divide(state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
+fn modulo(state: &mut InterpState) -> InterpResult {
+    let rhs = try!(state.pop_num());
+    let lhs = try!(state.pop_num());
+    try!(state.push(Value::Number(lhs % rhs)));
+    Ok(None)
+}
+
 pub fn pair(state: &mut InterpState) -> InterpResult {
     let b = try!(state.pop_num()) as usize;
     let a = try!(state.pop_num()) as usize;
@@ -374,6 +381,7 @@ impl<S> Interpreter<S> {
         words.insert(hash_str("add"), Keyword::BuiltIn(add));
         words.insert(hash_str("divide"), Keyword::BuiltIn(divide));
         words.insert(hash_str("multiply"), Keyword::BuiltIn(multiply));
+        words.insert(hash_str("modulo"), Keyword::BuiltIn(modulo));
         words.insert(hash_str("pair"), Keyword::BuiltIn(pair));
         words.insert(hash_str("print"), Keyword::BuiltIn(print));
         words.insert(hash_str("print_heap"), Keyword::BuiltIn(print_heap));
