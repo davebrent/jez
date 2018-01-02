@@ -44,8 +44,8 @@ impl<'a> Assembler<'a> {
                     try!(self.emit_globals(globals))
                 }
                 Directive::Version(ver) => {
-                    if ver != 1 {
-                        return Err(AssemErr::UnsupportedVersion(1));
+                    if ver != 0 {
+                        return Err(AssemErr::UnsupportedVersion(ver));
                     }
                 }
             }
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn test_strings() {
         let dirs = vec![
-            Directive::Version(1),
+            Directive::Version(0),
             Directive::Func(
                 "main",
                 0,
@@ -222,7 +222,7 @@ mod tests {
         globs.insert("a", Value::Number(3.9));
 
         let dirs = vec![
-            Directive::Version(1),
+            Directive::Version(0),
             Directive::Globals(globs),
             Directive::Func(
                 "bar",

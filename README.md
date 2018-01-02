@@ -5,7 +5,7 @@
 A stack machine for sequencing things
 
     $ cat <<EOF | jez
-      .verson 1
+      .verson 0
 
       .def main 0:
         ['track1] tracks

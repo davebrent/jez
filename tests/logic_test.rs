@@ -12,7 +12,7 @@ fn test_sieves_basic() {
     let (tos, mut state) = eval(
         0,
         "
-.version 1
+.version 0
 
 .def main 0:
   0 10 range = $seq
@@ -40,7 +40,7 @@ fn test_sieves_xor() {
     let (tos, mut state) = eval(
         0,
         "
-.version 1
+.version 0
 
 .def main 0:
   0 32 range = $seq
@@ -69,7 +69,7 @@ fn test_onsets() {
     let (tos, mut state) = eval(
         0,
         "
-.version 1
+.version 0
 
 .def main 0:
   5 10 [0 1 2 7 8 10] onsets
@@ -92,7 +92,7 @@ fn test_rotate() {
     let (tos, mut state) = eval(
         0,
         "
-.version 1
+.version 0
 
 .def main 0:
   [ 1 2 3 4 ] 5 rotate

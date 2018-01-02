@@ -44,7 +44,7 @@ fn test_simple_program() {
         dur,
         dt,
         "
-.version 1
+.version 0
 
 .def t1 0:
   [64 66 68 70] 250 1 127 midi_out
@@ -87,7 +87,7 @@ fn test_log_events() {
         dur,
         dt,
         "
-.version 1
+.version 0
 
 .def t1 0:
   [64 ~ 68 ~ 48] 250 1 127 midi_out
