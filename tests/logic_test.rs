@@ -86,3 +86,26 @@ fn test_onsets() {
 
     assert_eq!(actual, expected);
 }
+
+#[test]
+fn test_rotate() {
+    let (tos, mut state) = eval(
+        0,
+        "
+.version 1
+
+.def main 0:
+  [ 1 2 3 4 ] 5 rotate
+    ",
+    );
+
+    let (start, end) = tos.as_pair().unwrap();
+    let actual = state.heap_slice_mut(start, end).unwrap().to_vec();
+
+    let expected = vec![4, 1, 2, 3]
+        .iter()
+        .map(|n| Value::Number(f64::from(*n)))
+        .collect::<Vec<_>>();
+
+    assert_eq!(actual, expected);
+}

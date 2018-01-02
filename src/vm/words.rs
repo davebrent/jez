@@ -126,7 +126,8 @@ pub fn rotate(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let (start, end) = try!(state.last_pair());
 
     let lst = try!(state.heap_slice_mut(start, end)).to_vec();
-    let (a, b) = lst.split_at(lst.len() - amount);
+    let len = lst.len();
+    let (a, b) = lst.split_at(len - (amount % len));
     let mut out = Vec::new();
     out.extend_from_slice(b);
     out.extend_from_slice(a);
