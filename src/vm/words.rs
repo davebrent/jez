@@ -6,16 +6,13 @@ use std::rc::Rc;
 use byteorder::{LittleEndian, WriteBytesExt};
 
 use err::RuntimeErr;
-use lang::hash_str;
 
-use super::audio::AudioContext;
 use super::filters::Filter;
 use super::interp::{InterpResult, InterpState, Value};
 use super::markov::MarkovFilter;
 use super::math::path_to_curve;
 use super::msgs::{Destination, Event, EventValue};
 use super::pitch::PitchQuantizeFilter;
-use super::synths::WaveTable;
 
 pub type ExtKeyword = fn(&mut ExtState, &mut InterpState) -> InterpResult;
 
@@ -42,7 +39,6 @@ pub struct ExtState {
     pub events: Vec<Event>,
     pub tracks: Vec<Track>,
     pub duration: f64,
-    pub audio: AudioContext,
     pub rng: StdRng,
 }
 
@@ -53,7 +49,6 @@ impl ExtState {
             events: Vec::new(),
             tracks: Vec::new(),
             duration: 0.0,
-            audio: AudioContext::new(),
             rng: StdRng::from_seed(&[0, 0, 0, 0]),
         }
     }
@@ -344,53 +339,6 @@ pub fn bin_list(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
 /// Puts the current cycle revision onto the stack
 pub fn revision(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     try!(state.push(Value::Number(seq.revision as f64)));
-    Ok(None)
-}
-
-pub fn channels(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    seq.audio.settings.channels = try!(state.pop_num()) as f32;
-    Ok(None)
-}
-
-pub fn block_size(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    seq.audio.settings.block_size = try!(state.pop_num()) as f32;
-    Ok(None)
-}
-
-pub fn sample_rate(seq: &mut ExtState,
-                   state: &mut InterpState)
-                   -> InterpResult {
-    seq.audio.settings.sample_rate = try!(state.pop_num()) as f32;
-    Ok(None)
-}
-
-pub fn wave_table(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    let len = try!(state.pop_num());
-    let wave = try!(try!(state.pop()).as_sym());
-    let id = try!(try!(state.pop()).as_sym());
-
-    let mut synth = WaveTable::new(len as usize);
-    if wave == hash_str("noise") {
-        synth.noise();
-    } else if wave == hash_str("sine") {
-        synth.sine();
-    } else {
-        return Err(RuntimeErr::InvalidArgs);
-    }
-
-    seq.audio.synths.insert(id, Rc::new(synth));
-    Ok(None)
-}
-
-/// Output synth events
-pub fn synth_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    let param = try!(try!(state.pop()).as_sym());
-    let synth = try!(try!(state.pop()).as_sym());
-    let dur = try!(state.pop_num());
-    let mut events =
-        try!(subdivide(state, dur, Destination::Synth(synth, param)));
-    seq.duration = dur;
-    seq.events.append(&mut events);
     Ok(None)
 }
 

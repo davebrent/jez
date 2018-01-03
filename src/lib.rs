@@ -8,8 +8,6 @@ extern crate byteorder;
 extern crate jack;
 #[macro_use]
 extern crate nom;
-#[cfg(feature = "with-portaudio")]
-extern crate portaudio;
 #[cfg(feature = "with-portmidi")]
 extern crate portmidi;
 extern crate rand;
@@ -30,8 +28,8 @@ use std::time::Duration;
 pub use err::JezErr;
 pub use err::RuntimeErr;
 pub use sinks::make_sink;
-pub use vm::{AudioBlock, Command, Control, Destination, Event, EventValue,
-             Instr, InterpState, Machine, RingBuffer, Value, millis_to_dur};
+pub use vm::{Command, Control, Destination, Event, EventValue, Instr,
+             InterpState, Machine, Value, millis_to_dur};
 
 pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));
@@ -51,18 +49,11 @@ pub fn eval(rev: usize,
             func: &str,
             prog: &str)
             -> Result<(Value, InterpState), JezErr> {
-    let ring = RingBuffer::new(64, AudioBlock::new(64));
     let (back_send, _) = channel();
     let (host_send, host_recv) = channel();
 
     let instrs = try!(make_program(prog));
-    let mut machine = Machine::new(
-        ring,
-        back_send.clone(),
-        host_send.clone(),
-        host_recv,
-        &instrs,
-    );
+    let mut machine = Machine::new(back_send, host_send, host_recv, &instrs);
 
     let value = try!(machine.eval(func, rev));
     Ok((value, machine.interp.state))
@@ -72,19 +63,11 @@ pub fn simulate(dur: Duration,
                 dt: Duration,
                 prog: &str)
                 -> Result<Simulation, JezErr> {
-    let ring = RingBuffer::new(64, AudioBlock::new(64));
-
     let (back_send, back_recv) = channel();
     let (host_send, host_recv) = channel();
 
     let instrs = try!(make_program(prog));
-    let mut machine = Machine::new(
-        ring,
-        back_send.clone(),
-        host_send.clone(),
-        host_recv,
-        &instrs,
-    );
+    let mut machine = Machine::new(back_send, host_send, host_recv, &instrs);
 
     try!(machine.exec(dur, dt));
     let mut msgs = Vec::new();

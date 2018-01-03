@@ -3,7 +3,6 @@ use super::math::Curve;
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Destination {
     Midi(u8, u8),
-    Synth(u64, u64),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
@@ -22,7 +21,6 @@ pub struct Event {
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Command {
-    AudioSettings(usize, usize, usize),
     Event(Event),
     MidiCtl(u8, u8, u8),
     MidiNoteOff(u8, u8),

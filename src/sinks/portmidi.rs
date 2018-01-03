@@ -2,7 +2,7 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 
 use err::SysErr;
-use vm::{AudioBlock, Command, RingBuffer};
+use vm::Command;
 
 use portmidi as pm;
 
@@ -45,9 +45,7 @@ fn dispatch(port: &mut pm::OutputPort, msg: Command) {
 pub struct Portmidi;
 
 impl Portmidi {
-    pub fn new(_: RingBuffer<AudioBlock>,
-               channel: Receiver<Command>)
-               -> Result<Self, SysErr> {
+    pub fn new(channel: Receiver<Command>) -> Result<Self, SysErr> {
         thread::spawn(move || {
             let context = pm::PortMidi::new().unwrap();
 

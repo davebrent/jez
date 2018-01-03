@@ -7,7 +7,7 @@ use rosc::{OscMessage, OscPacket, OscType};
 use rosc::encoder;
 
 use err::SysErr;
-use vm::{AudioBlock, Command, RingBuffer};
+use vm::Command;
 
 impl From<Error> for SysErr {
     fn from(_: Error) -> SysErr {
@@ -57,9 +57,7 @@ fn dispatch(sock: &UdpSocket, msg: Command) {
 pub struct Osc;
 
 impl Osc {
-    pub fn new(_: RingBuffer<AudioBlock>,
-               channel: Receiver<Command>)
-               -> Result<Self, SysErr> {
+    pub fn new(channel: Receiver<Command>) -> Result<Self, SysErr> {
         let sock = try!(UdpSocket::bind("127.0.0.1:34254"));
         try!(sock.connect("127.0.0.1:3000"));
         thread::spawn(move || while let Ok(msg) = channel.recv() {

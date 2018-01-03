@@ -13,8 +13,8 @@ use std::time::{Duration, Instant};
 
 use docopt::Docopt;
 
-use jez::{AudioBlock, Command, Control, Instr, JezErr, Machine, RingBuffer,
-          RuntimeErr, make_program, make_sink, millis_to_dur};
+use jez::{Command, Control, Instr, JezErr, Machine, RuntimeErr, make_program,
+          make_sink, millis_to_dur};
 
 const USAGE: &'static str = "
 Jez.
@@ -35,7 +35,6 @@ Options:
 Sinks:
   console
   jack
-  portaudio
   portmidi
   osc
 ";
@@ -119,10 +118,8 @@ fn run_until_first(tasks: Vec<Task>) {
 }
 
 fn run_app(args: &Args) -> Result<(), JezErr> {
-    let ring = RingBuffer::new(64, AudioBlock::new(64));
-
     let (sink_send, sink_recv) = channel();
-    let mut _sink = try!(make_sink(&args.flag_sink, ring.clone(), sink_recv));
+    let mut _sink = try!(make_sink(&args.flag_sink, sink_recv));
 
     loop {
         let mut txt = String::new();
@@ -162,7 +159,6 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
         }
 
         let mut machine = Machine::new(
-            ring.clone(),
             sink_send.clone(),
             host_send.clone(),
             host_recv,

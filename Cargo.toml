@@ -16,7 +16,6 @@ byteorder = "1.2.1"
 docopt = { version = "0.8", optional = true }
 jack = { version = "0.5.6", optional = true }
 nom = "3.2.1"
-portaudio = { version = "0.7.0", optional = true }
 portmidi = { version = "0.2.4", optional = true }
 rand = "0.3.18"
 rosc = "0.1.5"
@@ -27,5 +26,4 @@ serde_json = "1.0.8"
 [features]
 binary = ["docopt"]
 with-jack = ["jack"]
-with-portaudio = ["portaudio"]
 with-portmidi = ["portmidi"]

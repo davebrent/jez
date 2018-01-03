@@ -1,4 +1,3 @@
-mod audio;
 mod filters;
 mod interp;
 mod markov;
@@ -6,8 +5,6 @@ mod math;
 mod msgs;
 mod midi;
 mod pitch;
-mod ring;
-mod synths;
 mod time;
 mod words;
 
@@ -21,22 +18,18 @@ use std::time::Duration;
 use err::{JezErr, RuntimeErr, SysErr};
 use lang::hash_str;
 
-pub use self::audio::AudioBlock;
-use self::audio::AudioProcessor;
 pub use self::interp::{Instr, InterpState, Value};
 use self::interp::Interpreter;
 pub use self::math::millis_to_dur;
 use self::midi::MidiProcessor;
 pub use self::msgs::{Command, Destination, Event, EventValue};
-pub use self::ring::RingBuffer;
 use self::time::{TimeEvent, TimerUnit};
-use self::words::{ExtKeyword, ExtState, bin_list, block_size, channels, cycle,
-                  degrade, every, gray_code, hop_jump, inter_onset,
-                  intersection, linear, markov_filter, midi_out, onsets,
-                  palindrome, pitch_quantize_filter, rand_range, rand_seed,
-                  range, repeat, reverse, revision, rotate, sample_rate,
-                  shuffle, sieve, simul, symmetric_difference, synth_out,
-                  tracks, union, wave_table};
+use self::words::{ExtKeyword, ExtState, bin_list, cycle, degrade, every,
+                  gray_code, hop_jump, inter_onset, intersection, linear,
+                  markov_filter, midi_out, onsets, palindrome,
+                  pitch_quantize_filter, rand_range, rand_seed, range, repeat,
+                  reverse, revision, rotate, shuffle, sieve, simul,
+                  symmetric_difference, tracks, union};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -47,7 +40,6 @@ pub enum Control {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum Signal {
-    Audio,
     Midi,
     Bus,
     Event(Event),
@@ -66,12 +58,10 @@ pub struct Machine {
     bus_recv: Receiver<Command>,
     functions: HashMap<u64, usize>,
     midi: MidiProcessor,
-    audio: AudioProcessor,
 }
 
 impl Machine {
-    pub fn new(ring: RingBuffer<AudioBlock>,
-               backend: Sender<Command>,
+    pub fn new(backend: Sender<Command>,
                bus_send: Sender<Command>,
                bus_recv: Receiver<Command>,
                instrs: &[Instr])
@@ -100,11 +90,6 @@ impl Machine {
         words.insert("simul", simul);
         words.insert("midi_out", midi_out);
         words.insert("tracks", tracks);
-        words.insert("channels", channels);
-        words.insert("block_size", block_size);
-        words.insert("sample_rate", sample_rate);
-        words.insert("wave_table", wave_table);
-        words.insert("synth_out", synth_out);
         words.insert("rand_seed", rand_seed);
         words.insert("rand_range", rand_range);
         words.insert("markov_filter", markov_filter);
@@ -123,7 +108,6 @@ impl Machine {
             functions: funcs,
             interp: Interpreter::new(instrs.to_vec(), words, ExtState::new()),
             midi: MidiProcessor::new(bus_send.clone()),
-            audio: AudioProcessor::new(ring, bus_send.clone()),
         }
     }
 
@@ -220,12 +204,6 @@ impl Machine {
         self.interp.state.reset();
         try!(self.interp.eval(self.functions[&hash_str("main")]));
 
-        // Allow `main` to override default audio settings and schedule the
-        // signal at the desired audio rate
-        self.audio.configure(self.interp.data.audio.clone());
-        self.interp.data.audio.synths.clear();
-        timers.interval(self.audio.interval(), Signal::Audio);
-
         // Schedule track functions to be interpreted
         for track in &self.interp.data.tracks {
             let track = Signal::Track(track.id, 0, track.func);
@@ -249,7 +227,6 @@ impl Machine {
         match cmd {
             TimeEvent::Timer(time, signal) => {
                 match signal {
-                    Signal::Audio => self.handle_audio_signal(&time),
                     Signal::Bus => self.handle_bus_signal(signals),
                     Signal::Midi => self.handle_midi_signal(&time),
                     Signal::Event(event) => self.handle_event_signal(event),
@@ -260,14 +237,6 @@ impl Machine {
             }
             _ => Err(From::from(RuntimeErr::InvalidArgs)),
         }
-    }
-
-    // Update audio processor
-    fn handle_audio_signal(&mut self,
-                           elapsed: &Duration)
-                           -> Result<Control, JezErr> {
-        self.audio.update(elapsed);
-        Ok(Control::Continue)
     }
 
     // Read internal and external commands
@@ -288,7 +257,6 @@ impl Machine {
                     return Ok(Control::Reload);
                 }
 
-                Command::AudioSettings(_, _, _) |
                 Command::MidiNoteOn(_, _, _) |
                 Command::MidiNoteOff(_, _) |
                 Command::MidiCtl(_, _, _) => {
@@ -310,10 +278,6 @@ impl Machine {
         match event.dest {
             Destination::Midi(_, _) => {
                 self.midi.process(event);
-                Ok(Control::Continue)
-            }
-            Destination::Synth(_, _) => {
-                self.audio.process(event);
                 Ok(Control::Continue)
             }
         }

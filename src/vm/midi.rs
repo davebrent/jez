@@ -48,7 +48,6 @@ impl MidiProcessor {
     fn handle_trg_event(&mut self, event: Event, ptch: u8) {
         let (chan, vel) = match event.dest {
             Destination::Midi(chan, vel) => (chan, vel),
-            _ => return,
         };
 
         let len = self.off_events.len();
@@ -69,7 +68,6 @@ impl MidiProcessor {
     fn handle_ctl_event(&mut self, event: Event, curve: Curve) {
         let (chan, ctl) = match event.dest {
             Destination::Midi(chan, vel) => (chan, vel),
-            _ => return,
         };
 
         let dur = millis_to_dur(event.dur);
