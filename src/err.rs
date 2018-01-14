@@ -66,17 +66,15 @@ impl fmt::Display for AssemErr {
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum ParseErr {
-    InvalidInput,
-    InvalidSyntax(usize, usize),
-    UnknownToken(usize, usize),
+    Incomplete(usize, usize),
+    UnexpectedToken(usize, usize),
 }
 
 impl Error for ParseErr {
     fn description(&self) -> &str {
         match *self {
-            ParseErr::InvalidInput => "invalid input",
-            ParseErr::InvalidSyntax(_, _) => "invalid syntax",
-            ParseErr::UnknownToken(_, _) => "unknown token",
+            ParseErr::Incomplete(_, _) => "incomplete token",
+            ParseErr::UnexpectedToken(_, _) => "unknown token",
         }
     }
 
@@ -88,11 +86,10 @@ impl Error for ParseErr {
 impl fmt::Display for ParseErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ParseErr::InvalidInput => write!(f, "invalid input"),
-            ParseErr::InvalidSyntax(line, col) => {
-                write!(f, "invalid syntax on line {} col {}", line, col)
+            ParseErr::Incomplete(line, col) => {
+                write!(f, "incomplete token on line {} col {}", line, col)
             }
-            ParseErr::UnknownToken(line, col) => {
+            ParseErr::UnexpectedToken(line, col) => {
                 write!(f, "unknown token on line {} col {}", line, col)
             }
         }
@@ -141,6 +138,7 @@ pub enum JezErr {
     ParseErr(ParseErr),
     RuntimeErr(RuntimeErr),
     SysErr(SysErr),
+    IoErr,
 }
 
 impl From<AssemErr> for JezErr {
@@ -169,7 +167,7 @@ impl From<SysErr> for JezErr {
 
 impl From<io::Error> for JezErr {
     fn from(_: io::Error) -> JezErr {
-        JezErr::ParseErr(ParseErr::InvalidInput)
+        JezErr::IoErr
     }
 }
 
@@ -180,6 +178,7 @@ impl Error for JezErr {
             JezErr::ParseErr(ref err) => err.description(),
             JezErr::RuntimeErr(ref err) => err.description(),
             JezErr::SysErr(ref err) => err.description(),
+            JezErr::IoErr => "io error",
         }
     }
 
@@ -189,6 +188,7 @@ impl Error for JezErr {
             JezErr::ParseErr(ref err) => Some(err as &Error),
             JezErr::RuntimeErr(ref err) => Some(err as &Error),
             JezErr::SysErr(ref err) => Some(err as &Error),
+            JezErr::IoErr => None,
         }
     }
 }
@@ -200,6 +200,7 @@ impl fmt::Display for JezErr {
             JezErr::ParseErr(ref err) => write!(f, "Parse error {}", err),
             JezErr::RuntimeErr(ref err) => write!(f, "Runtime error {}", err),
             JezErr::SysErr(ref err) => write!(f, "System error {}", err),
+            JezErr::IoErr => write!(f, "IO error"),
         }
     }
 }

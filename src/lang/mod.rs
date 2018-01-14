@@ -1,4 +1,5 @@
 mod assem;
+mod dirs;
 mod parse;
 
 pub use self::assem::{assemble, hash_str};

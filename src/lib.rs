@@ -6,8 +6,6 @@ mod vm;
 extern crate byteorder;
 #[cfg(feature = "with-jack")]
 extern crate jack;
-#[macro_use]
-extern crate nom;
 #[cfg(feature = "with-portmidi")]
 extern crate portmidi;
 extern crate rand;

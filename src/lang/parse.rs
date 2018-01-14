@@ -1,558 +1,497 @@
-use std::collections::HashMap;
-use std::str;
-
-use nom::{IResult, digit, double, multispace, space};
+use std::error::Error;
+use std::fmt;
 
 use err::ParseErr;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Value<'a> {
-    Number(f64),
-    Symbol(&'a str),
-    Keyword(&'a str),
-    StringLiteral(&'a str),
-    Null,
+use super::dirs::{Argument, Code, Directive, Location, Name, Symbol, Token,
+                  Value};
+
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Status {
+    UnexpectedToken,
+    Incomplete,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Token<'a> {
-    Assignment(&'a str),
-    Comment(&'a str),
-    ListBegin,
-    ListEnd,
-    Value(Value<'a>),
-    Variable(&'a str),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Directive<'a> {
-    Comment(&'a str),
-    Func(&'a str, u64, Vec<Token<'a>>),
-    Globals(HashMap<&'a str, Value<'a>>),
-    Version(u64),
-}
-
-fn string_chars(chr: u8) -> bool {
-    let chr = chr as char;
-    chr.is_alphanumeric() || chr == '-' || chr == '_' || chr == '.' ||
-        chr == '#'
-}
-
-fn end_of_line(byte: u8) -> bool {
-    let c = byte as char;
-    c == '\n'
-}
-
-named!(string<&str>, do_parse!(
-    opt!(multispace)
-    >> not!(char!('.'))
-    >> sym: map_res!(take_while_s!(string_chars), str::from_utf8)
-    >> opt!(complete!(multispace))
-    >> (sym)
-));
-
-named!(comment<&str>, do_parse!(
-    char!(';')
-    >> com: map_res!(take_till!(end_of_line), str::from_utf8)
-    >> opt!(complete!(multispace))
-    >> (com)
-));
-
-named!(unsigned<u64>, map_res!(
-    map_res!(digit, str::from_utf8),
-    str::FromStr::from_str)
-);
-
-named!(integer<f64>, map_res!(
-    map_res!(digit, str::from_utf8),
-    str::FromStr::from_str)
-);
-
-named!(number<f64>, do_parse!(
-    opt!(multispace)
-    >> sym: alt!(complete!(double) | integer)
-    >> opt!(complete!(multispace))
-    >> (sym)
-));
-
-named!(variable<Token>, do_parse!(
-    char!('$')
-    >> sym: string
-    >> (Token::Variable(sym))
-));
-
-named!(symbol<Value>, do_parse!(
-    char!('\'')
-    >> sym: string
-    >> (Value::Symbol(sym))
-));
-
-named!(string_literal<Value>, do_parse!(
-    char!('"')
-    >> chars: map_res!(terminated!(is_not!("\""), tag_s!("\"")), str::from_utf8)
-    >> (Value::StringLiteral(chars))
-));
-
-named!(assignment<Token>, do_parse!(
-    char!('=')
-    >> opt!(multispace)
-    >> char!('$')
-    >> sym: string
-    >> (Token::Assignment(sym))
-));
-
-named!(value<Value>, do_parse!(
-    val: alt!(
-        number => { |n| Value::Number(n) }
-        | char!('~') => { |c| Value::Null }
-        | string_literal
-        | symbol
-        | string => { |s| Value::Keyword(s) }
-    )
-    >> (val)
-));
-
-named!(token<Token>, do_parse!(
-    tk: ws!(alt!(
-        comment => { |c| Token::Comment(c) }
-        | char!('[') => { |c| Token::ListBegin }
-        | char!(']') => { |c| Token::ListEnd }
-        | variable
-        | assignment
-        | value => { |v| Token::Value(v) }
-    ))
-    >> (tk)
-));
-
-named!(key_value <(&str, Value)>, do_parse!(
-    key: string
-    >> char!('=')
-    >> val: value
-    >> (key, val)
-));
-
-named!(key_value_list<HashMap<&str, Value> >,
-  fold_many0!(
-    key_value,
-    HashMap::new(),
-    |mut acc: HashMap<_, _>, item| {
-        let (key, val) = item;
-        acc.insert(key, val);
-        acc
-    }
-  )
-);
-
-named!(version<Directive>, do_parse!(
-    tag!(".version")
-    >> multispace
-    >> version: unsigned
-    >> (Directive::Version(version))
-));
-
-named!(globals<Directive>, do_parse!(
-    tag!(".globals")
-    >> res: key_value_list
-    >> (Directive::Globals(res))
-));
-
-named!(func<Directive>, do_parse!(
-    tag!(".def")
-    >> name: string
-    >> args: unsigned
-    >> opt!(space)
-    >> tag!(":")
-    >> tokens: many0!(token)
-    >> (Directive::Func(name, args, tokens))
-));
-
-named!(directive<Directive>, do_parse!(
-    dir: alt!(
-        comment => {|c| Directive::Comment(c) }
-        | version
-        | globals
-        | func
-    )
-    >> opt!(complete!(multispace))
-    >> (dir)
-));
-
-named!(pub directives<Vec<Directive> >, do_parse!(
-    opt!(multispace)
-    >> dirs: many0!(directive)
-    >> (dirs)
-));
-
-fn cursor_pos(txt: &str, rest: &str) -> (usize, usize) {
-    let mid = txt.len() - rest.len();
-    let mut line = 0;
-    let mut col = 0;
-
-    for (i, ch) in txt.chars().enumerate() {
-        if i == mid {
-            break;
-        } else if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += 1;
+impl Error for Status {
+    fn description(&self) -> &str {
+        match *self {
+            Status::UnexpectedToken => "unknown token",
+            Status::Incomplete => "incomplete",
         }
     }
 
-    (line, col)
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
 }
 
-pub fn parser(txt: &str) -> Result<Vec<Directive>, ParseErr> {
-    match directives(txt.as_bytes()) {
-        IResult::Error(_) => {
-            // XXX: Is this case possible?
-            Err(ParseErr::InvalidInput)
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Status::UnexpectedToken => write!(f, "unknown token"),
+            Status::Incomplete => write!(f, "incomplete"),
         }
-        IResult::Incomplete(_) => {
-            let (line, col) = cursor_pos(txt, "");
-            Err(ParseErr::InvalidSyntax(line, col))
+    }
+}
+
+fn is_alphabetic(chr: char) -> bool {
+    (chr as u8 >= 0x41 && chr as u8 <= 0x5A) ||
+        (chr as u8 >= 0x61 && chr as u8 <= 0x7A)
+}
+
+fn is_digit(chr: char) -> bool {
+    chr as u8 >= 0x30 && chr as u8 <= 0x39
+}
+
+fn is_alphanumeric(chr: char) -> bool {
+    is_alphabetic(chr) || is_digit(chr)
+}
+
+fn is_line_ending(chr: char) -> bool {
+    chr == '\r' || chr == '\n'
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+struct TokenStream<'a> {
+    pub loc: Location,
+    input: &'a str,
+}
+
+impl<'a> TokenStream<'a> {
+    pub fn new(input: &'a str) -> TokenStream {
+        TokenStream {
+            loc: Location::new(1, 0, 0, input.len()),
+            input: input,
         }
-        IResult::Done(rest, dirs) => {
-            if rest.is_empty() {
-                Ok(dirs)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.peek().is_none()
+    }
+
+    pub fn peek(&self) -> Option<(char, Location)> {
+        let mut loc = self.loc.clone();
+        let mut is_comment = false;
+
+        loop {
+            let string = match self.input.get(loc.begin..) {
+                Some(string) => string,
+                None => return None,
+            };
+
+            let tk = match string.chars().next() {
+                Some(tk) => tk,
+                None => return None,
+            };
+
+            if !is_comment && tk == ';' {
+                is_comment = true;
+                loc.begin += tk.len_utf8();
+                loc.col += 1;
+                continue;
+            } else if is_comment && is_line_ending(tk) {
+                is_comment = false;
+            } else if is_comment {
+                loc.begin += tk.len_utf8();
+                loc.col += 1;
+                continue;
+            }
+
+            if tk.is_whitespace() {
+                loc.begin += tk.len_utf8();
+                loc.col += 1;
+
+                if is_line_ending(tk) {
+                    loc.line += 1;
+                    loc.col = 0;
+                }
             } else {
-                let rest = str::from_utf8(rest).unwrap();
-                let (line, col) = cursor_pos(txt, rest);
-                Err(ParseErr::UnknownToken(line, col))
+                loc.end = loc.begin + 1;
+                return Some((tk, loc));
             }
         }
     }
+
+    pub fn next(&mut self) -> Option<(char, Location)> {
+        match self.peek() {
+            Some((tk, loc)) => {
+                self.loc.begin = loc.begin + tk.len_utf8();
+                self.loc.col = loc.col + 1;
+                self.loc.line = loc.line;
+                Some((tk, loc))
+            }
+            None => None,
+        }
+    }
+
+    pub fn expect(&mut self, c: char) -> Result<(), Status> {
+        match self.next() {
+            Some((tk, _)) => {
+                if c == tk {
+                    Ok(())
+                } else {
+                    Err(Status::UnexpectedToken)
+                }
+            }
+            None => Err(Status::Incomplete),
+        }
+    }
+
+    pub fn take_while<F>(&mut self, cond: F) -> Option<(&'a str, Location)>
+    where
+        F: Fn(char) -> bool,
+    {
+        let (_, mut loc) = match self.peek() {
+            Some((tk, loc)) => (tk, loc),
+            None => return None,
+        };
+
+        while let Some((token, pos)) = self.peek() {
+            // Encounted white space
+            if pos.end - loc.end > 1 {
+                break;
+            }
+
+            if cond(token) {
+                loc.end = pos.end;
+                self.next().unwrap();
+            } else {
+                break;
+            }
+        }
+
+        match self.input.get(loc.begin..loc.end) {
+            Some(string) => Some((string, loc)),
+            None => None,
+        }
+    }
+}
+
+struct Parser<'c, 's: 'c> {
+    stream: &'c mut TokenStream<'s>,
+}
+
+// Recursive descent parser for the following grammar
+//
+// start: directive*
+//
+// directive : "." name [arg+] [":" code+]
+// name      : "version"       -> version
+//           | "globals"       -> globals
+//           | "def"           -> def
+//           | "track"         -> track
+// arg       : (VARIABLE "=" value) | value
+// ?code     : (symbol | value)
+// value     : SIGNED_NUMBER   -> number
+//           | ESCAPED_STRING  -> string
+//           | WORD            -> word
+//           | "'" WORD        -> hash
+//           | VARIABLE        -> variable
+//
+// symbol    : "["             -> list_begin
+//           | "]"             -> list_end
+//           | "~"             -> null
+//           | "=" VARIABLE    -> assign
+//
+// WORD      : LETTER ("_" | "#" | LETTER | DIGIT)*
+// VARIABLE  : "$" WORD
+//
+// %import common.LETTER
+// %import common.DIGIT
+// %import common.WS
+// %import common.SIGNED_NUMBER
+// %import common.ESCAPED_STRING
+//
+// %ignore WS
+impl<'c, 's: 'c> Parser<'c, 's> {
+    pub fn new(stream: &'c mut TokenStream<'s>) -> Parser<'c, 's> {
+        Parser { stream: stream }
+    }
+
+    pub fn parse(&mut self) -> Result<Vec<Directive<'s>>, ParseErr> {
+        let mut dirs = vec![];
+
+        while !self.stream.is_empty() {
+            match self.parse_directive() {
+                Ok(dir) => dirs.push(dir),
+                Err(status) => {
+                    let line = self.stream.loc.line;
+                    let col = self.stream.loc.col;
+                    match status {
+                        Status::Incomplete => {
+                            return Err(ParseErr::Incomplete(line, col));
+                        }
+                        Status::UnexpectedToken => {
+                            return Err(ParseErr::UnexpectedToken(line, col));
+                        }
+                    }
+                }
+            };
+        }
+
+        Ok(dirs)
+    }
+
+    fn parse_name(&mut self) -> Result<Token<Name>, Status> {
+        let (tk, loc) = match self.stream.take_while(|c| c.is_alphabetic()) {
+            Some(tk) => tk,
+            None => return Err(Status::Incomplete),
+        };
+
+        let name = match tk {
+            "version" => Name::Version,
+            "globals" => Name::Globals,
+            "def" => Name::Def,
+            _ => return Err(Status::UnexpectedToken),
+        };
+
+        Ok(Token::new(name, loc))
+    }
+
+    fn parse_word(&mut self) -> Result<Token<&'s str>, Status> {
+        match self.stream.peek() {
+            Some((token, _)) => {
+                if !is_alphabetic(token) {
+                    return Err(Status::UnexpectedToken);
+                }
+            }
+            None => return Err(Status::Incomplete),
+        };
+
+        let res = self.stream.take_while(|c| {
+            is_alphanumeric(c) || c == '#' || c == '_' || c == '-'
+        });
+
+        match res {
+            Some((string, loc)) => Ok(Token::new(string, loc)),
+            None => Err(Status::Incomplete),
+        }
+    }
+
+    fn parse_value(&mut self) -> Result<Token<Value<'s>>, Status> {
+        let tk = match self.stream.peek() {
+            Some((tk, _)) => tk,
+            None => return Err(Status::Incomplete),
+        };
+
+        let val = match tk {
+            '$' => {
+                let var = try!(self.parse_variable());
+                Token::new(Value::Variable(var.data), var.loc)
+            }
+            '\'' => {
+                try!(self.stream.expect('\''));
+                let word = try!(self.parse_word());
+                Token::new(Value::Symbol(word.data), word.loc)
+            }
+            '"' => {
+                self.stream.next().unwrap(); // "
+                // FIXME: Handle escaping + white space
+                let (string, loc) =
+                    self.stream.take_while(|c| c != '"').unwrap();
+                self.stream.next().unwrap(); // "
+                Token::new(Value::StringLiteral(string), loc)
+            }
+            _ => {
+                if is_digit(tk) || tk == '-' {
+                    let (raw, loc) = self.stream
+                        .take_while(|c| is_digit(c) || c == '-' || c == '.')
+                        .unwrap();
+                    let num = raw.parse::<f64>().unwrap();
+                    Token::new(Value::Number(num), loc)
+                } else {
+                    let word = try!(self.parse_word());
+                    Token::new(Value::Keyword(word.data), word.loc)
+                }
+            }
+        };
+
+        Ok(val)
+    }
+
+    fn parse_arg(&mut self) -> Result<Argument<'s>, Status> {
+        let tk = match self.stream.peek() {
+            Some((tk, _)) => tk,
+            None => return Err(Status::Incomplete),
+        };
+
+        if tk == '$' {
+            let key = try!(self.parse_variable());
+            self.stream.next().unwrap(); // =
+            let val = try!(self.parse_value());
+            Ok(Argument::Kwarg(key, val))
+        } else {
+            let val = try!(self.parse_value());
+            Ok(Argument::Arg(val))
+        }
+    }
+
+    fn parse_variable(&mut self) -> Result<Token<&'s str>, Status> {
+        self.stream.next().unwrap(); // $
+        self.parse_word()
+    }
+
+    fn parse_code(&mut self) -> Result<Token<Code<'s>>, Status> {
+        let (token, loc) = match self.stream.peek() {
+            Some((token, loc)) => (token, loc),
+            None => return Err(Status::Incomplete),
+        };
+
+        let val = match token {
+            '[' => {
+                self.stream.next().unwrap();
+                Token::new(Code::Symbol(Symbol::ListBegin), loc)
+            }
+            ']' => {
+                self.stream.next().unwrap();
+                Token::new(Code::Symbol(Symbol::ListEnd), loc)
+            }
+            '~' => {
+                self.stream.next().unwrap();
+                Token::new(Code::Symbol(Symbol::Null), loc)
+            }
+            '=' => {
+                self.stream.next().unwrap();
+                let var = try!(self.parse_variable());
+                Token::new(Code::Symbol(Symbol::Assign(var.data)), loc)
+            }
+            _ => {
+                let val = try!(self.parse_value());
+                Token::new(Code::Value(val.data), val.loc)
+            }
+        };
+
+        Ok(val)
+    }
+
+    fn parse_directive(&mut self) -> Result<Directive<'s>, Status> {
+        let token = match self.stream.peek() {
+            Some((token, _)) => token,
+            None => return Err(Status::Incomplete),
+        };
+
+        if token != '.' {
+            return Err(Status::UnexpectedToken);
+        }
+
+        self.stream.next().unwrap(); // .
+        let name = try!(self.parse_name());
+        let mut args = vec![];
+        let mut body = vec![];
+
+        while let Some((tk, _)) = self.stream.peek() {
+            if tk == '.' || tk == ':' {
+                break;
+            }
+            let arg = try!(self.parse_arg());
+            args.push(arg);
+        }
+
+        let token = match self.stream.peek() {
+            Some((token, _)) => token,
+            None => return Err(Status::Incomplete),
+        };
+
+        if token == ':' {
+            self.stream.next().unwrap(); // :
+            while let Some((tk, _)) = self.stream.peek() {
+                if tk == '.' {
+                    break;
+                }
+                let code = try!(self.parse_code());
+                body.push(code);
+            }
+        }
+
+        Ok(Directive {
+            name: name,
+            args: args,
+            body: body,
+        })
+    }
+}
+
+pub fn parser(txt: &str) -> Result<Vec<Directive>, ParseErr> {
+    let mut stream = TokenStream::new(txt);
+    let mut parser = Parser::new(&mut stream);
+    parser.parse()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // Text
-
     #[test]
-    fn test_string_underscore() {
-        let sym = string(b"foo_foo");
-        assert_eq!(sym.unwrap(), (&b""[..], "foo_foo"));
+    fn test_stream_next() {
+        let mut ts = TokenStream::new("\n\t.de fu");
+        assert_eq!(ts.next().unwrap(), ('.', Location::new(2, 1, 2, 3)));
+        assert_eq!(ts.next().unwrap(), ('d', Location::new(2, 2, 3, 4)));
+        assert_eq!(ts.next().unwrap(), ('e', Location::new(2, 3, 4, 5)));
+        assert_eq!(ts.next().unwrap(), ('f', Location::new(2, 5, 6, 7)));
+        assert_eq!(ts.next().unwrap(), ('u', Location::new(2, 6, 7, 8)));
     }
 
     #[test]
-    fn test_string_trailing_space() {
-        let sym = string(b"foo_foo- ");
-        assert_eq!(sym.unwrap(), (&b""[..], "foo_foo-"));
+    fn test_stream_peek() {
+        let mut ts = TokenStream::new("\n\t.de fu");
+        assert_eq!(ts.peek().unwrap(), ('.', Location::new(2, 1, 2, 3)));
+        assert_eq!(ts.next().unwrap(), ('.', Location::new(2, 1, 2, 3)));
+        assert_eq!(ts.peek().unwrap(), ('d', Location::new(2, 2, 3, 4)));
+        assert_eq!(ts.next().unwrap(), ('d', Location::new(2, 2, 3, 4)));
+        assert_eq!(ts.peek().unwrap(), ('e', Location::new(2, 3, 4, 5)));
+        assert_eq!(ts.next().unwrap(), ('e', Location::new(2, 3, 4, 5)));
+        assert_eq!(ts.peek().unwrap(), ('f', Location::new(2, 5, 6, 7)));
+        assert_eq!(ts.next().unwrap(), ('f', Location::new(2, 5, 6, 7)));
+        assert_eq!(ts.peek().unwrap(), ('u', Location::new(2, 6, 7, 8)));
+        assert_eq!(ts.next().unwrap(), ('u', Location::new(2, 6, 7, 8)));
     }
 
     #[test]
-    fn test_string_dotprefix() {
-        let sym = string(b".foo_foo");
-        assert_eq!(sym.is_err(), true);
-    }
-
-    // Values
-
-    #[test]
-    fn test_value_string_literal() {
-        let txt = value(b"\"baz foo / bar\"");
-        let expected = Value::StringLiteral("baz foo / bar");
-        assert_eq!(txt.unwrap(), (&b""[..], expected));
+    fn test_stream_next_peek_order() {
+        let mut ts = TokenStream::new("\n\t.de fu");
+        assert_eq!(ts.next().unwrap(), ('.', Location::new(2, 1, 2, 3)));
+        assert_eq!(ts.peek().unwrap(), ('d', Location::new(2, 2, 3, 4)));
     }
 
     #[test]
-    fn test_value_float() {
-        let sym = value(b"3.2");
-        assert_eq!(sym.unwrap(), (&b""[..], Value::Number(3.2)));
+    fn test_stream_take_while_whitespace() {
+        let mut ts = TokenStream::new(" .foo  ");
+        let (tk, loc) = ts.take_while(|_| true).unwrap();
+        assert_eq!(tk, ".foo");
+        assert_eq!(loc, Location::new(1, 1, 1, 5));
+        assert_eq!(ts.next(), None);
     }
 
     #[test]
-    fn test_value_int() {
-        let sym = value(b"3");
-        assert_eq!(sym.unwrap(), (&b""[..], Value::Number(3.0)));
+    fn test_stream_take_while_eof() {
+        let mut ts = TokenStream::new(" .foo");
+        let (tk, _) = ts.take_while(|_| true).unwrap();
+        assert_eq!(tk, ".foo");
+        assert_eq!(ts.next(), None);
     }
 
     #[test]
-    fn test_value_function() {
-        let sym = value(b"foobar");
-        assert_eq!(sym.unwrap(), (&b""[..], Value::Keyword("foobar")));
+    fn test_stream_take_while_multiple() {
+        let mut ts = TokenStream::new("foo bar");
+
+        let (a, loc) = ts.take_while(|_| true).unwrap();
+        assert_eq!(a, "foo");
+        assert_eq!(loc, Location::new(1, 0, 0, 3));
+
+        let (b, loc) = ts.take_while(|_| true).unwrap();
+        assert_eq!(b, "bar");
+        assert_eq!(loc, Location::new(1, 4, 4, 7));
     }
 
     #[test]
-    fn test_value_null() {
-        let s = value(b"~");
-        assert_eq!(s.unwrap(), (&b""[..], Value::Null));
-    }
+    fn test_stream_comments() {
+        let mut ts = TokenStream::new("foo ; comment \nbar");
 
-    #[test]
-    fn test_value_symbol() {
-        let s = value(b"'foo");
-        assert_eq!(s.unwrap(), (&b""[..], Value::Symbol("foo")));
-    }
+        let (a, _) = ts.take_while(|_| true).unwrap();
+        assert_eq!(a, "foo");
 
-    #[test]
-    fn test_value_symbol_special_chars() {
-        let s = value(b"'f#o_-o");
-        assert_eq!(s.unwrap(), (&b""[..], Value::Symbol("f#o_-o")));
-    }
-
-    // Comments
-
-    #[test]
-    fn test_comment_newline() {
-        let com = comment(b"; a comment\n");
-        assert_eq!(com.unwrap(), (&b""[..], " a comment"));
-    }
-
-    #[test]
-    fn test_comment_no_newline() {
-        let com = comment(b"; a comment");
-        assert_eq!(com.unwrap(), (&b""[..], " a comment"));
-    }
-
-    // Tokens
-
-    #[test]
-    fn test_token_list_begin() {
-        let s = token(b"[");
-        assert_eq!(s.unwrap(), (&b""[..], Token::ListBegin));
-    }
-
-    #[test]
-    fn test_token_list_end() {
-        let s = token(b"]");
-        assert_eq!(s.unwrap(), (&b""[..], Token::ListEnd));
-    }
-
-    #[test]
-    fn test_token_variable() {
-        let s = token(b"$foo");
-        assert_eq!(s.unwrap(), (&b""[..], Token::Variable("foo")));
-    }
-
-    #[test]
-    fn test_token_assignment() {
-        let s = token(b"= $foo");
-        assert_eq!(s.unwrap(), (&b""[..], Token::Assignment("foo")));
-    }
-
-    // Key values
-
-    #[test]
-    fn test_key_value() {
-        let a = key_value(b"foo_foo=bar");
-        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Keyword("bar"))));
-
-        let a = key_value(b"foo_foo =bar");
-        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Keyword("bar"))));
-
-        let a = key_value(b"foo_foo = bar");
-        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Keyword("bar"))));
-
-        let a = key_value(b"foo_foo  =  \nbar ");
-        assert_eq!(a.unwrap(), (&b""[..], ("foo_foo", Value::Keyword("bar"))));
-    }
-
-    #[test]
-    fn test_key_value_lists() {
-        let mut expected = HashMap::new();
-        expected.insert("a", Value::Number(2.0));
-        expected.insert("b", Value::Number(3.0));
-        expected.insert("c", Value::Number(1.0));
-
-        let res = key_value_list(b"a=2 b=3 c=1\n").unwrap();
-        assert_eq!(res, (&b""[..], expected));
-
-        let mut expected = HashMap::new();
-        expected.insert("a", Value::Number(2.0));
-        expected.insert("b", Value::Number(3.0));
-        expected.insert("c", Value::Number(1.0));
-
-        let res = key_value_list(b"a =2\n b =3\n c = 1 .");
-        assert_eq!(res.unwrap(), (&b"."[..], expected));
-    }
-
-    // Directives
-
-    #[test]
-    fn test_version() {
-        let res = version(b".version 2   ").unwrap();
-        assert_eq!(res, (&b"   "[..], Directive::Version(2)));
-
-        let res = version(b".version\n2").unwrap();
-        assert_eq!(res, (&b""[..], Directive::Version(2)));
-    }
-
-    #[test]
-    fn test_globals() {
-        let mut expected = HashMap::new();
-        expected.insert("b", Value::Number(3.0));
-        expected.insert("a", Value::Number(2.0));
-
-        let res = globals(b".globals b = 3.0 a = 2\n").unwrap();
-        assert_eq!(res, (&b""[..], Directive::Globals(expected)));
-    }
-
-    #[test]
-    fn test_func_oneline() {
-        let res = func(b".def foobar 12: 12.0 3.2 add\n");
-        let dir = Directive::Func(
-            "foobar",
-            12,
-            vec![
-                Token::Value(Value::Number(12.0)),
-                Token::Value(Value::Number(3.2)),
-                Token::Value(Value::Keyword("add"))
-        ],
-        );
-        assert_eq!(res.unwrap(), (&b""[..], dir));
-    }
-
-    #[test]
-    fn test_func_manylines() {
-        let res = func(
-            b".def foobar 12:\n
-
-          12.0
-
-        \t 3.2
-
-           add
-
-           \n
-        ",
-        );
-
-        let dir = Directive::Func(
-            "foobar",
-            12,
-            vec![
-                Token::Value(Value::Number(12.0)),
-                Token::Value(Value::Number(3.2)),
-                Token::Value(Value::Keyword("add"))
-            ],
-        );
-        assert_eq!(res.unwrap(), (&b""[..], dir));
-    }
-
-    #[test]
-    fn test_directive() {
-        let res = directive(b".version 1  ");
-        assert_eq!(res.unwrap(), (&b""[..], Directive::Version(1)));
-
-        let res = directive(
-            b".def foo 0:
-            1\n
-        2\n
-        add\n
-        ",
-        );
-
-        let dir = Directive::Func(
-            "foo",
-            0,
-            vec![
-                Token::Value(Value::Number(1.0)),
-                Token::Value(Value::Number(2.0)),
-                Token::Value(Value::Keyword("add"))
-            ],
-        );
-        assert_eq!(res.unwrap(), (&b""[..], dir));
-    }
-
-    #[test]
-    fn test_directives() {
-        let res = directives(
-            b"
-
-        .version 1
-
-        .globals a=2
-            b =3
-
-            .def foo 3 : add
-                binlist
-              \t rev
-
-        ",
-        );
-
-        let mut globals = HashMap::new();
-        globals.insert("a", Value::Number(2.0));
-        globals.insert("b", Value::Number(3.0));
-
-        let dirs = vec![
-            Directive::Version(1),
-            Directive::Globals(globals),
-            Directive::Func("foo", 3, vec![
-                Token::Value(Value::Keyword("add")),
-                Token::Value(Value::Keyword("binlist")),
-                Token::Value(Value::Keyword("rev"))
-            ])
-        ];
-
-        assert_eq!(res.unwrap(), (&b""[..], dirs));
-    }
-
-    #[test]
-    fn test_directives_comments() {
-        let res = directives(
-            b"
-        ;Another comment
-        .def foo 3:
-            add binlist
-            ;More comment
-            rev
-        ; Even more",
-        );
-
-        let dirs = vec![
-            Directive::Comment("Another comment"),
-            Directive::Func("foo", 3, vec![
-                 Token::Value(Value::Keyword("add")),
-                 Token::Value(Value::Keyword("binlist")),
-                 Token::Comment("More comment"),
-                 Token::Value(Value::Keyword("rev")),
-                 Token::Comment(" Even more")
-            ])
-        ];
-
-        assert_eq!(res.unwrap(), (&b""[..], dirs));
-    }
-
-    // Errors
-
-    #[test]
-    fn test_incomplete() {
-        let res = parser(
-            "
-.version",
-        );
-        assert!(res.is_err());
-        match res {
-            Err(err) => {
-                assert_eq!(err, ParseErr::InvalidSyntax(1, 8));
-            }
-            _ => (),
-        }
-    }
-
-    #[test]
-    fn test_line_col_nos() {
-        let res = parser(
-            "
-.version 1
-
-.globals a=2 b=3
-     @
-.def foo 3:
-    add binlist rev
-        ",
-        );
-
-        assert!(res.is_err());
-        match res {
-            Err(err) => {
-                assert_eq!(err, ParseErr::UnknownToken(4, 5));
-            }
-            _ => (),
-        }
+        let (b, _) = ts.take_while(|_| true).unwrap();
+        assert_eq!(b, "bar");
     }
 }

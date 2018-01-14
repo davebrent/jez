@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::collections::hash_map::{DefaultHasher, Entry};
 use std::hash::Hasher;
 
-use super::parse::{Directive, Token, Value};
+use super::dirs::{Argument, Code, Directive, Name, Symbol, Value};
 use err::AssemErr;
 use vm::Instr;
+
 
 pub fn hash_str(text: &str) -> u64 {
     let mut hasher = DefaultHasher::new();
@@ -31,32 +32,90 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    pub fn assemble(&mut self,
-                    dirs: &'a [Directive])
-                    -> Result<Vec<Instr>, AssemErr> {
-        for directive in dirs {
-            match *directive {
-                Directive::Comment(_) => (),
-                Directive::Func(name, args, ref words) => {
-                    try!(self.emit_func(name, args, words))
-                }
-                Directive::Globals(ref globals) => {
-                    try!(self.emit_globals(globals))
-                }
-                Directive::Version(ver) => {
-                    if ver != 0 {
-                        return Err(AssemErr::UnsupportedVersion(ver));
+    /// Check the language version matches the expected version
+    fn version_directive(&mut self,
+                         dir: &'a Directive)
+                         -> Result<(), AssemErr> {
+        if dir.args.len() != 1 {
+            return Err(AssemErr::UnsupportedVersion(0));
+        }
+
+        let arg = try!(try!(try!(dir.arg_at(0)).as_value()).as_num());
+        let ver = arg as u64;
+        if ver != 0 {
+            return Err(AssemErr::UnsupportedVersion(ver));
+        }
+
+        Ok(())
+    }
+
+    /// Declare and initialize global variables
+    fn globals_directive(&mut self,
+                         dir: &'a Directive)
+                         -> Result<(), AssemErr> {
+        for token in &dir.args {
+            match *token {
+                Argument::Kwarg(ref key, ref val) => {
+                    if self.globals.contains_key(key.data) {
+                        return Err(AssemErr::DuplicateVariable);
                     }
+                    let instr = self.from_value(&val.data);
+                    self.globals.insert(key.data, instr);
+                }
+                Argument::Arg(_) => {
+                    return Err(AssemErr::DuplicateVariable);
                 }
             }
         }
-        self.emit_footer();
-        Ok(self.instrs.clone())
+        Ok(())
     }
 
-    fn emit_footer(&mut self) {
-        self.instrs.push(Instr::Begin(0));
+    /// Define new keywords/functions
+    fn define_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
+        let name = try!(try!(dir.arg_at(0)).as_value());
+        let name = hash_str(try!(name.as_keyword()));
+        let args = try!(try!(try!(dir.arg_at(1)).as_value()).as_num()) as u64;
 
+        if self.funcs.contains_key(&name) {
+            return Err(AssemErr::DuplicateFunction);
+        }
+
+        self.funcs.insert(name, (args as usize, self.instrs.len()));
+        self.instrs.push(Instr::Begin(name));
+
+        for token in &dir.body {
+            let instr = match token.data {
+                Code::Symbol(sym) => {
+                    match sym {
+                        Symbol::ListBegin => Instr::ListBegin,
+                        Symbol::ListEnd => Instr::ListEnd,
+                        Symbol::Null => Instr::Null,
+                        Symbol::Assign(var) => Instr::StoreVar(hash_str(var)),
+                    }
+                }
+                Code::Value(ref val) => self.from_value(val),
+            };
+            self.instrs.push(instr);
+        }
+
+        self.instrs.push(Instr::Return);
+        self.instrs.push(Instr::End(name));
+        Ok(())
+    }
+
+    pub fn assemble(&mut self,
+                    dirs: &'a [Directive])
+                    -> Result<Vec<Instr>, AssemErr> {
+        for dir in dirs {
+            let res = match dir.name.data {
+                Name::Version => self.version_directive(dir),
+                Name::Globals => self.globals_directive(dir),
+                Name::Def => self.define_directive(dir),
+            };
+            try!(res);
+        }
+
+        self.instrs.push(Instr::Begin(0));
         // Pack global variables deterministicly
         let mut global_keys: Vec<&&str> = self.globals.keys().collect();
         global_keys.sort();
@@ -78,65 +137,15 @@ impl<'a> Assembler<'a> {
 
         self.instrs.push(Instr::Return);
         self.instrs.push(Instr::End(0));
+        Ok(self.instrs.clone())
     }
 
-    fn emit_globals(&mut self,
-                    globals: &'a HashMap<&str, Value>)
-                    -> Result<(), AssemErr> {
-        for (key, value) in globals.iter() {
-            if self.globals.contains_key(key) {
-                return Err(AssemErr::DuplicateVariable);
-            }
-            let instr = self.pack_value(value);
-            self.globals.insert(key, instr);
-        }
-        Ok(())
-    }
-
-    fn emit_func(&mut self,
-                 name: &str,
-                 args: u64,
-                 words: &'a [Token])
-                 -> Result<(), AssemErr> {
-        let name = hash_str(name);
-        if self.funcs.contains_key(&name) {
-            return Err(AssemErr::DuplicateFunction);
-        }
-
-        self.funcs.insert(name, (args as usize, self.instrs.len()));
-        self.instrs.push(Instr::Begin(name));
-
-        for word in words {
-            match *word {
-                Token::Comment(_) => (),
-                Token::ListBegin => {
-                    self.instrs.push(Instr::ListBegin);
-                }
-                Token::ListEnd => {
-                    self.instrs.push(Instr::ListEnd);
-                }
-                Token::Assignment(var) => {
-                    self.instrs.push(Instr::StoreVar(hash_str(var)));
-                }
-                Token::Variable(var) => {
-                    self.instrs.push(Instr::LoadVar(hash_str(var)));
-                }
-                Token::Value(ref prim) => {
-                    let instr = self.pack_value(prim);
-                    self.instrs.push(instr);
-                }
-            }
-        }
-
-        self.instrs.push(Instr::Return);
-        self.instrs.push(Instr::End(name));
-        Ok(())
-    }
-
-    fn pack_value(&mut self, value: &'a Value) -> Instr {
+    fn from_value(&mut self, value: &'a Value) -> Instr {
         match *value {
-            Value::Null => Instr::Null,
+            Value::Variable(var) => Instr::LoadVar(hash_str(var)),
+
             Value::Number(num) => Instr::LoadNumber(num),
+
             Value::StringLiteral(literal) => {
                 let idx = match self.string_map.entry(literal) {
                     Entry::Occupied(o) => *o.get(),
@@ -149,7 +158,9 @@ impl<'a> Assembler<'a> {
                 };
                 Instr::LoadString(idx as u64)
             }
+
             Value::Symbol(var) => Instr::LoadSymbol(hash_str(var)),
+
             Value::Keyword(word) => {
                 let sym = hash_str(word);
                 if self.funcs.contains_key(&sym) {
@@ -170,20 +181,46 @@ pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::dirs::Token;
 
     #[test]
     fn test_strings() {
         let dirs = vec![
-            Directive::Version(0),
-            Directive::Func(
-                "main",
-                0,
-                vec![
-                    Token::Value(Value::StringLiteral("abc")),
-                    Token::Value(Value::StringLiteral("def")),
-                    Token::Value(Value::StringLiteral("abc")),
-                ]
-            ),
+            Directive {
+                name: Token::new(Name::Version, Default::default()),
+                args: vec![
+                    Argument::Arg(
+                        Token::new(Value::Number(0.0), Default::default())
+                    ),
+                ],
+                body: vec![],
+            },
+            Directive {
+                name: Token::new(Name::Def, Default::default()),
+                args: vec![
+                    Argument::Arg(Token::new(
+                        Value::Keyword("main"),
+                        Default::default(),
+                    )),
+                    Argument::Arg(
+                        Token::new(Value::Number(0.0), Default::default())
+                    ),
+                ],
+                body: vec![
+                    Token::new(
+                        Code::Value(Value::StringLiteral("abc")),
+                        Default::default()
+                    ),
+                    Token::new(
+                        Code::Value(Value::StringLiteral("def")),
+                        Default::default()
+                    ),
+                    Token::new(
+                        Code::Value(Value::StringLiteral("abc")),
+                        Default::default()
+                    ),
+                ],
+            },
         ];
 
         let result = assemble(&dirs).unwrap();
@@ -217,29 +254,72 @@ mod tests {
 
     #[test]
     fn test_simple() {
-        let mut globs = HashMap::new();
-        globs.insert("b", Value::Number(2.0));
-        globs.insert("a", Value::Number(3.9));
-
         let dirs = vec![
-            Directive::Version(0),
-            Directive::Globals(globs),
-            Directive::Func(
-                "bar",
-                1,
-                vec![
-                    Token::Value(Value::Number(2.7)),
-                    Token::Value(Value::Keyword("add")),
-                ]
-            ),
-            Directive::Func(
-                "foo",
-                1,
-                vec![
-                    Token::Value(Value::Number(3.6)),
-                    Token::Value(Value::Keyword("bar")),
-                ]
-            ),
+            Directive {
+                name: Token::new(Name::Version, Default::default()),
+                args: vec![
+                    Argument::Arg(
+                        Token::new(Value::Number(0.0), Default::default())
+                    ),
+                ],
+                body: vec![],
+            },
+            Directive {
+                name: Token::new(Name::Globals, Default::default()),
+                args: vec![
+                    Argument::Kwarg(
+                        Token::new("b", Default::default()),
+                        Token::new(Value::Number(2.0), Default::default())
+                    ),
+                    Argument::Kwarg(
+                        Token::new("a", Default::default()),
+                        Token::new(Value::Number(3.9), Default::default())
+                    ),
+                ],
+                body: vec![],
+            },
+            Directive {
+                name: Token::new(Name::Def, Default::default()),
+                args: vec![
+                    Argument::Arg(
+                        Token::new(Value::Keyword("bar"), Default::default())
+                    ),
+                    Argument::Arg(
+                        Token::new(Value::Number(1.0), Default::default())
+                    ),
+                ],
+                body: vec![
+                    Token::new(
+                        Code::Value(Value::Number(2.7)),
+                        Default::default()
+                    ),
+                    Token::new(
+                        Code::Value(Value::Keyword("add")),
+                        Default::default()
+                    ),
+                ],
+            },
+            Directive {
+                name: Token::new(Name::Def, Default::default()),
+                args: vec![
+                    Argument::Arg(
+                        Token::new(Value::Keyword("foo"), Default::default())
+                    ),
+                    Argument::Arg(
+                        Token::new(Value::Number(1.0), Default::default())
+                    ),
+                ],
+                body: vec![
+                    Token::new(
+                        Code::Value(Value::Number(3.6)),
+                        Default::default()
+                    ),
+                    Token::new(
+                        Code::Value(Value::Keyword("bar")),
+                        Default::default()
+                    ),
+                ],
+            },
         ];
 
         let result = assemble(&dirs).unwrap();
