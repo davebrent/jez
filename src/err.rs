@@ -56,7 +56,7 @@ impl fmt::Display for AssemErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             AssemErr::UnsupportedVersion(req) => {
-                write!(f, "unsupported version, requires '{}'", req)
+                write!(f, "unsupported version '{}', requires 0", req)
             }
             AssemErr::DuplicateVariable => write!(f, "duplicate variable"),
             AssemErr::DuplicateFunction => write!(f, "duplicate function"),

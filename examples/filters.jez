@@ -1,4 +1,4 @@
-.version 1
+.version 0
 
 .def main 0:
   ['t1] tracks
