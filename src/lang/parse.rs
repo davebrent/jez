@@ -243,6 +243,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             "version" => Name::Version,
             "globals" => Name::Globals,
             "def" => Name::Def,
+            "track" => Name::Track,
             _ => return Err(Status::UnexpectedToken),
         };
 

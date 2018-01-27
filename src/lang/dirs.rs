@@ -37,6 +37,7 @@ pub enum Name {
     Version,
     Globals,
     Def,
+    Track,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
@@ -104,6 +105,7 @@ impl fmt::Display for Name {
             Name::Version => write!(f, ".version"),
             Name::Def => write!(f, ".def"),
             Name::Globals => write!(f, ".globals"),
+            Name::Track => write!(f, ".track"),
         }
     }
 }

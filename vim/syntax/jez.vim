@@ -5,7 +5,7 @@ if exists("b:current_syntax")
   finish
 endif
 
-syn keyword jezDirective def globals version
+syn keyword jezDirective def globals version track
 syn match jezComment ";.*$"
 
 syntax region jezString start=/"/ end=/"/

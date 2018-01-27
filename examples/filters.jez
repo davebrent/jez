@@ -1,8 +1,7 @@
 .version 0
 
 .def main 0:
-  ['t1] tracks
   't1 1 100 markov_filter
 
-.def t1 0:
+.track t1:
   [1 ~ ~ 1 2 ~ 1 ~] 1000 0 127 midi_out

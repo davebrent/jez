@@ -394,17 +394,6 @@ impl<S> Interpreter<S> {
             words.insert(hash_str(word), Keyword::Extension(*func));
         }
 
-        let instrs_len = instrs.len();
-        let mut inner_main = instrs.len();
-        for (pc, instr) in instrs.iter().enumerate() {
-            if let Instr::Begin(word) = *instr {
-                if word == 0 {
-                    inner_main = pc + 1;
-                    break;
-                }
-            }
-        }
-
         let mut interpreter = Interpreter {
             instrs: instrs,
             words: words,
@@ -413,13 +402,9 @@ impl<S> Interpreter<S> {
             strings: HashMap::new(),
         };
 
-        // This block is created by the assembler so must always succeed
-        if inner_main != instrs_len {
-            interpreter.eval(inner_main).unwrap();
-            interpreter.state.reserved = interpreter.state.heap.len();
-            interpreter.state.reset();
-        }
-
+        interpreter.eval_block(0).ok();
+        interpreter.state.reserved = interpreter.state.heap.len();
+        interpreter.state.reset();
         interpreter
     }
 
@@ -535,6 +520,18 @@ impl<S> Interpreter<S> {
             self.state.pc += 1;
         }
         Ok(None)
+    }
+
+    pub fn eval_block(&mut self, block: u64) -> InterpResult {
+        let instrs = self.instrs.clone();
+        for (pc, instr) in instrs.iter().enumerate() {
+            if let Instr::Begin(word) = *instr {
+                if word == block {
+                    return self.eval(pc + 1);
+                }
+            }
+        }
+        Err(RuntimeErr::InvalidArgs)
     }
 }
 

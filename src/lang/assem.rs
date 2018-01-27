@@ -16,6 +16,7 @@ pub fn hash_str(text: &str) -> u64 {
 struct Assembler<'a> {
     globals: HashMap<&'a str, Instr>,
     funcs: HashMap<u64, (usize, usize)>,
+    tracks: Vec<u64>,
     instrs: Vec<Instr>,
     string_map: HashMap<&'a str, usize>,
     strings: Vec<&'a str>,
@@ -26,6 +27,7 @@ impl<'a> Assembler<'a> {
         Assembler {
             globals: HashMap::new(),
             funcs: HashMap::new(),
+            tracks: Vec::new(),
             instrs: Vec::new(),
             string_map: HashMap::new(),
             strings: Vec::new(),
@@ -75,7 +77,23 @@ impl<'a> Assembler<'a> {
         let name = try!(try!(dir.arg_at(0)).as_value());
         let name = hash_str(try!(name.as_keyword()));
         let args = try!(try!(try!(dir.arg_at(1)).as_value()).as_num()) as u64;
+        self.emit_func(name, args, dir)
+    }
 
+    /// Define new track functions
+    fn track_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
+        let name = try!(try!(dir.arg_at(0)).as_value());
+        let name = hash_str(try!(name.as_keyword()));
+        try!(self.emit_func(name, 0, dir));
+        self.tracks.push(name);
+        Ok(())
+    }
+
+    fn emit_func(&mut self,
+                 name: u64,
+                 args: u64,
+                 dir: &'a Directive)
+                 -> Result<(), AssemErr> {
         if self.funcs.contains_key(&name) {
             return Err(AssemErr::DuplicateFunction);
         }
@@ -111,6 +129,7 @@ impl<'a> Assembler<'a> {
                 Name::Version => self.version_directive(dir),
                 Name::Globals => self.globals_directive(dir),
                 Name::Def => self.define_directive(dir),
+                Name::Track => self.track_directive(dir),
             };
             try!(res);
         }
@@ -134,9 +153,19 @@ impl<'a> Assembler<'a> {
                 self.instrs.push(Instr::RawData(*b));
             }
         }
-
         self.instrs.push(Instr::Return);
         self.instrs.push(Instr::End(0));
+
+        self.instrs.push(Instr::Begin(1));
+        // Return a list of track functions
+        self.instrs.push(Instr::ListBegin);
+        for track in &self.tracks {
+            self.instrs.push(Instr::LoadSymbol(*track));
+        }
+        self.instrs.push(Instr::ListEnd);
+        self.instrs.push(Instr::Return);
+        self.instrs.push(Instr::End(1));
+
         Ok(self.instrs.clone())
     }
 
@@ -244,6 +273,11 @@ mod tests {
             Instr::RawData(102),
             Instr::Return,
             Instr::End(0),
+            Instr::Begin(1),
+            Instr::ListBegin,
+            Instr::ListEnd,
+            Instr::Return,
+            Instr::End(1),
         ];
         assert_eq!(result, instrs);
         let abc = String::from_utf8(vec![97, 32, 98, 32, 99]).unwrap();
@@ -341,6 +375,11 @@ mod tests {
             Instr::StoreGlob(10025803482645881038),
             Instr::Return,
             Instr::End(0),
+            Instr::Begin(1),
+            Instr::ListBegin,
+            Instr::ListEnd,
+            Instr::Return,
+            Instr::End(1),
         ];
         assert_eq!(result, instrs);
     }

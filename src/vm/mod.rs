@@ -24,12 +24,12 @@ pub use self::math::millis_to_dur;
 use self::midi::MidiProcessor;
 pub use self::msgs::{Command, Destination, Event, EventValue};
 use self::time::{TimeEvent, TimerUnit};
-use self::words::{ExtKeyword, ExtState, bin_list, cycle, degrade, every,
-                  gray_code, hop_jump, inter_onset, intersection, linear,
-                  markov_filter, midi_out, onsets, palindrome,
+use self::words::{ExtKeyword, ExtState, Track, bin_list, cycle, degrade,
+                  every, gray_code, hop_jump, inter_onset, intersection,
+                  linear, markov_filter, midi_out, onsets, palindrome,
                   pitch_quantize_filter, rand_range, rand_seed, range, repeat,
                   reverse, revision, rotate, shuffle, sieve, simul,
-                  symmetric_difference, tracks, union};
+                  symmetric_difference, union};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -89,7 +89,6 @@ impl Machine {
         words.insert("shuffle", shuffle);
         words.insert("simul", simul);
         words.insert("midi_out", midi_out);
-        words.insert("tracks", tracks);
         words.insert("rand_seed", rand_seed);
         words.insert("rand_range", rand_range);
         words.insert("markov_filter", markov_filter);
@@ -197,12 +196,28 @@ impl Machine {
         timers.interval(3.0, Signal::Midi);
         timers.interval(2.0, Signal::Bus);
 
+        // Create tracks as defined by block 1
+        match try!(self.interp.eval_block(1)) {
+            Some(val) => {
+                let (start, end) = try!(val.as_pair());
+                for (i, ptr) in (start..end).enumerate() {
+                    let sym =
+                        try!(try!(self.interp.state.heap_get(ptr)).as_sym());
+                    self.interp.data.tracks.push(Track::new(i, sym));
+                }
+            }
+            None => (),
+        };
+
         // Reset interpreter and call into `main`
         self.interp.data.revision = 0;
         self.interp.data.duration = 0.0;
         self.interp.data.events.clear();
         self.interp.state.reset();
-        try!(self.interp.eval(self.functions[&hash_str("main")]));
+        match self.functions.get(&hash_str("main")) {
+            Some(pc) => try!(self.interp.eval(*pc)),
+            None => None,
+        };
 
         // Schedule track functions to be interpreted
         for track in &self.interp.data.tracks {

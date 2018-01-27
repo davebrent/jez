@@ -221,17 +221,6 @@ pub fn simul(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
-/// Define a list of track functions
-pub fn tracks(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    let (start, end) = try!(state.pop_pair());
-    for (i, ptr) in (start..end).enumerate() {
-        let sym = try!(try!(state.heap_get(ptr)).as_sym());
-        let track = Track::new(i, sym);
-        seq.tracks.push(track);
-    }
-    Ok(None)
-}
-
 fn subdivide(state: &mut InterpState,
              dur: f64,
              dest: Destination)
