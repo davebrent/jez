@@ -195,7 +195,7 @@ struct Parser<'c, 's: 'c> {
 //           | "=" VARIABLE    -> assign
 //
 // WORD      : LETTER ("_" | "#" | LETTER | DIGIT)*
-// VARIABLE  : "$" WORD
+// VARIABLE  : "@" WORD
 //
 // %import common.LETTER
 // %import common.DIGIT
@@ -276,7 +276,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         };
 
         let val = match tk {
-            '$' => {
+            '@' => {
                 let var = try!(self.parse_variable());
                 Token::new(Value::Variable(var.data), var.loc)
             }
@@ -316,7 +316,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             None => return Err(Status::Incomplete),
         };
 
-        if tk == '$' {
+        if tk == '@' {
             let key = try!(self.parse_variable());
             self.stream.next().unwrap(); // =
             let val = try!(self.parse_value());
@@ -328,7 +328,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
     }
 
     fn parse_variable(&mut self) -> Result<Token<&'s str>, Status> {
-        self.stream.next().unwrap(); // $
+        self.stream.next().unwrap(); // @
         self.parse_word()
     }
 

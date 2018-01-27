@@ -111,7 +111,7 @@ impl fmt::Display for Name {
 impl<'a> fmt::Display for Value<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Value::Variable(var) => write!(f, "${}", var),
+            Value::Variable(var) => write!(f, "@{}", var),
             Value::Number(num) => write!(f, "{}", num),
             Value::Symbol(sym) => write!(f, "'{}", sym),
             Value::Keyword(word) => write!(f, "{}", word),
@@ -126,7 +126,7 @@ impl<'a> fmt::Display for Symbol<'a> {
             Symbol::ListBegin => write!(f, "["),
             Symbol::ListEnd => write!(f, "]"),
             Symbol::Null => write!(f, "~"),
-            Symbol::Assign(var) => write!(f, "= ${}", var),
+            Symbol::Assign(var) => write!(f, "= @{}", var),
         }
     }
 }
@@ -145,7 +145,7 @@ impl<'a> fmt::Display for Argument<'a> {
         match *self {
             Argument::Arg(val) => write!(f, "{}", val.data),
             Argument::Kwarg(key, val) => {
-                write!(f, "${} = {}", key.data, val.data)
+                write!(f, "@{} = {}", key.data, val.data)
             }
         }
     }

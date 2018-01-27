@@ -15,10 +15,10 @@ fn test_sieves_basic() {
 .version 0
 
 .def main 0:
-  0 10 range = $seq
+  0 10 range = @seq
 
-  $seq 3 2 pair sieve
-  $seq intersection
+  @seq 3 2 pair sieve
+  @seq intersection
 
   0 swap 10 swap onsets
     ",
@@ -43,13 +43,13 @@ fn test_sieves_xor() {
 .version 0
 
 .def main 0:
-  0 32 range = $seq
+  0 32 range = @seq
 
-  $seq 7 3 pair sieve = $seq1
-  $seq 7 5 pair sieve = $seq2
-  $seq 3 0 pair sieve = $seq3
+  @seq 7 3 pair sieve = @seq1
+  @seq 7 5 pair sieve = @seq2
+  @seq 3 0 pair sieve = @seq3
 
-  $seq1 $seq2 union $seq3 symmetric_difference
+  @seq1 @seq2 union @seq3 symmetric_difference
     ",
     );
 
