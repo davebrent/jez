@@ -34,7 +34,6 @@ Options:
 
 Sinks:
   console
-  jack
   portmidi
   osc
 ";

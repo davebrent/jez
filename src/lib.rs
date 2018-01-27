@@ -4,8 +4,6 @@ mod sinks;
 mod vm;
 
 extern crate byteorder;
-#[cfg(feature = "with-jack")]
-extern crate jack;
 #[cfg(feature = "with-portmidi")]
 extern crate portmidi;
 extern crate rand;
