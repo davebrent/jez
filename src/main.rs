@@ -13,24 +13,29 @@ use std::time::{Duration, Instant};
 
 use docopt::Docopt;
 
-use jez::{Command, Control, Instr, JezErr, Machine, RuntimeErr, make_program,
-          make_sink, millis_to_dur};
+use jez::{Command, Control, Instr, JezErr, Machine, RuntimeErr, SinkArgs,
+          make_program, make_sink, millis_to_dur};
 
-const USAGE: &'static str = "
+
+const USAGE: &str = "
 Jez.
 
 Usage:
+  jez [options] list
   jez [options] [<file>]
   jez (-h | --help)
   jez --version
 
 Options:
-  -h, --help    Show this screen.
-  --version     Show version.
-  --verbose     Print more output.
-  --watch       Reload input file on changes.
-  --time=MS     Length of time (in milliseconds) to run for.
-  --sink=NAME   Specify the output sink [default: console].
+  -h, --help            Show this screen.
+  --version             Show version.
+  --verbose             Print more output.
+  --watch               Reload input file on changes.
+  --time=MS             Length of time (in milliseconds) to run for.
+  --sink=NAME           Specify the output sink(s) [default: console].
+  --osc-host=ADDRESS    OSC host address [default: 127.0.0.1:34254].
+  --osc-client=ADDRESS  OSC client address [default: 127.0.0.1:3000].
+  --midi-out=DEVICE     Midi output device id.
 
 Sinks:
   console
@@ -45,7 +50,11 @@ struct Args {
     flag_watch: bool,
     flag_verbose: bool,
     flag_version: bool,
+    flag_osc_host: String,
+    flag_osc_client: String,
+    flag_midi_out: Option<usize>,
     arg_file: String,
+    cmd_list: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -117,8 +126,24 @@ fn run_until_first(tasks: Vec<Task>) {
 }
 
 fn run_app(args: &Args) -> Result<(), JezErr> {
+    let sink_args = SinkArgs::new(
+        &args.flag_osc_host,
+        &args.flag_osc_client,
+        args.flag_midi_out,
+    );
+
+    let mut sink = try!(make_sink(&args.flag_sink, &sink_args));
+
+    if args.cmd_list {
+        let devices = sink.devices();
+        for dev in &devices {
+            println!("{}", dev);
+        }
+        return Ok(());
+    }
+
     let (sink_send, sink_recv) = channel();
-    let mut _sink = try!(make_sink(&args.flag_sink, sink_recv));
+    sink.run_forever(sink_recv);
 
     loop {
         let mut txt = String::new();

@@ -23,9 +23,10 @@ use std::time::Duration;
 
 pub use err::JezErr;
 pub use err::RuntimeErr;
-pub use sinks::make_sink;
+pub use sinks::{SinkArgs, make_sink};
 pub use vm::{Command, Control, Destination, Event, EventValue, Instr,
              InterpState, Machine, Value, millis_to_dur};
+
 
 pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));
