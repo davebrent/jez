@@ -1,15 +1,29 @@
 # Jez
 
-[![Build Status](https://travis-ci.org/davebrent/jez.svg?branch=master)](https://travis-ci.org/davebrent/jez)
+[![Build Status][master]](https://travis-ci.org/davebrent/jez)
 
-A stack machine for sequencing things
+  [master]: https://travis-ci.org/davebrent/jez.svg?branch=master
 
-    $ cat <<EOF | jez
-      .verson 0
+Jez is a text-based step sequencer for generative music.
 
-      .def main 0:
-        ['track1] tracks
+Jez implements a domain specific language for expressing step sequences and
+provides a command-line tool for their playback over Open Sound Control and
+MIDI.
 
-      .def track1 0:
-        [96 ~ 64 ~] 1000 1 127 midi_out
-    EOF
+Nested step sequences are supported, for creating more rhythmically complex
+patterns, and a range of built-in keywords and track effects are provided for
+adding further variation.
+
+**Features**
+
+* Deterministic.
+* Support for Open Sound Control and MIDI.
+* Range of built-in keywords & track effects for manipulating sequences.
+* Support for user defined keywords.
+* Light on system dependencies.
+
+**Plans**
+
+* C API for FFI usage (primarily for Web Assembly).
+* MIDI clock support & other forms of synchronisation.
+* Better documentation and examples.
