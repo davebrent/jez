@@ -24,6 +24,8 @@ pub enum Instr {
     ListEnd,
     ExpBegin,
     ExpEnd,
+    GroupBegin,
+    GroupEnd,
     Null,
 }
 
@@ -33,7 +35,7 @@ pub enum Value {
     Number(f64),
     Symbol(u64),
     Pair(usize, usize),
-    Tuple(usize, usize),
+    Group(usize, usize),
     Expr(usize, usize),
     Str(String),
     Instruction(Instr),
@@ -472,6 +474,12 @@ impl<S> Interpreter<S> {
             Instr::ExpEnd => {
                 list_end(&mut self.state, Instr::ExpBegin, |start, end| {
                     Value::Expr(start, end)
+                })
+            }
+            Instr::GroupBegin => list_begin(&mut self.state, Instr::GroupBegin),
+            Instr::GroupEnd => {
+                list_end(&mut self.state, Instr::GroupBegin, |start, end| {
+                    Value::Group(start, end)
                 })
             }
             Instr::Keyword(word) => {

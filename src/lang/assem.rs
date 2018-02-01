@@ -109,6 +109,8 @@ impl<'a> Assembler<'a> {
                         Symbol::ListEnd => Instr::ListEnd,
                         Symbol::ExpBegin => Instr::ExpBegin,
                         Symbol::ExpEnd => Instr::ExpEnd,
+                        Symbol::GroupBegin => Instr::GroupBegin,
+                        Symbol::GroupEnd => Instr::GroupEnd,
                         Symbol::Null => Instr::Null,
                         Symbol::Assign(var) => Instr::StoreVar(hash_str(var)),
                     }

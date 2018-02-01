@@ -214,13 +214,6 @@ pub fn hop_jump(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
-/// Define a list of simultanious events
-pub fn simul(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    let (start, end) = try!(state.pop_pair());
-    try!(state.push(Value::Tuple(start, end)));
-    Ok(None)
-}
-
 /// Output midi events
 pub fn midi_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
     let chan = try!(state.pop_num()) as u8;
@@ -260,7 +253,7 @@ pub fn midi_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
                     onset += interval;
                 }
             }
-            Value::Tuple(start, end) => {
+            Value::Group(start, end) => {
                 for n in start..end {
                     visit.push((onset, dur, try!(state.heap_get(n))));
                 }
@@ -645,8 +638,7 @@ mod tests {
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
         state.heap_push(Value::Number(3.0));
-        state.push(Value::Pair(0, 3)).unwrap();
-        simul(&mut seq, &mut state).unwrap();
+        state.push(Value::Group(0, 3)).unwrap();
         state.push(Value::Number(1000.0)).unwrap();
         state.push(Value::Number(0.0)).unwrap();
         midi_out(&mut seq, &mut state).unwrap();

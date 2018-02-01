@@ -193,6 +193,8 @@ struct Parser<'c, 's: 'c> {
 //           | "]"             -> list_end
 //           | "("             -> exp_begin
 //           | ")"             -> exp_end
+//           | "{"             -> group_begin
+//           | "}"             -> group_end
 //           | "~"             -> null
 //           | "=" VARIABLE    -> assign
 //
@@ -357,6 +359,14 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             ')' => {
                 self.stream.next().unwrap();
                 Token::new(Code::Symbol(Symbol::ExpEnd), loc)
+            }
+            '{' => {
+                self.stream.next().unwrap();
+                Token::new(Code::Symbol(Symbol::GroupBegin), loc)
+            }
+            '}' => {
+                self.stream.next().unwrap();
+                Token::new(Code::Symbol(Symbol::GroupEnd), loc)
             }
             '~' => {
                 self.stream.next().unwrap();

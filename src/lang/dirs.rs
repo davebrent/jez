@@ -18,6 +18,8 @@ pub enum Symbol<'a> {
     ListEnd,
     ExpBegin,
     ExpEnd,
+    GroupBegin,
+    GroupEnd,
     Null,
     Assign(&'a str),
 }
@@ -131,6 +133,8 @@ impl<'a> fmt::Display for Symbol<'a> {
             Symbol::ListEnd => write!(f, "]"),
             Symbol::ExpBegin => write!(f, "("),
             Symbol::ExpEnd => write!(f, ")"),
+            Symbol::GroupBegin => write!(f, "{{"),
+            Symbol::GroupEnd => write!(f, "}}"),
             Symbol::Null => write!(f, "~"),
             Symbol::Assign(var) => write!(f, "= @{}", var),
         }

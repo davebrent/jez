@@ -28,7 +28,7 @@ use self::words::{ExtKeyword, ExtState, Track, bin_list, cycle, degrade,
                   every, gray_code, hop_jump, inter_onset, intersection,
                   linear, markov_filter, midi_out, onsets, palindrome,
                   pitch_quantize_filter, rand_range, rand_seed, range, repeat,
-                  reverse, revision, rotate, shuffle, sieve, simul,
+                  reverse, revision, rotate, shuffle, sieve,
                   symmetric_difference, union};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -87,7 +87,6 @@ impl Machine {
         words.insert("reverse", reverse);
         words.insert("rotate", rotate);
         words.insert("shuffle", shuffle);
-        words.insert("simul", simul);
         words.insert("midi_out", midi_out);
         words.insert("rand_seed", rand_seed);
         words.insert("rand_range", rand_range);
