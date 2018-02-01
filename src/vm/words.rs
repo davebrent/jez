@@ -221,10 +221,11 @@ pub fn simul(_: &mut ExtState, state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
-fn subdivide(state: &mut InterpState,
-             dur: f64,
-             dest: Destination)
-             -> Result<Vec<Event>, RuntimeErr> {
+/// Output midi events
+pub fn midi_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
+    let chan = try!(state.pop_num()) as u8;
+    let dur = try!(state.pop_num());
+
     let mut output = Vec::new();
 
     let mut visit: Vec<(f64, f64, Value)> = Vec::new();
@@ -234,7 +235,7 @@ fn subdivide(state: &mut InterpState,
         match val {
             Value::Curve(points) => {
                 let event = Event {
-                    dest: dest,
+                    dest: Destination::Midi(chan, 0),
                     onset: onset,
                     dur: dur,
                     value: EventValue::Curve(points),
@@ -244,14 +245,14 @@ fn subdivide(state: &mut InterpState,
             Value::Null => (),
             Value::Number(val) => {
                 let event = Event {
-                    dest: dest,
+                    dest: Destination::Midi(chan, 127),
                     onset: onset,
                     dur: dur,
                     value: EventValue::Trigger(val),
                 };
                 output.push(event);
             }
-            Value::Pair(start, end) => {
+            Value::Expr(start, end) => {
                 let interval = dur / (end - start) as f64;
                 let mut onset = onset;
                 for n in start..end {
@@ -264,22 +265,44 @@ fn subdivide(state: &mut InterpState,
                     visit.push((onset, dur, try!(state.heap_get(n))));
                 }
             }
+            Value::Pair(start, end) => {
+                let len = end - start;
+                if len == 0 || len > 3 {
+                    return Err(RuntimeErr::InvalidArgs);
+                }
+
+                let (value, default) = match try!(state.heap_get(start)) {
+                    Value::Curve(points) => (EventValue::Curve(points), 0),
+                    Value::Number(pitch) => (EventValue::Trigger(pitch), 127),
+                    _ => return Err(RuntimeErr::InvalidArgs),
+                };
+
+                let dest = Destination::Midi(
+                    if len == 3 {
+                        try!(try!(state.heap_get(start + 2)).as_num()) as u8
+                    } else {
+                        chan
+                    },
+                    if len == 2 {
+                        try!(try!(state.heap_get(start + 1)).as_num()) as u8
+                    } else {
+                        default
+                    },
+                );
+
+                output.push(Event {
+                    dest: dest,
+                    onset: onset,
+                    dur: dur,
+                    value: value,
+                });
+            }
             _ => return Err(RuntimeErr::InvalidArgs),
         }
     }
 
-    Ok(output)
-}
-
-/// Output midi events
-pub fn midi_out(seq: &mut ExtState, state: &mut InterpState) -> InterpResult {
-    let extra = try!(state.pop_num()) as u8;
-    let chan = try!(state.pop_num()) as u8;
-    let dur = try!(state.pop_num());
-    let mut events =
-        try!(subdivide(state, dur, Destination::Midi(chan, extra)));
     seq.duration = dur;
-    seq.events.append(&mut events);
+    seq.events.append(&mut output);
     Ok(None)
 }
 
@@ -626,7 +649,6 @@ mod tests {
         simul(&mut seq, &mut state).unwrap();
         state.push(Value::Number(1000.0)).unwrap();
         state.push(Value::Number(0.0)).unwrap();
-        state.push(Value::Number(127.0)).unwrap();
         midi_out(&mut seq, &mut state).unwrap();
 
         assert_eq!(

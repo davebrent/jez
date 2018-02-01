@@ -107,6 +107,8 @@ impl<'a> Assembler<'a> {
                     match sym {
                         Symbol::ListBegin => Instr::ListBegin,
                         Symbol::ListEnd => Instr::ListEnd,
+                        Symbol::ExpBegin => Instr::ExpBegin,
+                        Symbol::ExpEnd => Instr::ExpEnd,
                         Symbol::Null => Instr::Null,
                         Symbol::Assign(var) => Instr::StoreVar(hash_str(var)),
                     }

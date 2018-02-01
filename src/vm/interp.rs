@@ -22,6 +22,8 @@ pub enum Instr {
     Keyword(u64),
     ListBegin,
     ListEnd,
+    ExpBegin,
+    ExpEnd,
     Null,
 }
 
@@ -32,6 +34,7 @@ pub enum Value {
     Symbol(u64),
     Pair(usize, usize),
     Tuple(usize, usize),
+    Expr(usize, usize),
     Str(String),
     Instruction(Instr),
     Curve(Curve),
@@ -356,6 +359,35 @@ fn swap(state: &mut InterpState) -> InterpResult {
     Ok(None)
 }
 
+fn list_begin(state: &mut InterpState, begin: Instr) -> InterpResult {
+    let val = Value::Instruction(begin);
+    try!(state.push(val));
+    Ok(None)
+}
+
+fn list_end<F>(state: &mut InterpState, end: Instr, con: F) -> InterpResult
+where
+    F: Fn(usize, usize) -> Value,
+{
+    let start = state.heap_len();
+    loop {
+        let val = try!(state.pop());
+        match val {
+            Value::Instruction(instr) => {
+                if instr == end {
+                    let end = state.heap_len();
+                    try!(state.push(con(start, end)));
+                    try!(state.heap_slice_mut(start, end)).reverse();
+                    return Ok(None);
+                } else {
+                    state.heap_push(val)
+                }
+            }
+            _ => state.heap_push(val),
+        };
+    }
+}
+
 pub type BuiltInKeyword = fn(&mut InterpState) -> InterpResult;
 pub type ExtKeyword<S> = fn(&mut S, &mut InterpState) -> InterpResult;
 
@@ -430,39 +462,17 @@ impl<S> Interpreter<S> {
                 try!(self.state.push(val));
                 Ok(None)
             }
-            Instr::ListBegin => {
-                let val = Value::Instruction(Instr::ListBegin);
-                try!(self.state.push(val));
-                Ok(None)
-            }
+            Instr::ListBegin => list_begin(&mut self.state, Instr::ListBegin),
             Instr::ListEnd => {
-                let start = self.state.heap_len();
-                loop {
-                    // Loop back through the stack, moving objects to the heap,
-                    // until a 'ListBegin' instruction is reached then, store
-                    // the range on the stack
-                    let val = try!(self.state.pop());
-                    match val {
-                        Value::Instruction(instr) => {
-                            match instr {
-                                Instr::ListBegin => {
-                                    let end = self.state.heap_len();
-                                    let pair = Value::Pair(start, end);
-                                    try!(self.state.push(pair));
-                                    try!(self.state.heap_slice_mut(start, end))
-                                        .reverse();
-                                    return Ok(None);
-                                }
-                                _ => {
-                                    self.state.heap_push(val);
-                                }
-                            }
-                        }
-                        _ => {
-                            self.state.heap_push(val);
-                        }
-                    }
-                }
+                list_end(&mut self.state, Instr::ListBegin, |start, end| {
+                    Value::Pair(start, end)
+                })
+            }
+            Instr::ExpBegin => list_begin(&mut self.state, Instr::ExpBegin),
+            Instr::ExpEnd => {
+                list_end(&mut self.state, Instr::ExpBegin, |start, end| {
+                    Value::Expr(start, end)
+                })
             }
             Instr::Keyword(word) => {
                 // Keywords operate on an implicit stack frame

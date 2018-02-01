@@ -16,6 +16,8 @@ pub enum Value<'a> {
 pub enum Symbol<'a> {
     ListBegin,
     ListEnd,
+    ExpBegin,
+    ExpEnd,
     Null,
     Assign(&'a str),
 }
@@ -127,6 +129,8 @@ impl<'a> fmt::Display for Symbol<'a> {
         match *self {
             Symbol::ListBegin => write!(f, "["),
             Symbol::ListEnd => write!(f, "]"),
+            Symbol::ExpBegin => write!(f, "("),
+            Symbol::ExpEnd => write!(f, ")"),
             Symbol::Null => write!(f, "~"),
             Symbol::Assign(var) => write!(f, "= @{}", var),
         }

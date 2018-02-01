@@ -18,6 +18,8 @@ syntax match jezOpertator "\v\="
 
 syntax match jezDelimiter "\v\["
 syntax match jezDelimiter "\v\]"
+syntax match jezDelimiter "\v\("
+syntax match jezDelimiter "\v\)"
 
 highlight default link jezComment Comment
 highlight default link jezDirective Keyword

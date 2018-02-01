@@ -4,4 +4,4 @@
   't1 1 100 markov_filter
 
 .track t1:
-  [1 ~ ~ 1 2 ~ 1 ~] 1000 0 127 midi_out
+  (1 ~ ~ 1 2 ~ 1 ~) 1000 0 midi_out
