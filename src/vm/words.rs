@@ -11,6 +11,7 @@ use super::filters::Filter;
 use super::interp::{InterpResult, InterpState, Value};
 use super::markov::MarkovFilter;
 use super::math::path_to_curve;
+use super::midi::MidiVelocityMapper;
 use super::msgs::{Destination, Event, EventValue};
 use super::pitch::PitchQuantizeFilter;
 
@@ -392,6 +393,28 @@ pub fn pitch_quantize_filter(seq: &mut ExtState,
     };
 
     track.filters.push(Rc::new(filter));
+    Ok(None)
+}
+
+pub fn midi_velocity_filter(seq: &mut ExtState,
+                            state: &mut InterpState)
+                            -> InterpResult {
+    let param = try!(try!(state.pop()).as_sym());
+    let device = try!(try!(state.pop()).as_sym());
+    let name = try!(try!(state.pop()).as_sym());
+
+    let track = match seq.tracks.iter_mut().find(
+        |ref mut track| track.func == name,
+    ) {
+        Some(track) => track,
+        None => return Err(RuntimeErr::InvalidArgs),
+    };
+
+    match MidiVelocityMapper::new(device, param) {
+        Some(filter) => track.filters.push(Rc::new(filter)),
+        None => return Err(RuntimeErr::InvalidArgs),
+    };
+
     Ok(None)
 }
 

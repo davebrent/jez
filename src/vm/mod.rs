@@ -26,10 +26,10 @@ pub use self::msgs::{Command, Destination, Event, EventValue};
 use self::time::{TimeEvent, TimerUnit};
 use self::words::{ExtKeyword, ExtState, Track, bin_list, cycle, degrade,
                   every, gray_code, hop_jump, inter_onset, intersection,
-                  linear, markov_filter, midi_out, onsets, palindrome,
-                  pitch_quantize_filter, rand_range, rand_seed, range, repeat,
-                  reverse, revision, rotate, shuffle, sieve,
-                  symmetric_difference, union};
+                  linear, markov_filter, midi_out, midi_velocity_filter,
+                  onsets, palindrome, pitch_quantize_filter, rand_range,
+                  rand_seed, range, repeat, reverse, revision, rotate,
+                  shuffle, sieve, symmetric_difference, union};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -99,6 +99,7 @@ impl Machine {
         words.insert("symmetric_difference", symmetric_difference);
         words.insert("inter_onset", inter_onset);
         words.insert("onsets", onsets);
+        words.insert("midi_velocity_filter", midi_velocity_filter);
 
         Machine {
             backend: backend,
