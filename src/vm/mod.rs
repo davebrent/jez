@@ -1,11 +1,9 @@
-mod filters;
+mod fx;
 mod interp;
-mod markov;
 mod math;
-mod msgs;
 mod midi;
-mod pitch;
 mod time;
+mod types;
 mod words;
 
 use std::collections::HashMap;
@@ -22,14 +20,10 @@ pub use self::interp::{Instr, InterpState, Value};
 use self::interp::Interpreter;
 pub use self::math::millis_to_dur;
 use self::midi::MidiProcessor;
-pub use self::msgs::{Command, Destination, Event, EventValue};
 use self::time::{TimeEvent, TimerUnit};
-use self::words::{ExtKeyword, ExtState, Track, bin_list, cycle, degrade,
-                  every, gray_code, hop_jump, inter_onset, intersection,
-                  linear, markov_filter, midi_out, midi_velocity_filter,
-                  onsets, palindrome, pitch_quantize_filter, rand_range,
-                  rand_seed, range, repeat, reverse, revision, rotate,
-                  shuffle, sieve, symmetric_difference, union};
+pub use self::types::{Command, Destination, Event, EventValue};
+use self::types::{SeqState, Track};
+
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -53,7 +47,7 @@ struct SignalState {
 }
 
 pub struct Machine {
-    pub interp: Interpreter<ExtState>,
+    pub interp: Interpreter<SeqState>,
     backend: Sender<Command>,
     bus_recv: Receiver<Command>,
     functions: HashMap<u64, usize>,
@@ -73,39 +67,15 @@ impl Machine {
             }
         }
 
-        let mut words: HashMap<&'static str, ExtKeyword> = HashMap::new();
-        words.insert("bin_list", bin_list);
-        words.insert("cycle", cycle);
-        words.insert("degrade", degrade);
-        words.insert("every", every);
-        words.insert("gray_code", gray_code);
-        words.insert("hop_jump", hop_jump);
-        words.insert("linear", linear);
-        words.insert("palindrome", palindrome);
-        words.insert("repeat", repeat);
-        words.insert("revision", revision);
-        words.insert("reverse", reverse);
-        words.insert("rotate", rotate);
-        words.insert("shuffle", shuffle);
-        words.insert("midi_out", midi_out);
-        words.insert("rand_seed", rand_seed);
-        words.insert("rand_range", rand_range);
-        words.insert("markov_filter", markov_filter);
-        words.insert("pitch_quantize_filter", pitch_quantize_filter);
-        words.insert("range", range);
-        words.insert("sieve", sieve);
-        words.insert("intersection", intersection);
-        words.insert("union", union);
-        words.insert("symmetric_difference", symmetric_difference);
-        words.insert("inter_onset", inter_onset);
-        words.insert("onsets", onsets);
-        words.insert("midi_velocity_filter", midi_velocity_filter);
-
         Machine {
             backend: backend,
             bus_recv: bus_recv,
             functions: funcs,
-            interp: Interpreter::new(instrs.to_vec(), words, ExtState::new()),
+            interp: Interpreter::new(
+                instrs.to_vec(),
+                &words::all(),
+                SeqState::new(),
+            ),
             midi: MidiProcessor::new(bus_send.clone()),
         }
     }

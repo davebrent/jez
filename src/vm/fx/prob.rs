@@ -3,8 +3,8 @@ use std::f64::EPSILON;
 
 use rand::{Rng, StdRng};
 
-use super::filters::Filter;
-use super::msgs::Event;
+use vm::types::{Effect, Event};
+
 
 #[derive(Copy, Clone, Debug)]
 struct State {
@@ -277,7 +277,7 @@ impl MarkovFilter {
     }
 }
 
-impl Filter for MarkovFilter {
+impl Effect for MarkovFilter {
     fn apply(&mut self, dur: f64, events: &[Event]) -> Vec<Event> {
         self.observe(dur, events);
 
@@ -292,7 +292,7 @@ impl Filter for MarkovFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::msgs::{Destination, EventValue};
+    use vm::types::{Destination, EventValue};
 
     use rand::SeedableRng;
 

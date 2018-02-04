@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
 use lang::hash_str;
+use vm::types::{Effect, Event, EventValue};
 
-use super::filters::Filter;
-use super::msgs::{Event, EventValue};
 
 #[derive(Clone, Debug)]
 pub struct PitchQuantizeFilter {
@@ -76,7 +75,7 @@ impl PitchQuantizeFilter {
     }
 }
 
-impl Filter for PitchQuantizeFilter {
+impl Effect for PitchQuantizeFilter {
     fn apply(&mut self, _: f64, events: &[Event]) -> Vec<Event> {
         let mut output = Vec::with_capacity(events.len());
         for event in events {

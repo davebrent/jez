@@ -287,80 +287,6 @@ impl InterpState {
     }
 }
 
-fn add(state: &mut InterpState) -> InterpResult {
-    let rhs = try!(state.pop_num());
-    let lhs = try!(state.pop_num());
-    try!(state.push(Value::Number(lhs + rhs)));
-    Ok(None)
-}
-
-fn subtract(state: &mut InterpState) -> InterpResult {
-    let rhs = try!(state.pop_num());
-    let lhs = try!(state.pop_num());
-    try!(state.push(Value::Number(lhs - rhs)));
-    Ok(None)
-}
-
-fn multiply(state: &mut InterpState) -> InterpResult {
-    let rhs = try!(state.pop_num());
-    let lhs = try!(state.pop_num());
-    try!(state.push(Value::Number(lhs * rhs)));
-    Ok(None)
-}
-
-fn divide(state: &mut InterpState) -> InterpResult {
-    let rhs = try!(state.pop_num());
-    let lhs = try!(state.pop_num());
-    try!(state.push(Value::Number(lhs / rhs)));
-    Ok(None)
-}
-
-fn modulo(state: &mut InterpState) -> InterpResult {
-    let rhs = try!(state.pop_num());
-    let lhs = try!(state.pop_num());
-    try!(state.push(Value::Number(lhs % rhs)));
-    Ok(None)
-}
-
-pub fn pair(state: &mut InterpState) -> InterpResult {
-    let b = try!(state.pop_num()) as usize;
-    let a = try!(state.pop_num()) as usize;
-    try!(state.push(Value::Pair(a, b)));
-    Ok(None)
-}
-
-fn print(state: &mut InterpState) -> InterpResult {
-    let val = try!(state.last());
-    println!("{:?}", val);
-    Ok(None)
-}
-
-fn print_heap(state: &mut InterpState) -> InterpResult {
-    let (start, end) = try!(state.pop_pair());
-    let slice = try!(state.heap_slice_mut(start, end));
-    println!("{:?}", slice);
-    Ok(None)
-}
-
-fn drop(state: &mut InterpState) -> InterpResult {
-    try!(state.pop());
-    Ok(None)
-}
-
-fn duplicate(state: &mut InterpState) -> InterpResult {
-    let val = try!(state.last());
-    try!(state.push(val));
-    Ok(None)
-}
-
-fn swap(state: &mut InterpState) -> InterpResult {
-    let a = try!(state.pop());
-    let b = try!(state.pop());
-    try!(state.push(a));
-    try!(state.push(b));
-    Ok(None)
-}
-
 fn list_begin(state: &mut InterpState, begin: Instr) -> InterpResult {
     let val = Value::Instruction(begin);
     try!(state.push(val));
@@ -390,13 +316,7 @@ where
     }
 }
 
-pub type BuiltInKeyword = fn(&mut InterpState) -> InterpResult;
-pub type ExtKeyword<S> = fn(&mut S, &mut InterpState) -> InterpResult;
-
-pub enum Keyword<S> {
-    BuiltIn(BuiltInKeyword),
-    Extension(ExtKeyword<S>),
-}
+pub type Keyword<S> = fn(&mut S, &mut InterpState) -> InterpResult;
 
 pub struct Interpreter<S> {
     pub data: S,
@@ -408,24 +328,12 @@ pub struct Interpreter<S> {
 
 impl<S> Interpreter<S> {
     pub fn new(instrs: Vec<Instr>,
-               exts: HashMap<&'static str, ExtKeyword<S>>,
+               exts: &HashMap<&'static str, Keyword<S>>,
                data: S)
                -> Interpreter<S> {
         let mut words = HashMap::new();
-        words.insert(hash_str("add"), Keyword::BuiltIn(add));
-        words.insert(hash_str("divide"), Keyword::BuiltIn(divide));
-        words.insert(hash_str("multiply"), Keyword::BuiltIn(multiply));
-        words.insert(hash_str("modulo"), Keyword::BuiltIn(modulo));
-        words.insert(hash_str("pair"), Keyword::BuiltIn(pair));
-        words.insert(hash_str("print"), Keyword::BuiltIn(print));
-        words.insert(hash_str("print_heap"), Keyword::BuiltIn(print_heap));
-        words.insert(hash_str("subtract"), Keyword::BuiltIn(subtract));
-        words.insert(hash_str("drop"), Keyword::BuiltIn(drop));
-        words.insert(hash_str("dup"), Keyword::BuiltIn(duplicate));
-        words.insert(hash_str("swap"), Keyword::BuiltIn(swap));
-
-        for (word, func) in &exts {
-            words.insert(hash_str(word), Keyword::Extension(*func));
+        for (word, func) in exts {
+            words.insert(hash_str(word), *func);
         }
 
         let mut interpreter = Interpreter {
@@ -484,13 +392,8 @@ impl<S> Interpreter<S> {
             }
             Instr::Keyword(word) => {
                 // Keywords operate on an implicit stack frame
-                if let Some(keyword) = self.words.get(&word) {
-                    match *keyword {
-                        Keyword::BuiltIn(func) => func(&mut self.state),
-                        Keyword::Extension(func) => {
-                            func(&mut self.data, &mut self.state)
-                        }
-                    }
+                if let Some(func) = self.words.get(&word) {
+                    func(&mut self.data, &mut self.state)
                 } else {
                     Err(RuntimeErr::UnknownKeyword(word))
                 }
@@ -558,51 +461,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_callables() {
-        let instrs = vec![
-            Instr::Begin(1),
-            Instr::LoadNumber(13.0),
-            Instr::LoadNumber(12.0),
-            Instr::Call(2, 6),
-            Instr::Return,
-            Instr::End(1),
-            Instr::Begin(2),
-            Instr::Keyword(hash_str("add")),
-            Instr::Return,
-            Instr::End(2),
-        ];
-        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
-        let res = interp.eval(1).unwrap();
-        assert_eq!(res.unwrap(), Value::Number(25.0));
-    }
-
-    #[test]
-    fn test_addition() {
-        let instrs = vec![
-            Instr::LoadNumber(3.2),
-            Instr::LoadNumber(2.8),
-            Instr::Keyword(hash_str("add")),
-            Instr::Return,
-        ];
-        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
-        let res = interp.eval(1).unwrap();
-        assert_eq!(res.unwrap(), Value::Number(6.0));
-    }
-
-    #[test]
-    fn test_subtraction() {
-        let instrs = vec![
-            Instr::LoadNumber(2.0),
-            Instr::LoadNumber(3.0),
-            Instr::Keyword(hash_str("subtract")),
-            Instr::Return,
-        ];
-        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
-        let res = interp.eval(1).unwrap();
-        assert_eq!(res.unwrap(), Value::Number(-1.0));
-    }
-
-    #[test]
     fn test_variables() {
         let instrs = vec![
             Instr::LoadNumber(3.0),
@@ -611,20 +469,7 @@ mod tests {
             Instr::LoadVar(hash_str("foo")),
             Instr::Return,
         ];
-        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
-        let res = interp.eval(1).unwrap();
-        assert_eq!(res.unwrap(), Value::Number(3.0));
-    }
-
-    #[test]
-    fn test_swap() {
-        let instrs = vec![
-            Instr::LoadNumber(3.0),
-            Instr::LoadNumber(2.0),
-            Instr::Keyword(hash_str("swap")),
-            Instr::Return,
-        ];
-        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let mut interp = Interpreter::new(instrs, &HashMap::new(), ());
         let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(3.0));
     }
@@ -642,7 +487,7 @@ mod tests {
             Instr::Return,
             Instr::End(0),
         ];
-        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let mut interp = Interpreter::new(instrs, &HashMap::new(), ());
         let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(200.0));
     }
@@ -662,7 +507,7 @@ mod tests {
             Instr::Return,
             Instr::End(0),
         ];
-        let mut interp = Interpreter::new(instrs, HashMap::new(), ());
+        let mut interp = Interpreter::new(instrs, &HashMap::new(), ());
         let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Str(String::from("abc")));
     }
