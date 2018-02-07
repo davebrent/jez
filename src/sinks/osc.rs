@@ -26,6 +26,47 @@ impl Osc {
         try!(sock.connect(client_addr));
         Ok(Osc { sock: sock })
     }
+
+    pub fn encode(cmd: Command) -> Option<Vec<u8>> {
+        match cmd {
+            Command::MidiNoteOn(chn, pitch, vel) => {
+                Some(
+                    encoder::encode(&OscPacket::Message(OscMessage {
+                        addr: "/note_on".to_string(),
+                        args: Some(vec![
+                            OscType::Int(i32::from(chn)),
+                            OscType::Int(i32::from(pitch)),
+                            OscType::Int(i32::from(vel)),
+                        ]),
+                    })).unwrap(),
+                )
+            }
+            Command::MidiNoteOff(chn, pitch) => {
+                Some(
+                    encoder::encode(&OscPacket::Message(OscMessage {
+                        addr: "/note_off".to_string(),
+                        args: Some(vec![
+                            OscType::Int(i32::from(chn)),
+                            OscType::Int(i32::from(pitch)),
+                        ]),
+                    })).unwrap(),
+                )
+            }
+            Command::MidiCtl(chn, ctl, val) => {
+                Some(
+                    encoder::encode(&OscPacket::Message(OscMessage {
+                        addr: "/ctrl".to_string(),
+                        args: Some(vec![
+                            OscType::Int(i32::from(chn)),
+                            OscType::Int(i32::from(ctl)),
+                            OscType::Int(i32::from(val)),
+                        ]),
+                    })).unwrap(),
+                )
+            }
+            _ => None,
+        }
+    }
 }
 
 impl Sink for Osc {
@@ -34,39 +75,8 @@ impl Sink for Osc {
     }
 
     fn recieve(&mut self, cmd: Command) {
-        let buff = match cmd {
-            Command::MidiNoteOn(chn, pitch, vel) => {
-                encoder::encode(&OscPacket::Message(OscMessage {
-                    addr: "/note_on".to_string(),
-                    args: Some(vec![
-                        OscType::Int(i32::from(chn)),
-                        OscType::Int(i32::from(pitch)),
-                        OscType::Int(i32::from(vel)),
-                    ]),
-                })).unwrap()
-            }
-            Command::MidiNoteOff(chn, pitch) => {
-                encoder::encode(&OscPacket::Message(OscMessage {
-                    addr: "/note_off".to_string(),
-                    args: Some(vec![
-                        OscType::Int(i32::from(chn)),
-                        OscType::Int(i32::from(pitch)),
-                    ]),
-                })).unwrap()
-            }
-            Command::MidiCtl(chn, ctl, val) => {
-                encoder::encode(&OscPacket::Message(OscMessage {
-                    addr: "/ctrl".to_string(),
-                    args: Some(vec![
-                        OscType::Int(i32::from(chn)),
-                        OscType::Int(i32::from(ctl)),
-                        OscType::Int(i32::from(val)),
-                    ]),
-                })).unwrap()
-            }
-            _ => return,
-        };
-
-        self.sock.send(&buff).unwrap();
+        if let Some(buff) = Osc::encode(cmd) {
+            self.sock.send(&buff).unwrap();
+        }
     }
 }
