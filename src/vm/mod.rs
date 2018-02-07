@@ -18,7 +18,7 @@ use lang::hash_str;
 
 pub use self::interp::{Instr, InterpState, Value};
 use self::interp::Interpreter;
-pub use self::math::millis_to_dur;
+pub use self::math::{dur_to_millis, millis_to_dur};
 use self::midi::MidiProcessor;
 use self::time::{TimeEvent, TimerUnit};
 pub use self::types::{Command, Destination, Event, EventValue};
@@ -113,10 +113,7 @@ impl Machine {
             return Ok(Control::Stop);
         }
 
-        let handle = thread::spawn(move || {
-            let res = Duration::new(0, 1_000_000);
-            timers.run_forever(res);
-        });
+        let handle = thread::spawn(move || timers.run_forever());
 
         while let Ok(cmd) = signals.input.recv() {
             let status = try!(self.handle_signal(cmd, &mut signals));
@@ -163,8 +160,8 @@ impl Machine {
 
         // Setup timers, schduling the recurring signals (ms)
         let mut timers = TimerUnit::new(timer_to_vm_send, vm_to_timer_recv);
-        timers.interval(3.0, Signal::Midi);
-        timers.interval(2.0, Signal::Bus);
+        timers.interval(2.0, Signal::Midi);
+        timers.interval(0.5, Signal::Bus);
 
         // Create tracks as defined by block 1
         match try!(self.interp.eval_block(1)) {

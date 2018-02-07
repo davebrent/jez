@@ -130,14 +130,16 @@ where
         true
     }
 
-    pub fn run_forever(&mut self, res: Duration) {
+    pub fn run_forever(&mut self) {
         let mut previous = Instant::now();
+        let res = Duration::new(0, 1);
         loop {
             let now = Instant::now();
             let delta = now.duration_since(previous);
 
             if self.tick(&delta) {
                 previous = now;
+                // Sleeping instead of `yield_now` to keep CPU usage down
                 thread::sleep(res);
             } else {
                 break;

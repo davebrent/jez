@@ -5,11 +5,29 @@ use super::math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
 use super::types::{Command, Destination, Event, EventValue};
 
 
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+struct CtrlState {
+    duration: Duration,
+    t: f64,
+    channel: u8,
+    controller: u8,
+    curve: Curve,
+    previous: u8,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+struct NoteState {
+    duration: Duration,
+    channel: u8,
+    pitch: u8,
+}
+
 #[derive(Debug)]
 pub struct MidiProcessor {
     output: Sender<Command>,
-    off_events: Vec<(Duration, u8, u8)>,
-    ctl_events: Vec<(Duration, f64, u8, u8, Curve)>,
+    off_events: Vec<NoteState>,
+    ctl_events: Vec<CtrlState>,
     last_update: Duration,
 }
 
@@ -34,8 +52,9 @@ impl MidiProcessor {
     }
 
     pub fn stop(&mut self) {
-        while let Some((_, chan, pitch)) = self.off_events.pop() {
-            self.output.send(Command::MidiNoteOff(chan, pitch)).ok();
+        while let Some(note) = self.off_events.pop() {
+            let cmd = Command::MidiNoteOff(note.channel, note.pitch);
+            self.output.send(cmd).ok();
         }
     }
 
@@ -52,17 +71,21 @@ impl MidiProcessor {
         };
 
         let len = self.off_events.len();
-        self.off_events.retain(
-            |&evt| !(evt.1 == chan && evt.2 == ptch),
-        );
+        self.off_events.retain(|&evt| {
+            !(evt.channel == chan && evt.pitch == ptch)
+        });
         if len != self.off_events.len() {
             self.output.send(Command::MidiNoteOff(chan, ptch)).ok();
         }
 
-        self.off_events.push((millis_to_dur(event.dur), chan, ptch));
-        self.off_events.sort_by(
-            |a, b| b.0.partial_cmp(&a.0).unwrap(),
-        );
+        self.off_events.push(NoteState {
+            duration: millis_to_dur(event.dur),
+            channel: chan,
+            pitch: ptch,
+        });
+        self.off_events.sort_by(|a, b| {
+            b.duration.partial_cmp(&a.duration).unwrap()
+        });
         self.output.send(Command::MidiNoteOn(chan, ptch, vel)).ok();
     }
 
@@ -71,47 +94,68 @@ impl MidiProcessor {
             Destination::Midi(chan, vel) => (chan, vel),
         };
 
-        let dur = millis_to_dur(event.dur);
-        let msg = Command::MidiCtl(chan, ctl, curve[0] as u8);
+        let initial = point_on_curve(0.0, &curve)[1].round() as u8;
+        let existing = self.ctl_events.iter().position(|&evt| {
+            evt.channel == chan && evt.controller == ctl
+        });
 
-        self.ctl_events.push((dur, 0.0, chan, ctl, curve));
-        self.ctl_events.sort_by(
-            |a, b| b.0.partial_cmp(&a.0).unwrap(),
-        );
-        self.output.send(msg).ok();
+        let send_init = match existing {
+            None => true,
+            Some(index) => {
+                let send = initial != self.ctl_events[index].previous;
+                self.ctl_events.remove(index);
+                send
+            }
+        };
+
+        self.ctl_events.push(CtrlState {
+            t: 0.0,
+            duration: millis_to_dur(event.dur),
+            channel: chan,
+            controller: ctl,
+            curve: curve,
+            previous: initial,
+        });
+
+        if send_init {
+            let cmd = Command::MidiCtl(chan, ctl, initial);
+            self.output.send(cmd).ok();
+        }
     }
 
     fn update_ctl_events(&mut self, delta: &Duration) {
         for evt in &mut self.ctl_events {
-            evt.1 += dur_to_millis(delta) / dur_to_millis(&evt.0);
+            evt.t += dur_to_millis(delta) / dur_to_millis(&evt.duration);
         }
 
         for evt in &mut self.ctl_events {
-            let t = evt.1;
-            let val = point_on_curve(t, &evt.4);
-            let msg = Command::MidiCtl(evt.2, evt.3, val[1] as u8);
-            self.output.send(msg).ok();
+            let cc = point_on_curve(evt.t, &evt.curve)[1].round() as u8;
+            if cc != evt.previous {
+                evt.previous = cc;
+                let msg = Command::MidiCtl(evt.channel, evt.controller, cc);
+                self.output.send(msg).ok();
+            }
         }
 
-        self.ctl_events.retain(|&evt| evt.1 < 1.0);
+        self.ctl_events.retain(|&evt| evt.t < 1.0);
     }
 
     fn update_off_events(&mut self, delta: &Duration) {
         let zero = Duration::new(0, 0);
 
         for evt in &mut self.off_events {
-            evt.0 = match evt.0.checked_sub(*delta) {
+            evt.duration = match evt.duration.checked_sub(*delta) {
                 Some(dur) => dur,
                 None => zero,
             }
         }
 
-        while let Some((dur, chan, pitch)) = self.off_events.pop() {
-            if dur != zero {
-                self.off_events.push((dur, chan, pitch));
+        while let Some(note) = self.off_events.pop() {
+            if note.duration != zero {
+                self.off_events.push(note);
                 break;
             } else {
-                let msg = Command::MidiNoteOff(chan, pitch);
+                let msg = Command::MidiNoteOff(note.channel, note.pitch);
                 self.output.send(msg).ok();
             }
         }
