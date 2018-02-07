@@ -12,6 +12,8 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+#[cfg(feature = "with-websocket")]
+extern crate ws;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_double};

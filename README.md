@@ -17,7 +17,7 @@ adding further variation.
 **Features**
 
 * Deterministic.
-* Support for Open Sound Control and MIDI.
+* Support for MIDI & Open Sound Control (over UDP and WebSockets).
 * Range of built-in keywords & track effects for manipulating sequences.
 * Support for user defined keywords.
 * Light on system dependencies.

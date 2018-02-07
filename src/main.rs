@@ -36,11 +36,13 @@ Options:
   --osc-host=ADDRESS    OSC host address [default: 127.0.0.1:34254].
   --osc-client=ADDRESS  OSC client address [default: 127.0.0.1:3000].
   --midi-out=DEVICE     Midi output device id.
+  --ws-host=ADDRESS     Websocket host address [default: 127.0.0.1:2794].
 
 Sinks:
   console
   portmidi
   osc
+  websocket
 ";
 
 #[derive(Debug, Deserialize)]
@@ -53,6 +55,7 @@ struct Args {
     flag_osc_host: String,
     flag_osc_client: String,
     flag_midi_out: Option<usize>,
+    flag_ws_host: String,
     arg_file: String,
     cmd_list: bool,
 }
@@ -129,6 +132,7 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
     let sink_args = SinkArgs::new(
         &args.flag_osc_host,
         &args.flag_osc_client,
+        &args.flag_ws_host,
         args.flag_midi_out,
     );
 

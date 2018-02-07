@@ -3,6 +3,8 @@ mod osc;
 #[cfg(feature = "with-portmidi")]
 mod portmidi;
 mod sink;
+#[cfg(feature = "with-websocket")]
+mod ws;
 
 use std::convert::From;
 
@@ -13,6 +15,8 @@ pub use self::osc::Osc;
 #[cfg(feature = "with-portmidi")]
 pub use self::portmidi::Portmidi;
 use self::sink::{CompositeSink, Sink, ThreadedSink};
+#[cfg(feature = "with-websocket")]
+pub use self::ws::WebSocket;
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -20,16 +24,19 @@ pub struct SinkArgs<'a> {
     osc_host_addr: &'a str,
     osc_client_addr: &'a str,
     midi_device_id: Option<usize>,
+    ws_host_addr: &'a str,
 }
 
 impl<'a> SinkArgs<'a> {
     pub fn new(osc_host_addr: &'a str,
                osc_client_addr: &'a str,
+               ws_host_addr: &'a str,
                midi_device_id: Option<usize>)
                -> SinkArgs<'a> {
         SinkArgs {
             osc_host_addr: osc_host_addr,
             osc_client_addr: osc_client_addr,
+            ws_host_addr: ws_host_addr,
             midi_device_id: midi_device_id,
         }
     }
@@ -43,6 +50,8 @@ pub fn factory(name: &str, args: &SinkArgs) -> Result<Box<Sink>, JezErr> {
         ),
         #[cfg(feature = "with-portmidi")]
         "portmidi" => Box::new(try!(Portmidi::new(args.midi_device_id))),
+        #[cfg(feature = "with-websocket")]
+        "websocket" => Box::new(try!(WebSocket::new(args.ws_host_addr))),
         _ => return Err(From::from(SysErr::UnknownBackend)),
     };
 
