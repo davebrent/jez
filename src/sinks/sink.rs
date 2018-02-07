@@ -7,7 +7,7 @@ use vm::Command;
 
 pub trait Device: fmt::Display {}
 
-pub trait Sink: Send + Sync {
+pub trait Sink: Send {
     fn name(&self) -> &str;
 
     fn recieve(&mut self, cmd: Command);
