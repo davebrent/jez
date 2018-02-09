@@ -8,8 +8,9 @@ use vm::types::{Result, SeqState};
 
 /// Apply a residual class to an integer sequence
 pub fn sieve(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let (modulus, shift) = try!(state.pop_pair());
-    let (start, end) = try!(state.pop_pair());
+    let shift = try!(state.pop_num()) as usize;
+    let modulus = try!(state.pop_num()) as usize;
+    let (start, end) = try!(try!(state.pop()).as_range());
 
     let next_start = state.heap_len();
     for ptr in start..end {
@@ -20,13 +21,13 @@ pub fn sieve(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let next_end = state.heap_len();
-    try!(state.push(Value::Pair(next_start, next_end)));
+    try!(state.push(Value::Seq(next_start, next_end)));
     Ok(None)
 }
 
 pub fn _pop_set(state: &mut InterpState)
                 -> result::Result<BTreeSet<usize>, RuntimeErr> {
-    let (start, end) = try!(state.pop_pair());
+    let (start, end) = try!(try!(state.pop()).as_range());
     let mut output = BTreeSet::new();
 
     for ptr in start..end {
@@ -49,7 +50,7 @@ pub fn intersection(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Pair(start, end)));
+    try!(state.push(Value::Seq(start, end)));
     Ok(None)
 }
 
@@ -65,7 +66,7 @@ pub fn union(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Pair(start, end)));
+    try!(state.push(Value::Seq(start, end)));
     Ok(None)
 }
 
@@ -83,6 +84,6 @@ pub fn symmetric_difference(_: &mut SeqState,
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Pair(start, end)));
+    try!(state.push(Value::Seq(start, end)));
     Ok(None)
 }

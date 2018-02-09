@@ -53,13 +53,13 @@ pub fn hop_jump(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let len = state.heap_len();
-    try!(state.push(Value::Pair(start, len)));
+    try!(state.push(Value::Seq(start, len)));
     Ok(None)
 }
 
 /// Return a new list containing the difference between consecutive elements
 pub fn inter_onset(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(state.pop_pair());
+    let (start, end) = try!(try!(state.pop()).as_range());
     let count = end - start;
     let heap_start = state.heap_len();
 
@@ -74,13 +74,13 @@ pub fn inter_onset(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Pair(heap_start, end)));
+    try!(state.push(Value::Seq(heap_start, end)));
     Ok(None)
 }
 
 /// Return a binary onset representation of a list
 pub fn onsets(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(state.pop_pair());
+    let (start, end) = try!(try!(state.pop()).as_range());
     let b = try!(state.pop_num()) as usize;
     let a = try!(state.pop_num()) as usize;
 
@@ -100,6 +100,6 @@ pub fn onsets(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let heap_end = state.heap_len();
-    try!(state.push(Value::Pair(heap_start, heap_end)));
+    try!(state.push(Value::Seq(heap_start, heap_end)));
     Ok(None)
 }

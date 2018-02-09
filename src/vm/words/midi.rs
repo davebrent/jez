@@ -35,7 +35,7 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
                 };
                 output.push(event);
             }
-            Value::Expr(start, end) => {
+            Value::Seq(start, end) => {
                 let interval = dur / (end - start) as f64;
                 let mut onset = onset;
                 for n in start..end {
@@ -48,7 +48,7 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
                     visit.push((onset, dur, try!(state.heap_get(n))));
                 }
             }
-            Value::Pair(start, end) => {
+            Value::List(start, end) => {
                 let len = end - start;
                 if len == 0 || len > 3 {
                     return Err(RuntimeErr::InvalidArgs);

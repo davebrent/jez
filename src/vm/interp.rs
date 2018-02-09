@@ -22,8 +22,8 @@ pub enum Instr {
     Keyword(u64),
     ListBegin,
     ListEnd,
-    ExpBegin,
-    ExpEnd,
+    SeqBegin,
+    SeqEnd,
     GroupBegin,
     GroupEnd,
     Null,
@@ -34,9 +34,9 @@ pub enum Value {
     Null,
     Number(f64),
     Symbol(u64),
-    Pair(usize, usize),
+    List(usize, usize),
     Group(usize, usize),
-    Expr(usize, usize),
+    Seq(usize, usize),
     Str(String),
     Instruction(Instr),
     Curve(Curve),
@@ -50,9 +50,11 @@ impl Value {
         }
     }
 
-    pub fn as_pair(&self) -> Result<(usize, usize), RuntimeErr> {
+    pub fn as_range(&self) -> Result<(usize, usize), RuntimeErr> {
         match *self {
-            Value::Pair(a, b) => Ok((a, b)),
+            Value::List(a, b) => Ok((a, b)),
+            Value::Group(a, b) => Ok((a, b)),
+            Value::Seq(a, b) => Ok((a, b)),
             _ => Err(RuntimeErr::InvalidArgs),
         }
     }
@@ -222,20 +224,6 @@ impl InterpState {
         }
     }
 
-    pub fn pop_pair(&mut self) -> Result<(usize, usize), RuntimeErr> {
-        match try!(self.pop()) {
-            Value::Pair(start, end) => Ok((start, end)),
-            _ => Err(RuntimeErr::InvalidArgs),
-        }
-    }
-
-    pub fn last_pair(&mut self) -> Result<(usize, usize), RuntimeErr> {
-        match try!(self.last()) {
-            Value::Pair(start, end) => Ok((start, end)),
-            _ => Err(RuntimeErr::InvalidArgs),
-        }
-    }
-
     pub fn push(&mut self, val: Value) -> InterpResult {
         match self.frames.last_mut() {
             None => Err(RuntimeErr::StackExhausted),
@@ -375,13 +363,13 @@ impl<S> Interpreter<S> {
             Instr::ListBegin => list_begin(&mut self.state, Instr::ListBegin),
             Instr::ListEnd => {
                 list_end(&mut self.state, Instr::ListBegin, |start, end| {
-                    Value::Pair(start, end)
+                    Value::List(start, end)
                 })
             }
-            Instr::ExpBegin => list_begin(&mut self.state, Instr::ExpBegin),
-            Instr::ExpEnd => {
-                list_end(&mut self.state, Instr::ExpBegin, |start, end| {
-                    Value::Expr(start, end)
+            Instr::SeqBegin => list_begin(&mut self.state, Instr::SeqBegin),
+            Instr::SeqEnd => {
+                list_end(&mut self.state, Instr::SeqBegin, |start, end| {
+                    Value::Seq(start, end)
                 })
             }
             Instr::GroupBegin => list_begin(&mut self.state, Instr::GroupBegin),

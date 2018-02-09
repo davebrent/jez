@@ -83,7 +83,6 @@ fn set(words: &mut Module) {
 fn stack(words: &mut Module) {
     words.insert("drop", stack::drop);
     words.insert("dup", stack::duplicate);
-    words.insert("pair", stack::pair);
     words.insert("swap", stack::swap);
 }
 

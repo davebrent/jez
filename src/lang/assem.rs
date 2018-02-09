@@ -107,8 +107,8 @@ impl<'a> Assembler<'a> {
                     match sym {
                         Symbol::ListBegin => Instr::ListBegin,
                         Symbol::ListEnd => Instr::ListEnd,
-                        Symbol::ExpBegin => Instr::ExpBegin,
-                        Symbol::ExpEnd => Instr::ExpEnd,
+                        Symbol::SeqBegin => Instr::SeqBegin,
+                        Symbol::SeqEnd => Instr::SeqEnd,
                         Symbol::GroupBegin => Instr::GroupBegin,
                         Symbol::GroupEnd => Instr::GroupEnd,
                         Symbol::Null => Instr::Null,

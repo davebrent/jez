@@ -6,7 +6,7 @@ use vm::types::{Result, SeqState};
 
 /// Create a bezier curve from a linear ramp
 pub fn linear(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(state.pop_pair());
+    let (start, end) = try!(try!(state.pop()).as_range());
     if end - start != 2 {
         return Err(RuntimeErr::InvalidArgs);
     }

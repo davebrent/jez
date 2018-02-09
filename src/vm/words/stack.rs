@@ -1,13 +1,6 @@
-use vm::interp::{InterpState, Value};
+use vm::interp::InterpState;
 use vm::types::{Result, SeqState};
 
-
-pub fn pair(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let b = try!(state.pop_num()) as usize;
-    let a = try!(state.pop_num()) as usize;
-    try!(state.push(Value::Pair(a, b)));
-    Ok(None)
-}
 
 pub fn drop(_: &mut SeqState, state: &mut InterpState) -> Result {
     try!(state.pop());

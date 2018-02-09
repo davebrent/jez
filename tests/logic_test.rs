@@ -17,14 +17,14 @@ fn test_sieves_basic() {
 .def main 0:
   0 10 range = @seq
 
-  @seq 3 2 pair sieve
+  @seq 3 2 sieve
   @seq intersection
 
   0 swap 10 swap onsets
     ",
     );
 
-    let (start, end) = tos.as_pair().unwrap();
+    let (start, end) = tos.as_range().unwrap();
     let actual = state.heap_slice_mut(start, end).unwrap().to_vec();
 
     let expected = vec![0, 0, 1, 0, 0, 1, 0, 0, 1, 0]
@@ -45,15 +45,15 @@ fn test_sieves_xor() {
 .def main 0:
   0 32 range = @seq
 
-  @seq 7 3 pair sieve = @seq1
-  @seq 7 5 pair sieve = @seq2
-  @seq 3 0 pair sieve = @seq3
+  @seq 7 3 sieve = @seq1
+  @seq 7 5 sieve = @seq2
+  @seq 3 0 sieve = @seq3
 
   @seq1 @seq2 union @seq3 symmetric_difference
     ",
     );
 
-    let (start, end) = tos.as_pair().unwrap();
+    let (start, end) = tos.as_range().unwrap();
     let actual = state.heap_slice_mut(start, end).unwrap().to_vec();
 
     let expected = vec![0, 5, 6, 9, 10, 15, 17, 18, 19, 21, 26, 27, 30, 31]
@@ -76,7 +76,7 @@ fn test_onsets() {
     ",
     );
 
-    let (start, end) = tos.as_pair().unwrap();
+    let (start, end) = tos.as_range().unwrap();
     let actual = state.heap_slice_mut(start, end).unwrap().to_vec();
 
     let expected = vec![0, 0, 1, 1, 0]
@@ -99,7 +99,7 @@ fn test_rotate() {
     ",
     );
 
-    let (start, end) = tos.as_pair().unwrap();
+    let (start, end) = tos.as_range().unwrap();
     let actual = state.heap_slice_mut(start, end).unwrap().to_vec();
 
     let expected = vec![4, 1, 2, 3]

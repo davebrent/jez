@@ -169,7 +169,7 @@ impl Machine {
         // Create tracks as defined by block 1
         match try!(self.interp.eval_block(1)) {
             Some(val) => {
-                let (start, end) = try!(val.as_pair());
+                let (start, end) = try!(val.as_range());
                 for (i, ptr) in (start..end).enumerate() {
                     let sym =
                         try!(try!(self.interp.state.heap_get(ptr)).as_sym());

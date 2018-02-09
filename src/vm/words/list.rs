@@ -6,7 +6,7 @@ use vm::types::{Result, SeqState};
 
 /// Every cycle, puts the 'next' element of a list on the stack
 pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(state.pop_pair());
+    let (start, end) = try!(try!(state.pop()).as_range());
     if start != end {
         let i = seq.revision % (end - start);
         let v = try!(state.heap_get(i));
@@ -17,7 +17,7 @@ pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> Result {
 
 /// Randomly set values to rests in a list
 pub fn degrade(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(state.last_pair());
+    let (start, end) = try!(try!(state.last()).as_range());
     let lst = try!(state.heap_slice_mut(start, end));
     for item in lst {
         if seq.rng.gen() {
@@ -60,7 +60,7 @@ pub fn range(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Pair(start, end)));
+    try!(state.push(Value::Seq(start, end)));
     Ok(None)
 }
 
@@ -76,7 +76,7 @@ pub fn repeat(_: &mut SeqState, state: &mut InterpState) -> Result {
 
 /// Reverse a list, leaving it on the stack
 pub fn reverse(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(state.last_pair());
+    let (start, end) = try!(try!(state.last()).as_range());
     let slice = try!(state.heap_slice_mut(start, end));
     slice.reverse();
     Ok(None)
@@ -85,7 +85,7 @@ pub fn reverse(_: &mut SeqState, state: &mut InterpState) -> Result {
 /// Rotate a list
 pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> Result {
     let amount = try!(state.pop_num()) as usize;
-    let (start, end) = try!(state.last_pair());
+    let (start, end) = try!(try!(state.last()).as_range());
 
     let lst = try!(state.heap_slice_mut(start, end)).to_vec();
     let len = lst.len();
@@ -100,7 +100,7 @@ pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> Result {
 
 /// Shuffle a list, leaving it on the stack
 pub fn shuffle(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(state.last_pair());
+    let (start, end) = try!(try!(state.last()).as_range());
     let slice = try!(state.heap_slice_mut(start, end));
     seq.rng.shuffle(slice);
     Ok(None)
@@ -180,7 +180,7 @@ mod tests {
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
         state.heap_push(Value::Number(3.0));
-        state.push(Value::Pair(0, 3)).unwrap();
+        state.push(Value::Seq(0, 3)).unwrap();
         reverse(&mut seq, &mut state).unwrap();
         let out = state.heap_slice_mut(0, 3).unwrap();
         assert_eq!(out[0].as_num().unwrap(), 3.0);
@@ -196,7 +196,7 @@ mod tests {
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
         state.heap_push(Value::Number(3.0));
-        state.push(Value::Pair(0, 3)).unwrap();
+        state.push(Value::Seq(0, 3)).unwrap();
         state.push(Value::Number(1.0)).unwrap();
         rotate(&mut seq, &mut state).unwrap();
         let out = state.heap_slice_mut(0, 3).unwrap();

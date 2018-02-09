@@ -18,7 +18,7 @@ pub fn bin_list(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let len = state.heap_len();
-    try!(state.push(Value::Pair(start, len)));
+    try!(state.push(Value::Seq(start, len)));
     Ok(None)
 }
 
