@@ -46,9 +46,7 @@ impl<T> TimerUnit<T>
 where
     T: Clone + Debug,
 {
-    pub fn new(output: Sender<TimeEvent<T>>,
-               input: Receiver<TimeEvent<T>>)
-               -> TimerUnit<T> {
+    pub fn new(output: Sender<TimeEvent<T>>, input: Receiver<TimeEvent<T>>) -> TimerUnit<T> {
         TimerUnit {
             input: input,
             output: output,
@@ -110,9 +108,8 @@ where
 
     fn push_timer(&mut self, timer: Timer<T>) {
         self.timers.push(timer);
-        self.timers.sort_by(|a, b| {
-            b.dispatched_at.partial_cmp(&a.dispatched_at).unwrap()
-        });
+        self.timers
+            .sort_by(|a, b| b.dispatched_at.partial_cmp(&a.dispatched_at).unwrap());
     }
 
     pub fn tick(&mut self, delta: &Duration) -> bool {

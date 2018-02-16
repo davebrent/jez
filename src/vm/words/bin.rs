@@ -1,7 +1,6 @@
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
-
 /// Encode a number into a binary list
 pub fn bin_list(_: &mut SeqState, state: &mut InterpState) -> Result {
     let num = try!(state.pop_num()) as i64;

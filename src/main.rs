@@ -1,21 +1,20 @@
+extern crate docopt;
 extern crate jez;
 #[macro_use]
 extern crate serde_derive;
-extern crate docopt;
 
 use std::convert::From;
 use std::fs;
 use std::io;
 use std::io::{Read, Write};
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use docopt::Docopt;
 
-use jez::{Command, Control, Instr, JezErr, Machine, RuntimeErr, SinkArgs,
-          make_program, make_sink, millis_to_dur};
-
+use jez::{make_program, make_sink, millis_to_dur, Command, Control, Instr, JezErr, Machine,
+          RuntimeErr, SinkArgs};
 
 const USAGE: &str = "
 Jez.
@@ -73,19 +72,22 @@ fn timer_task(millis: f64, channel: Sender<Command>) -> Task {
     let start = Instant::now();
     let end = millis_to_dur(millis);
 
-    Box::new(move || if start.elapsed() >= end {
-        channel.send(Command::Stop).unwrap();
-        Ok(TaskStatus::Completed)
-    } else {
-        Ok(TaskStatus::Continue)
+    Box::new(move || {
+        if start.elapsed() >= end {
+            channel.send(Command::Stop).unwrap();
+            Ok(TaskStatus::Completed)
+        } else {
+            Ok(TaskStatus::Continue)
+        }
     })
 }
 
 /// Send a `reload` command when a program file changes
-fn watcher_task(filepath: String,
-                instrs: Vec<Instr>,
-                channel: Sender<Command>)
-                -> Result<Task, JezErr> {
+fn watcher_task(
+    filepath: String,
+    instrs: Vec<Instr>,
+    channel: Sender<Command>,
+) -> Result<Task, JezErr> {
     let meta_data = try!(fs::metadata(filepath.clone()));
     let mod_time = try!(meta_data.modified());
 
@@ -186,12 +188,7 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
             thread::spawn(move || run_until_first(tasks));
         }
 
-        let mut machine = Machine::new(
-            sink_send.clone(),
-            host_send.clone(),
-            host_recv,
-            &instrs,
-        );
+        let mut machine = Machine::new(sink_send.clone(), host_send.clone(), host_recv, &instrs);
 
         match try!(machine.exec_realtime()) {
             Control::Stop => return Ok(()),

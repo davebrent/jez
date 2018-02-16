@@ -5,7 +5,6 @@ use err::RuntimeErr;
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
-
 /// Apply a residual class to an integer sequence
 pub fn sieve(_: &mut SeqState, state: &mut InterpState) -> Result {
     let shift = try!(state.pop_num()) as usize;
@@ -25,8 +24,7 @@ pub fn sieve(_: &mut SeqState, state: &mut InterpState) -> Result {
     Ok(None)
 }
 
-pub fn _pop_set(state: &mut InterpState)
-                -> result::Result<BTreeSet<usize>, RuntimeErr> {
+pub fn _pop_set(state: &mut InterpState) -> result::Result<BTreeSet<usize>, RuntimeErr> {
     let (start, end) = try!(try!(state.pop()).as_range());
     let mut output = BTreeSet::new();
 
@@ -71,9 +69,7 @@ pub fn union(_: &mut SeqState, state: &mut InterpState) -> Result {
 }
 
 /// Perform the symmetric difference ('xor') between two lists
-pub fn symmetric_difference(_: &mut SeqState,
-                            state: &mut InterpState)
-                            -> Result {
+pub fn symmetric_difference(_: &mut SeqState, state: &mut InterpState) -> Result {
     let a = try!(_pop_set(state));
     let b = try!(_pop_set(state));
     let vals: Vec<usize> = a.symmetric_difference(&b).cloned().collect();

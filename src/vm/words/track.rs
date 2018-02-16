@@ -1,7 +1,6 @@
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
-
 /// Puts the current cycle revision onto the stack
 pub fn revision(seq: &mut SeqState, state: &mut InterpState) -> Result {
     try!(state.push(Value::Number(seq.revision as f64)));

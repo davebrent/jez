@@ -5,7 +5,6 @@ use rand::{Rng, StdRng};
 
 use vm::types::{Effect, Event};
 
-
 #[derive(Copy, Clone, Debug)]
 struct State {
     delta: f64,
@@ -14,8 +13,7 @@ struct State {
 
 impl PartialEq for State {
     fn eq(&self, other: &State) -> bool {
-        other.event.value == self.event.value &&
-            (other.delta - self.delta).abs() < EPSILON
+        other.event.value == self.event.value && (other.delta - self.delta).abs() < EPSILON
     }
 }
 

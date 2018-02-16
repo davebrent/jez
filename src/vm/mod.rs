@@ -9,7 +9,7 @@ mod words;
 use std::collections::HashMap;
 use std::convert::From;
 use std::rc::Rc;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
@@ -23,7 +23,6 @@ use self::midi::MidiProcessor;
 use self::time::{TimeEvent, TimerUnit};
 pub use self::types::{Command, Destination, Event, EventValue};
 use self::types::{SeqState, Track};
-
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Control {
@@ -55,11 +54,12 @@ pub struct Machine {
 }
 
 impl Machine {
-    pub fn new(backend: Sender<Command>,
-               bus_send: Sender<Command>,
-               bus_recv: Receiver<Command>,
-               instrs: &[Instr])
-               -> Machine {
+    pub fn new(
+        backend: Sender<Command>,
+        bus_send: Sender<Command>,
+        bus_recv: Receiver<Command>,
+        instrs: &[Instr],
+    ) -> Machine {
         let mut funcs = HashMap::new();
         for (pc, instr) in instrs.iter().enumerate() {
             if let Instr::Begin(word) = *instr {
@@ -71,19 +71,12 @@ impl Machine {
             backend: backend,
             bus_recv: bus_recv,
             functions: funcs,
-            interp: Interpreter::new(
-                instrs.to_vec(),
-                &words::all(),
-                SeqState::new(),
-            ),
+            interp: Interpreter::new(instrs.to_vec(), &words::all(), SeqState::new()),
             midi: MidiProcessor::new(bus_send.clone()),
         }
     }
 
-    pub fn exec(&mut self,
-                duration: Duration,
-                delta: Duration)
-                -> Result<Control, JezErr> {
+    pub fn exec(&mut self, duration: Duration, delta: Duration) -> Result<Control, JezErr> {
         let (mut signals, mut timers) = try!(self.setup());
         let mut elapsed = Duration::new(0, 0);
 
@@ -141,12 +134,10 @@ impl Machine {
 
         match self.interp.eval(self.functions[&func]) {
             Err(err) => Err(From::from(err)),
-            Ok(val) => {
-                Ok(match val {
-                    Some(val) => val,
-                    None => Value::Null,
-                })
-            }
+            Ok(val) => Ok(match val {
+                Some(val) => val,
+                None => Value::Null,
+            }),
         }
     }
 
@@ -168,8 +159,7 @@ impl Machine {
             Some(val) => {
                 let (start, end) = try!(val.as_range());
                 for (i, ptr) in (start..end).enumerate() {
-                    let sym =
-                        try!(try!(self.interp.state.heap_get(ptr)).as_sym());
+                    let sym = try!(try!(self.interp.state.heap_get(ptr)).as_sym());
                     self.interp.data.tracks.push(Track::new(i, sym));
                 }
             }
@@ -202,29 +192,24 @@ impl Machine {
     }
 
     // Main signal handler
-    fn handle_signal(&mut self,
-                     cmd: TimeEvent<Signal>,
-                     signals: &mut SignalState)
-                     -> Result<Control, JezErr> {
+    fn handle_signal(
+        &mut self,
+        cmd: TimeEvent<Signal>,
+        signals: &mut SignalState,
+    ) -> Result<Control, JezErr> {
         match cmd {
-            TimeEvent::Timer(time, signal) => {
-                match signal {
-                    Signal::Bus => self.handle_bus_signal(signals),
-                    Signal::Midi => self.handle_midi_signal(&time),
-                    Signal::Event(event) => self.handle_event_signal(event),
-                    Signal::Track(num, rev, func) => {
-                        self.handle_track_signal(signals, num, rev, func)
-                    }
-                }
-            }
+            TimeEvent::Timer(time, signal) => match signal {
+                Signal::Bus => self.handle_bus_signal(signals),
+                Signal::Midi => self.handle_midi_signal(&time),
+                Signal::Event(event) => self.handle_event_signal(event),
+                Signal::Track(num, rev, func) => self.handle_track_signal(signals, num, rev, func),
+            },
             _ => Err(From::from(RuntimeErr::InvalidArgs)),
         }
     }
 
     // Read internal and external commands
-    fn handle_bus_signal(&mut self,
-                         signals: &mut SignalState)
-                         -> Result<Control, JezErr> {
+    fn handle_bus_signal(&mut self, signals: &mut SignalState) -> Result<Control, JezErr> {
         while let Ok(msg) = self.bus_recv.try_recv() {
             match msg {
                 Command::Event(_) => (),
@@ -239,9 +224,9 @@ impl Machine {
                     return Ok(Control::Reload);
                 }
 
-                Command::MidiNoteOn(_, _, _) |
-                Command::MidiNoteOff(_, _) |
-                Command::MidiCtl(_, _, _) => {
+                Command::MidiNoteOn(_, _, _)
+                | Command::MidiNoteOff(_, _)
+                | Command::MidiCtl(_, _, _) => {
                     if self.backend.send(msg).is_err() {
                         return Err(From::from(SysErr::UnreachableBackend));
                     }
@@ -266,20 +251,19 @@ impl Machine {
     }
 
     // Update midi messages (note, ctrl, clock etc.)
-    fn handle_midi_signal(&mut self,
-                          elapsed: &Duration)
-                          -> Result<Control, JezErr> {
+    fn handle_midi_signal(&mut self, elapsed: &Duration) -> Result<Control, JezErr> {
         self.midi.update(elapsed);
         Ok(Control::Continue)
     }
 
     // Call a track function scheduling its produced events
-    fn handle_track_signal(&mut self,
-                           signals: &mut SignalState,
-                           num: usize,
-                           rev: usize,
-                           func: u64)
-                           -> Result<Control, JezErr> {
+    fn handle_track_signal(
+        &mut self,
+        signals: &mut SignalState,
+        num: usize,
+        rev: usize,
+        func: u64,
+    ) -> Result<Control, JezErr> {
         self.interp.data.revision = rev;
         self.interp.data.duration = 0.0;
         self.interp.data.events.clear();
@@ -290,9 +274,7 @@ impl Machine {
         let track = &mut self.interp.data.tracks[num];
         let dur = self.interp.data.duration;
         for filter in &mut track.filters {
-            let f = try!(Rc::get_mut(filter).ok_or(JezErr::RuntimeErr(
-                RuntimeErr::InvalidArgs,
-            )));
+            let f = try!(Rc::get_mut(filter).ok_or(JezErr::RuntimeErr(RuntimeErr::InvalidArgs,)));
             self.interp.data.events = f.apply(dur, &self.interp.data.events);
         }
 

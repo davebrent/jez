@@ -2,7 +2,6 @@ use std::fmt;
 
 use err::AssemErr;
 
-
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Value<'a> {
     Variable(&'a str),
@@ -154,9 +153,7 @@ impl<'a> fmt::Display for Argument<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Argument::Arg(val) => write!(f, "{}", val.data),
-            Argument::Kwarg(key, val) => {
-                write!(f, "@{} = {}", key.data, val.data)
-            }
+            Argument::Kwarg(key, val) => write!(f, "@{} = {}", key.data, val.data),
         }
     }
 }

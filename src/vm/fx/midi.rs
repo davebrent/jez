@@ -4,7 +4,6 @@ use lang::hash_str;
 use vm::math::path_to_curve;
 use vm::types::{Destination, Effect, Event, EventValue};
 
-
 type MidiMap = HashMap<u64, u8>;
 
 fn volca_fm_map() -> MidiMap {

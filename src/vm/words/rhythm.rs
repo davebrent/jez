@@ -4,7 +4,6 @@ use err::RuntimeErr;
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
-
 /// Generate a rhythm using the Hop-and-jump algorithm
 ///
 /// Rhythms that satisfy the rhythmic oddity property. See [1]

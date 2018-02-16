@@ -1,10 +1,8 @@
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
-use super::math::{Curve, dur_to_millis, millis_to_dur, point_on_curve};
+use super::math::{dur_to_millis, millis_to_dur, point_on_curve, Curve};
 use super::types::{Command, Destination, Event, EventValue};
-
-
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct CtrlState {
@@ -71,9 +69,8 @@ impl MidiProcessor {
         };
 
         let len = self.off_events.len();
-        self.off_events.retain(|&evt| {
-            !(evt.channel == chan && evt.pitch == ptch)
-        });
+        self.off_events
+            .retain(|&evt| !(evt.channel == chan && evt.pitch == ptch));
         if len != self.off_events.len() {
             self.output.send(Command::MidiNoteOff(chan, ptch)).ok();
         }
@@ -83,9 +80,8 @@ impl MidiProcessor {
             channel: chan,
             pitch: ptch,
         });
-        self.off_events.sort_by(|a, b| {
-            b.duration.partial_cmp(&a.duration).unwrap()
-        });
+        self.off_events
+            .sort_by(|a, b| b.duration.partial_cmp(&a.duration).unwrap());
         self.output.send(Command::MidiNoteOn(chan, ptch, vel)).ok();
     }
 
@@ -95,9 +91,9 @@ impl MidiProcessor {
         };
 
         let initial = point_on_curve(0.0, &curve)[1].round() as u8;
-        let existing = self.ctl_events.iter().position(|&evt| {
-            evt.channel == chan && evt.controller == ctl
-        });
+        let existing = self.ctl_events
+            .iter()
+            .position(|&evt| evt.channel == chan && evt.controller == ctl);
 
         let send_init = match existing {
             None => true,

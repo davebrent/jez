@@ -3,7 +3,6 @@ use rand::Rng;
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
-
 /// Every cycle, puts the 'next' element of a list on the stack
 pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let (start, end) = try!(try!(state.pop()).as_range());

@@ -5,18 +5,16 @@ use vm::fx::{MarkovFilter, MidiVelocityMapper, PitchQuantizeFilter};
 use vm::interp::InterpState;
 use vm::types::{Result, SeqState};
 
-
-pub fn pitch_quantize_filter(seq: &mut SeqState,
-                             state: &mut InterpState)
-                             -> Result {
+pub fn pitch_quantize_filter(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let scale = try!(try!(state.pop()).as_sym());
     let octave = try!(state.pop_num()) as usize;
     let key = try!(try!(state.pop()).as_sym());
     let sym = try!(try!(state.pop()).as_sym());
 
-    let track = match seq.tracks.iter_mut().find(
-        |ref mut track| track.func == sym,
-    ) {
+    let track = match seq.tracks
+        .iter_mut()
+        .find(|ref mut track| track.func == sym)
+    {
         Some(track) => track,
         None => return Err(RuntimeErr::InvalidArgs),
     };
@@ -40,9 +38,10 @@ pub fn markov_filter(seq: &mut SeqState, state: &mut InterpState) -> Result {
         return Err(RuntimeErr::InvalidArgs);
     }
 
-    match seq.tracks.iter_mut().find(
-        |ref mut track| track.func == sym,
-    ) {
+    match seq.tracks
+        .iter_mut()
+        .find(|ref mut track| track.func == sym)
+    {
         Some(track) => {
             let filter = MarkovFilter::new(order, capacity, seq.rng);
             track.filters.push(Rc::new(filter));
@@ -52,16 +51,15 @@ pub fn markov_filter(seq: &mut SeqState, state: &mut InterpState) -> Result {
     }
 }
 
-pub fn midi_velocity_filter(seq: &mut SeqState,
-                            state: &mut InterpState)
-                            -> Result {
+pub fn midi_velocity_filter(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let param = try!(try!(state.pop()).as_sym());
     let device = try!(try!(state.pop()).as_sym());
     let name = try!(try!(state.pop()).as_sym());
 
-    let track = match seq.tracks.iter_mut().find(
-        |ref mut track| track.func == name,
-    ) {
+    let track = match seq.tracks
+        .iter_mut()
+        .find(|ref mut track| track.func == name)
+    {
         Some(track) => track,
         None => return Err(RuntimeErr::InvalidArgs),
     };

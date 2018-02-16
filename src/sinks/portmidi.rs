@@ -7,7 +7,6 @@ use vm::Command;
 
 use super::sink::{Device, Sink};
 
-
 impl From<pm::Error> for SysErr {
     fn from(_: pm::Error) -> SysErr {
         SysErr::UnreachableBackend
@@ -37,12 +36,10 @@ impl Portmidi {
 
         let id = match id {
             Some(id) => Some(id as i32),
-            None => {
-                match ctx.default_output_device_id() {
-                    Ok(id) => Some(id),
-                    Err(_) => None,
-                }
-            }
+            None => match ctx.default_output_device_id() {
+                Ok(id) => Some(id),
+                Err(_) => None,
+            },
         };
 
         let port = match id {
@@ -78,27 +75,21 @@ impl Sink for Portmidi {
 
     fn recieve(&mut self, cmd: Command) {
         let msg = match cmd {
-            Command::MidiNoteOn(chn, pitch, vel) => {
-                pm::MidiMessage {
-                    status: 144 + chn,
-                    data1: pitch,
-                    data2: vel,
-                }
-            }
-            Command::MidiNoteOff(chn, pitch) => {
-                pm::MidiMessage {
-                    status: 128 + chn,
-                    data1: pitch,
-                    data2: 0,
-                }
-            }
-            Command::MidiCtl(chn, ctl, val) => {
-                pm::MidiMessage {
-                    status: 176 + chn,
-                    data1: ctl,
-                    data2: val,
-                }
-            }
+            Command::MidiNoteOn(chn, pitch, vel) => pm::MidiMessage {
+                status: 144 + chn,
+                data1: pitch,
+                data2: vel,
+            },
+            Command::MidiNoteOff(chn, pitch) => pm::MidiMessage {
+                status: 128 + chn,
+                data1: pitch,
+                data2: 0,
+            },
+            Command::MidiCtl(chn, ctl, val) => pm::MidiMessage {
+                status: 176 + chn,
+                data1: ctl,
+                data2: val,
+            },
             _ => return,
         };
 

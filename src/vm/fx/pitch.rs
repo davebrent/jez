@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use lang::hash_str;
 use vm::types::{Effect, Event, EventValue};
 
-
 #[derive(Clone, Debug)]
 pub struct PitchQuantizeFilter {
     key: usize,
@@ -12,10 +11,7 @@ pub struct PitchQuantizeFilter {
 }
 
 impl PitchQuantizeFilter {
-    pub fn new(key: u64,
-               octave: usize,
-               scale: u64)
-               -> Option<PitchQuantizeFilter> {
+    pub fn new(key: u64, octave: usize, scale: u64) -> Option<PitchQuantizeFilter> {
         let mut keys = HashMap::new();
         keys.insert(hash_str("C"), 0);
         keys.insert(hash_str("C#"), 1);
@@ -30,8 +26,7 @@ impl PitchQuantizeFilter {
         keys.insert(hash_str("A#"), 10);
         keys.insert(hash_str("B"), 11);
 
-        let (c, cs, d, eb, e, f, fs, g, ab, a, bb, b) =
-            (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+        let (c, cs, d, eb, e, f, fs, g, ab, a, bb, b) = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
 
         let mut ss = HashMap::new();
         ss.insert(hash_str("natural_minor"), vec![c, d, eb, f, g, ab, bb]);
@@ -82,9 +77,7 @@ impl Effect for PitchQuantizeFilter {
             let mut event = *event;
             event.value = match event.value {
                 EventValue::Curve(_) => event.value,
-                EventValue::Trigger(val) => {
-                    EventValue::Trigger(self.quantize(val))
-                }
+                EventValue::Trigger(val) => EventValue::Trigger(self.quantize(val)),
             };
             output.push(event);
         }
@@ -96,12 +89,8 @@ impl Effect for PitchQuantizeFilter {
 mod tests {
     use super::*;
 
-    fn filter(key: &'static str,
-              scale: &'static str,
-              octave: usize)
-              -> PitchQuantizeFilter {
-        PitchQuantizeFilter::new(hash_str(key), octave, hash_str(scale))
-            .unwrap()
+    fn filter(key: &'static str, scale: &'static str, octave: usize) -> PitchQuantizeFilter {
+        PitchQuantizeFilter::new(hash_str(key), octave, hash_str(scale)).unwrap()
     }
 
     #[test]

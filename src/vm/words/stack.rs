@@ -1,7 +1,6 @@
 use vm::interp::InterpState;
 use vm::types::{Result, SeqState};
 
-
 pub fn drop(_: &mut SeqState, state: &mut InterpState) -> Result {
     try!(state.pop());
     Ok(None)

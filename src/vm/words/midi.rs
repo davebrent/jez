@@ -3,7 +3,6 @@ use err::RuntimeErr;
 use vm::interp::{InterpState, Value};
 use vm::types::{Destination, Event, EventValue, Result, SeqState};
 
-
 /// Output midi events
 pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let chan = try!(state.pop_num()) as u8;
@@ -43,11 +42,9 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
                     onset += interval;
                 }
             }
-            Value::Group(start, end) => {
-                for n in start..end {
-                    visit.push((onset, dur, try!(state.heap_get(n))));
-                }
-            }
+            Value::Group(start, end) => for n in start..end {
+                visit.push((onset, dur, try!(state.heap_get(n))));
+            },
             Value::List(start, end) => {
                 let len = end - start;
                 if len == 0 || len > 3 {

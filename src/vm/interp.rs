@@ -141,10 +141,7 @@ impl InterpState {
         }
     }
 
-    pub fn heap_slice_mut(&mut self,
-                          start: usize,
-                          end: usize)
-                          -> Result<&mut [Value], RuntimeErr> {
+    pub fn heap_slice_mut(&mut self, start: usize, end: usize) -> Result<&mut [Value], RuntimeErr> {
         if start > end || end > self.heap_len() {
             return Err(RuntimeErr::InvalidArgs);
         }
@@ -244,10 +241,7 @@ impl InterpState {
         Ok(())
     }
 
-    pub fn store_glob(&mut self,
-                      name: u64,
-                      val: Value)
-                      -> Result<(), RuntimeErr> {
+    pub fn store_glob(&mut self, name: u64, val: Value) -> Result<(), RuntimeErr> {
         let ptr = self.heap_len();
         self.heap_push(val);
         self.globals.insert(name, ptr);
@@ -315,10 +309,11 @@ pub struct Interpreter<S> {
 }
 
 impl<S> Interpreter<S> {
-    pub fn new(instrs: Vec<Instr>,
-               exts: &HashMap<&'static str, Keyword<S>>,
-               data: S)
-               -> Interpreter<S> {
+    pub fn new(
+        instrs: Vec<Instr>,
+        exts: &HashMap<&'static str, Keyword<S>>,
+        data: S,
+    ) -> Interpreter<S> {
         let mut words = HashMap::new();
         for (word, func) in exts {
             words.insert(hash_str(word), *func);
@@ -343,41 +338,43 @@ impl<S> Interpreter<S> {
             Instr::Null => self.state.push(Value::Null),
             Instr::LoadNumber(n) => self.state.push(Value::Number(n)),
             Instr::LoadSymbol(s) => self.state.push(Value::Symbol(s)),
+
             Instr::Call(args, pc) => self.state.call(args, pc),
             Instr::Return => self.state.ret(),
+
             Instr::StoreGlob(name) => {
                 let val = try!(self.state.pop());
                 try!(self.state.store_glob(name, val));
                 Ok(None)
             }
+
             Instr::StoreVar(name) => {
                 let val = try!(self.state.pop());
                 try!(self.state.store(name, val));
                 Ok(None)
             }
+
             Instr::LoadVar(name) => {
                 let val = try!(self.state.lookup(name));
                 try!(self.state.push(val));
                 Ok(None)
             }
+
             Instr::ListBegin => list_begin(&mut self.state, Instr::ListBegin),
-            Instr::ListEnd => {
-                list_end(&mut self.state, Instr::ListBegin, |start, end| {
-                    Value::List(start, end)
-                })
-            }
+            Instr::ListEnd => list_end(&mut self.state, Instr::ListBegin, |start, end| {
+                Value::List(start, end)
+            }),
+
             Instr::SeqBegin => list_begin(&mut self.state, Instr::SeqBegin),
-            Instr::SeqEnd => {
-                list_end(&mut self.state, Instr::SeqBegin, |start, end| {
-                    Value::Seq(start, end)
-                })
-            }
+            Instr::SeqEnd => list_end(&mut self.state, Instr::SeqBegin, |start, end| {
+                Value::Seq(start, end)
+            }),
+
             Instr::GroupBegin => list_begin(&mut self.state, Instr::GroupBegin),
-            Instr::GroupEnd => {
-                list_end(&mut self.state, Instr::GroupBegin, |start, end| {
-                    Value::Group(start, end)
-                })
-            }
+            Instr::GroupEnd => list_end(&mut self.state, Instr::GroupBegin, |start, end| {
+                Value::Group(start, end)
+            }),
+
             Instr::Keyword(word) => {
                 // Keywords operate on an implicit stack frame
                 if let Some(func) = self.words.get(&word) {
@@ -386,6 +383,7 @@ impl<S> Interpreter<S> {
                     Err(RuntimeErr::UnknownKeyword(word))
                 }
             }
+
             Instr::LoadString(id) => {
                 // Look up the string and push to the stack
                 match self.strings.get(&id) {
@@ -396,6 +394,7 @@ impl<S> Interpreter<S> {
                     None => Err(RuntimeErr::InvalidArgs),
                 }
             }
+
             Instr::StoreString(id, len) => {
                 // Pull all bytes out of the succeeding raw data instructions
                 // and interpret as a valid unicode string
@@ -414,6 +413,7 @@ impl<S> Interpreter<S> {
                 self.state.pc += len as usize;
                 Ok(None)
             }
+
             _ => Ok(None),
         }
     }

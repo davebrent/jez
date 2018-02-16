@@ -4,7 +4,6 @@ use std::thread;
 
 use vm::Command;
 
-
 pub trait Device: fmt::Display {}
 
 pub trait Sink: Send {
@@ -30,9 +29,11 @@ pub struct CompositeSink {
 
 impl CompositeSink {
     pub fn new(sinks: Vec<Box<Sink>>) -> CompositeSink {
-        let name = sinks.iter().map(|s| s.name()).collect::<Vec<_>>().join(
-            ", ",
-        );
+        let name = sinks
+            .iter()
+            .map(|s| s.name())
+            .collect::<Vec<_>>()
+            .join(", ");
 
         CompositeSink {
             inner: sinks,
@@ -92,8 +93,10 @@ impl Sink for ThreadedSink {
             Some(sink) => sink,
             None => return,
         };
-        thread::spawn(move || while let Ok(cmd) = channel.recv() {
-            sink.recieve(cmd);
+        thread::spawn(move || {
+            while let Ok(cmd) = channel.recv() {
+                sink.recieve(cmd);
+            }
         });
     }
 

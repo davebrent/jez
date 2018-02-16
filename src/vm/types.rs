@@ -4,7 +4,6 @@ use std::rc::Rc;
 use super::interp::{InterpResult, InterpState};
 use super::math::Curve;
 
-
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Destination {
     Midi(u8, u8),

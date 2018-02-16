@@ -1,4 +1,4 @@
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 use ws;
@@ -8,7 +8,6 @@ use vm::Command;
 
 use super::osc::Osc;
 use super::sink::Sink;
-
 
 impl From<ws::Error> for SysErr {
     fn from(_: ws::Error) -> SysErr {
@@ -51,8 +50,7 @@ impl ws::Handler for WebSocketHandler {
 }
 
 impl WebSocketServer {
-    pub fn new(channel: Sender<WebSocketEvent>)
-               -> Result<WebSocketServer, SysErr> {
+    pub fn new(channel: Sender<WebSocketEvent>) -> Result<WebSocketServer, SysErr> {
         Ok(WebSocketServer { channel: channel })
     }
 

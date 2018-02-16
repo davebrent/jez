@@ -25,10 +25,9 @@ use std::time::Duration;
 
 pub use err::JezErr;
 pub use err::RuntimeErr;
-pub use sinks::{SinkArgs, make_sink};
-pub use vm::{Command, Control, Destination, Event, EventValue, Instr,
-             InterpState, Machine, Value, millis_to_dur};
-
+pub use sinks::{make_sink, SinkArgs};
+pub use vm::{millis_to_dur, Command, Control, Destination, Event, EventValue, Instr, InterpState,
+             Machine, Value};
 
 pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));
@@ -44,10 +43,7 @@ pub struct Simulation {
     pub messages: Vec<Command>,
 }
 
-pub fn eval(rev: usize,
-            func: &str,
-            prog: &str)
-            -> Result<(Value, InterpState), JezErr> {
+pub fn eval(rev: usize, func: &str, prog: &str) -> Result<(Value, InterpState), JezErr> {
     let (back_send, _) = channel();
     let (host_send, host_recv) = channel();
 
@@ -58,10 +54,7 @@ pub fn eval(rev: usize,
     Ok((value, machine.interp.state))
 }
 
-pub fn simulate(dur: Duration,
-                dt: Duration,
-                prog: &str)
-                -> Result<Simulation, JezErr> {
+pub fn simulate(dur: Duration, dt: Duration, prog: &str) -> Result<Simulation, JezErr> {
     let (back_send, back_recv) = channel();
     let (host_send, host_recv) = channel();
 
@@ -91,10 +84,7 @@ fn to_str<'a>(s: *const c_char) -> &'a str {
 }
 
 #[no_mangle]
-pub extern "C" fn jez_simulate(dur: c_double,
-                               dt: c_double,
-                               prog: *const c_char)
-                               -> *const c_char {
+pub extern "C" fn jez_simulate(dur: c_double, dt: c_double, prog: *const c_char) -> *const c_char {
     let dur = millis_to_dur(dur);
     let dt = millis_to_dur(dt);
     let prog = to_str(prog);
@@ -106,10 +96,7 @@ pub extern "C" fn jez_simulate(dur: c_double,
 }
 
 #[no_mangle]
-pub extern "C" fn jez_eval(rev: usize,
-                           func: *const c_char,
-                           prog: *const c_char)
-                           -> *const c_char {
+pub extern "C" fn jez_eval(rev: usize, func: *const c_char, prog: *const c_char) -> *const c_char {
     let func = to_str(func);
     let prog = to_str(prog);
     let out = eval(rev, func, prog);

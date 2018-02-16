@@ -18,7 +18,6 @@ use self::sink::{CompositeSink, Sink, ThreadedSink};
 #[cfg(feature = "with-websocket")]
 pub use self::ws::WebSocket;
 
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct SinkArgs<'a> {
     osc_host_addr: &'a str,
@@ -28,11 +27,12 @@ pub struct SinkArgs<'a> {
 }
 
 impl<'a> SinkArgs<'a> {
-    pub fn new(osc_host_addr: &'a str,
-               osc_client_addr: &'a str,
-               ws_host_addr: &'a str,
-               midi_device_id: Option<usize>)
-               -> SinkArgs<'a> {
+    pub fn new(
+        osc_host_addr: &'a str,
+        osc_client_addr: &'a str,
+        ws_host_addr: &'a str,
+        midi_device_id: Option<usize>,
+    ) -> SinkArgs<'a> {
         SinkArgs {
             osc_host_addr: osc_host_addr,
             osc_client_addr: osc_client_addr,
@@ -45,9 +45,7 @@ impl<'a> SinkArgs<'a> {
 pub fn factory(name: &str, args: &SinkArgs) -> Result<Box<Sink>, JezErr> {
     let sink: Box<Sink> = match name {
         "console" | "" => Box::new(Console::new()),
-        "osc" => Box::new(
-            try!(Osc::new(&args.osc_host_addr, &args.osc_client_addr)),
-        ),
+        "osc" => Box::new(try!(Osc::new(&args.osc_host_addr, &args.osc_client_addr))),
         #[cfg(feature = "with-portmidi")]
         "portmidi" => Box::new(try!(Portmidi::new(args.midi_device_id))),
         #[cfg(feature = "with-websocket")]

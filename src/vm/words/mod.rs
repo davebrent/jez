@@ -15,7 +15,6 @@ use std::collections::HashMap;
 
 use vm::types::Keyword;
 
-
 type Module = HashMap<&'static str, Keyword>;
 
 fn bin(words: &mut Module) {

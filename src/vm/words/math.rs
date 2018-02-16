@@ -1,7 +1,6 @@
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
-
 pub fn add(_: &mut SeqState, state: &mut InterpState) -> Result {
     let rhs = try!(state.pop_num());
     let lhs = try!(state.pop_num());

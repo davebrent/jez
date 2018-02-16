@@ -1,8 +1,0 @@
-max_width = 80
-fn_args_layout = "Visual"
-fn_call_stype = "Visual"
-reorder_imports = true
-reorder_imports_in_group = true
-reorder_imported_names = true
-wrap_comments = true
-write_mode = "Overwrite"

@@ -1,7 +1,6 @@
 use vm::interp::InterpState;
 use vm::types::{Result, SeqState};
 
-
 pub fn print(_: &mut SeqState, state: &mut InterpState) -> Result {
     let val = try!(state.last());
     println!("{:?}", val);

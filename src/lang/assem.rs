@@ -6,7 +6,6 @@ use super::dirs::{Argument, Code, Directive, Name, Symbol, Value};
 use err::AssemErr;
 use vm::Instr;
 
-
 pub fn hash_str(text: &str) -> u64 {
     let mut hasher = DefaultHasher::new();
     hasher.write(text.as_bytes());
@@ -35,9 +34,7 @@ impl<'a> Assembler<'a> {
     }
 
     /// Check the language version matches the expected version
-    fn version_directive(&mut self,
-                         dir: &'a Directive)
-                         -> Result<(), AssemErr> {
+    fn version_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
         if dir.args.len() != 1 {
             return Err(AssemErr::UnsupportedVersion(0));
         }
@@ -52,9 +49,7 @@ impl<'a> Assembler<'a> {
     }
 
     /// Declare and initialize global variables
-    fn globals_directive(&mut self,
-                         dir: &'a Directive)
-                         -> Result<(), AssemErr> {
+    fn globals_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
         for token in &dir.args {
             match *token {
                 Argument::Kwarg(ref key, ref val) => {
@@ -89,11 +84,7 @@ impl<'a> Assembler<'a> {
         Ok(())
     }
 
-    fn emit_func(&mut self,
-                 name: u64,
-                 args: u64,
-                 dir: &'a Directive)
-                 -> Result<(), AssemErr> {
+    fn emit_func(&mut self, name: u64, args: u64, dir: &'a Directive) -> Result<(), AssemErr> {
         if self.funcs.contains_key(&name) {
             return Err(AssemErr::DuplicateFunction);
         }
@@ -103,18 +94,16 @@ impl<'a> Assembler<'a> {
 
         for token in &dir.body {
             let instr = match token.data {
-                Code::Symbol(sym) => {
-                    match sym {
-                        Symbol::ListBegin => Instr::ListBegin,
-                        Symbol::ListEnd => Instr::ListEnd,
-                        Symbol::SeqBegin => Instr::SeqBegin,
-                        Symbol::SeqEnd => Instr::SeqEnd,
-                        Symbol::GroupBegin => Instr::GroupBegin,
-                        Symbol::GroupEnd => Instr::GroupEnd,
-                        Symbol::Null => Instr::Null,
-                        Symbol::Assign(var) => Instr::StoreVar(hash_str(var)),
-                    }
-                }
+                Code::Symbol(sym) => match sym {
+                    Symbol::ListBegin => Instr::ListBegin,
+                    Symbol::ListEnd => Instr::ListEnd,
+                    Symbol::SeqBegin => Instr::SeqBegin,
+                    Symbol::SeqEnd => Instr::SeqEnd,
+                    Symbol::GroupBegin => Instr::GroupBegin,
+                    Symbol::GroupEnd => Instr::GroupEnd,
+                    Symbol::Null => Instr::Null,
+                    Symbol::Assign(var) => Instr::StoreVar(hash_str(var)),
+                },
                 Code::Value(ref val) => self.from_value(val),
             };
             self.instrs.push(instr);
@@ -125,9 +114,7 @@ impl<'a> Assembler<'a> {
         Ok(())
     }
 
-    pub fn assemble(&mut self,
-                    dirs: &'a [Directive])
-                    -> Result<Vec<Instr>, AssemErr> {
+    pub fn assemble(&mut self, dirs: &'a [Directive]) -> Result<Vec<Instr>, AssemErr> {
         for dir in dirs {
             let res = match dir.name.data {
                 Name::Version => self.version_directive(dir),
@@ -150,9 +137,8 @@ impl<'a> Assembler<'a> {
         // Pack string literals
         for (i, literal) in self.strings.iter().enumerate() {
             let bytes = literal.as_bytes();
-            self.instrs.push(
-                Instr::StoreString(i as u64, bytes.len() as u64),
-            );
+            self.instrs
+                .push(Instr::StoreString(i as u64, bytes.len() as u64));
             for b in bytes {
                 self.instrs.push(Instr::RawData(*b));
             }
@@ -222,36 +208,20 @@ mod tests {
             Directive {
                 name: Token::new(Name::Version, Default::default()),
                 args: vec![
-                    Argument::Arg(
-                        Token::new(Value::Number(0.0), Default::default())
-                    ),
+                    Argument::Arg(Token::new(Value::Number(0.0), Default::default())),
                 ],
                 body: vec![],
             },
             Directive {
                 name: Token::new(Name::Def, Default::default()),
                 args: vec![
-                    Argument::Arg(Token::new(
-                        Value::Keyword("main"),
-                        Default::default(),
-                    )),
-                    Argument::Arg(
-                        Token::new(Value::Number(0.0), Default::default())
-                    ),
+                    Argument::Arg(Token::new(Value::Keyword("main"), Default::default())),
+                    Argument::Arg(Token::new(Value::Number(0.0), Default::default())),
                 ],
                 body: vec![
-                    Token::new(
-                        Code::Value(Value::StringLiteral("abc")),
-                        Default::default()
-                    ),
-                    Token::new(
-                        Code::Value(Value::StringLiteral("def")),
-                        Default::default()
-                    ),
-                    Token::new(
-                        Code::Value(Value::StringLiteral("abc")),
-                        Default::default()
-                    ),
+                    Token::new(Code::Value(Value::StringLiteral("abc")), Default::default()),
+                    Token::new(Code::Value(Value::StringLiteral("def")), Default::default()),
+                    Token::new(Code::Value(Value::StringLiteral("abc")), Default::default()),
                 ],
             },
         ];
@@ -296,9 +266,7 @@ mod tests {
             Directive {
                 name: Token::new(Name::Version, Default::default()),
                 args: vec![
-                    Argument::Arg(
-                        Token::new(Value::Number(0.0), Default::default())
-                    ),
+                    Argument::Arg(Token::new(Value::Number(0.0), Default::default())),
                 ],
                 body: vec![],
             },
@@ -307,11 +275,11 @@ mod tests {
                 args: vec![
                     Argument::Kwarg(
                         Token::new("b", Default::default()),
-                        Token::new(Value::Number(2.0), Default::default())
+                        Token::new(Value::Number(2.0), Default::default()),
                     ),
                     Argument::Kwarg(
                         Token::new("a", Default::default()),
-                        Token::new(Value::Number(3.9), Default::default())
+                        Token::new(Value::Number(3.9), Default::default()),
                     ),
                 ],
                 body: vec![],
@@ -319,43 +287,23 @@ mod tests {
             Directive {
                 name: Token::new(Name::Def, Default::default()),
                 args: vec![
-                    Argument::Arg(
-                        Token::new(Value::Keyword("bar"), Default::default())
-                    ),
-                    Argument::Arg(
-                        Token::new(Value::Number(1.0), Default::default())
-                    ),
+                    Argument::Arg(Token::new(Value::Keyword("bar"), Default::default())),
+                    Argument::Arg(Token::new(Value::Number(1.0), Default::default())),
                 ],
                 body: vec![
-                    Token::new(
-                        Code::Value(Value::Number(2.7)),
-                        Default::default()
-                    ),
-                    Token::new(
-                        Code::Value(Value::Keyword("add")),
-                        Default::default()
-                    ),
+                    Token::new(Code::Value(Value::Number(2.7)), Default::default()),
+                    Token::new(Code::Value(Value::Keyword("add")), Default::default()),
                 ],
             },
             Directive {
                 name: Token::new(Name::Def, Default::default()),
                 args: vec![
-                    Argument::Arg(
-                        Token::new(Value::Keyword("foo"), Default::default())
-                    ),
-                    Argument::Arg(
-                        Token::new(Value::Number(1.0), Default::default())
-                    ),
+                    Argument::Arg(Token::new(Value::Keyword("foo"), Default::default())),
+                    Argument::Arg(Token::new(Value::Number(1.0), Default::default())),
                 ],
                 body: vec![
-                    Token::new(
-                        Code::Value(Value::Number(3.6)),
-                        Default::default()
-                    ),
-                    Token::new(
-                        Code::Value(Value::Keyword("bar")),
-                        Default::default()
-                    ),
+                    Token::new(Code::Value(Value::Number(3.6)), Default::default()),
+                    Token::new(Code::Value(Value::Keyword("bar")), Default::default()),
                 ],
             },
         ];

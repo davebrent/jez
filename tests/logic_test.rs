@@ -2,7 +2,6 @@ extern crate jez;
 
 use jez::{InterpState, Value};
 
-
 fn eval(rev: usize, prog: &'static str) -> (Value, InterpState) {
     jez::eval(rev, "main", prog).unwrap()
 }

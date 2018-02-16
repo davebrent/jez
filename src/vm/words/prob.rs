@@ -5,7 +5,6 @@ use err::RuntimeErr;
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
-
 /// Push a random integer, within a range, onto the stack
 pub fn rand_range(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let max = try!(state.pop_num()) as i64;

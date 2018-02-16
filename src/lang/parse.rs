@@ -3,9 +3,7 @@ use std::fmt;
 
 use err::ParseErr;
 
-use super::dirs::{Argument, Code, Directive, Location, Name, Symbol, Token,
-                  Value};
-
+use super::dirs::{Argument, Code, Directive, Location, Name, Symbol, Token, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Status {
@@ -36,8 +34,7 @@ impl fmt::Display for Status {
 }
 
 fn is_alphabetic(chr: char) -> bool {
-    (chr as u8 >= 0x41 && chr as u8 <= 0x5A) ||
-        (chr as u8 >= 0x61 && chr as u8 <= 0x7A)
+    (chr as u8 >= 0x41 && chr as u8 <= 0x5A) || (chr as u8 >= 0x61 && chr as u8 <= 0x7A)
 }
 
 fn is_digit(chr: char) -> bool {
@@ -264,9 +261,8 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             None => return Err(Status::Incomplete),
         };
 
-        let res = self.stream.take_while(|c| {
-            is_alphanumeric(c) || c == '#' || c == '_' || c == '-'
-        });
+        let res = self.stream
+            .take_while(|c| is_alphanumeric(c) || c == '#' || c == '_' || c == '-');
 
         match res {
             Some((string, loc)) => Ok(Token::new(string, loc)),
@@ -292,9 +288,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             }
             '"' => {
                 self.stream.next().unwrap(); // "
-                // FIXME: Handle escaping + white space
-                let (string, loc) =
-                    self.stream.take_while(|c| c != '"').unwrap();
+                let (string, loc) = self.stream.take_while(|c| c != '"').unwrap();
                 self.stream.next().unwrap(); // "
                 Token::new(Value::StringLiteral(string), loc)
             }
