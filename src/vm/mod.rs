@@ -155,16 +155,13 @@ impl Machine {
         timers.interval(0.5, Signal::Bus);
 
         // Create tracks as defined by block 1
-        match try!(self.interp.eval_block(1)) {
-            Some(val) => {
-                let (start, end) = try!(val.as_range());
-                for (i, ptr) in (start..end).enumerate() {
-                    let sym = try!(try!(self.interp.state.heap_get(ptr)).as_sym());
-                    self.interp.data.tracks.push(Track::new(i, sym));
-                }
+        if let Some(val) = try!(self.interp.eval_block(1)) {
+            let (start, end) = try!(val.as_range());
+            for (i, ptr) in (start..end).enumerate() {
+                let sym = try!(try!(self.interp.state.heap_get(ptr)).as_sym());
+                self.interp.data.tracks.push(Track::new(i, sym));
             }
-            None => (),
-        };
+        }
 
         // Reset interpreter and call into `main`
         self.interp.data.revision = 0;

@@ -68,7 +68,7 @@ impl<'a> TokenStream<'a> {
     }
 
     pub fn peek(&self) -> Option<(char, Location)> {
-        let mut loc = self.loc.clone();
+        let mut loc = self.loc;
         let mut is_comment = false;
 
         loop {

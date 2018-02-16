@@ -167,7 +167,7 @@ impl<'a> fmt::Display for Directive<'a> {
             try!(write!(f, "{}", arg));
         }
 
-        if self.body.len() != 0 {
+        if !self.body.is_empty() {
             try!(write!(f, ":\n "));
         }
 

@@ -45,7 +45,7 @@ impl<'a> SinkArgs<'a> {
 pub fn factory(name: &str, args: &SinkArgs) -> Result<Box<Sink>, JezErr> {
     let sink: Box<Sink> = match name {
         "console" | "" => Box::new(Console::new()),
-        "osc" => Box::new(try!(Osc::new(&args.osc_host_addr, &args.osc_client_addr))),
+        "osc" => Box::new(try!(Osc::new(args.osc_host_addr, args.osc_client_addr))),
         #[cfg(feature = "with-portmidi")]
         "portmidi" => Box::new(try!(Portmidi::new(args.midi_device_id))),
         #[cfg(feature = "with-websocket")]

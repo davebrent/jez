@@ -101,9 +101,8 @@ impl Sink for ThreadedSink {
     }
 
     fn recieve(&mut self, cmd: Command) {
-        match self.inner {
-            Some(ref mut sink) => sink.recieve(cmd),
-            None => (),
+        if let Some(ref mut sink) = self.inner {
+            sink.recieve(cmd);
         }
     }
 }

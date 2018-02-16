@@ -52,9 +52,7 @@ impl Value {
 
     pub fn as_range(&self) -> Result<(usize, usize), RuntimeErr> {
         match *self {
-            Value::List(a, b) => Ok((a, b)),
-            Value::Group(a, b) => Ok((a, b)),
-            Value::Seq(a, b) => Ok((a, b)),
+            Value::List(a, b) | Value::Group(a, b) | Value::Seq(a, b) => Ok((a, b)),
             _ => Err(RuntimeErr::InvalidArgs),
         }
     }

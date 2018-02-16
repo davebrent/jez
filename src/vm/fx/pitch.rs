@@ -26,6 +26,7 @@ impl PitchQuantizeFilter {
         keys.insert(hash_str("A#"), 10);
         keys.insert(hash_str("B"), 11);
 
+        #[cfg_attr(feature = "clippy", deny(many_single_char_names))]
         let (c, cs, d, eb, e, f, fs, g, ab, a, bb, b) = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
 
         let mut ss = HashMap::new();
