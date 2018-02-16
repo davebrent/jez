@@ -9,6 +9,39 @@ pub use super::state::InterpState;
 
 pub type Keyword<S> = fn(&mut S, &mut InterpState) -> InterpResult;
 
+pub trait Interpreter<S> {
+    /// Reset the interpreters internal state
+    fn reset(&mut self);
+
+    /// Return a mutable reference to user/extension data
+    fn data_mut(&mut self) -> &mut S;
+
+    /// Return a copy of the interpreters internal state
+    fn state(&self) -> InterpState;
+
+    /// Return all the interpreters instructions
+    fn instrs(&self) -> &[Instr];
+
+    /// Execute a single instruction
+    fn execute(&mut self, instr: Instr) -> InterpResult;
+
+    /// Evaluate all instructions from a program counter
+    fn eval(&mut self, pc: usize) -> InterpResult;
+
+    /// Evaluate a block of instructions
+    fn eval_block(&mut self, block: u64) -> InterpResult {
+        let instrs = self.instrs().to_vec();
+        for (pc, instr) in instrs.iter().enumerate() {
+            if let Instr::Begin(word) = *instr {
+                if word == block {
+                    return self.eval(pc + 1);
+                }
+            }
+        }
+        Err(RuntimeErr::InvalidArgs)
+    }
+}
+
 fn list_begin(state: &mut InterpState, begin: Instr) -> InterpResult {
     let val = Value::Instruction(begin);
     try!(state.push(val));
@@ -38,26 +71,26 @@ where
     }
 }
 
-pub struct Interpreter<S> {
-    pub data: S,
-    pub state: InterpState,
+pub struct BaseInterpreter<S> {
+    data: S,
+    state: InterpState,
     instrs: Vec<Instr>,
     words: HashMap<u64, Keyword<S>>,
     strings: HashMap<u64, String>,
 }
 
-impl<S> Interpreter<S> {
+impl<S> BaseInterpreter<S> {
     pub fn new(
         instrs: Vec<Instr>,
         exts: &HashMap<&'static str, Keyword<S>>,
         data: S,
-    ) -> Interpreter<S> {
+    ) -> BaseInterpreter<S> {
         let mut words = HashMap::new();
         for (word, func) in exts {
             words.insert(hash_str(word), *func);
         }
 
-        let mut interpreter = Interpreter {
+        let mut interpreter = BaseInterpreter {
             instrs: instrs,
             words: words,
             data: data,
@@ -70,14 +103,35 @@ impl<S> Interpreter<S> {
         interpreter.state.reset();
         interpreter
     }
+}
 
-    pub fn step(&mut self, instr: Instr) -> InterpResult {
+impl<S> Interpreter<S> for BaseInterpreter<S> {
+    fn instrs(&self) -> &[Instr] {
+        &self.instrs
+    }
+
+    fn state(&self) -> InterpState {
+        self.state.clone()
+    }
+
+    fn data_mut(&mut self) -> &mut S {
+        &mut self.data
+    }
+
+    fn reset(&mut self) {
+        self.state.reset();
+    }
+
+    fn execute(&mut self, instr: Instr) -> InterpResult {
         match instr {
             Instr::Null => self.state.push(Value::Null),
+
             Instr::LoadNumber(n) => self.state.push(Value::Number(n)),
+
             Instr::LoadSymbol(s) => self.state.push(Value::Symbol(s)),
 
             Instr::Call(args, pc) => self.state.call(args, pc),
+
             Instr::Return => self.state.ret(),
 
             Instr::StoreGlob(name) => {
@@ -156,29 +210,17 @@ impl<S> Interpreter<S> {
         }
     }
 
-    pub fn eval(&mut self, pc: usize) -> InterpResult {
+    fn eval(&mut self, pc: usize) -> InterpResult {
         try!(self.state.call(0, pc));
         while self.state.pc < self.instrs.len() && !self.state.exit {
             let instr = self.instrs[self.state.pc];
-            match try!(self.step(instr)) {
+            match try!(self.execute(instr)) {
                 None => (),
                 Some(val) => return Ok(Some(val)),
             }
             self.state.pc += 1;
         }
         Ok(None)
-    }
-
-    pub fn eval_block(&mut self, block: u64) -> InterpResult {
-        let instrs = self.instrs.clone();
-        for (pc, instr) in instrs.iter().enumerate() {
-            if let Instr::Begin(word) = *instr {
-                if word == block {
-                    return self.eval(pc + 1);
-                }
-            }
-        }
-        Err(RuntimeErr::InvalidArgs)
     }
 }
 
@@ -195,7 +237,7 @@ mod tests {
             Instr::LoadVar(hash_str("foo")),
             Instr::Return,
         ];
-        let mut interp = Interpreter::new(instrs, &HashMap::new(), ());
+        let mut interp = BaseInterpreter::new(instrs, &HashMap::new(), ());
         let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(3.0));
     }
@@ -213,7 +255,7 @@ mod tests {
             Instr::Return,
             Instr::End(0),
         ];
-        let mut interp = Interpreter::new(instrs, &HashMap::new(), ());
+        let mut interp = BaseInterpreter::new(instrs, &HashMap::new(), ());
         let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Number(200.0));
     }
@@ -233,7 +275,7 @@ mod tests {
             Instr::Return,
             Instr::End(0),
         ];
-        let mut interp = Interpreter::new(instrs, &HashMap::new(), ());
+        let mut interp = BaseInterpreter::new(instrs, &HashMap::new(), ());
         let res = interp.eval(1).unwrap();
         assert_eq!(res.unwrap(), Value::Str(String::from("abc")));
     }

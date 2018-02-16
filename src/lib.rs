@@ -51,7 +51,7 @@ pub fn eval(rev: usize, func: &str, prog: &str) -> Result<(Value, InterpState), 
     let mut machine = Machine::new(back_send, host_send, host_recv, &instrs);
 
     let value = try!(machine.eval(func, rev));
-    Ok((value, machine.interp.state))
+    Ok((value, machine.interp.state()))
 }
 
 pub fn simulate(dur: Duration, dt: Duration, prog: &str) -> Result<Simulation, JezErr> {

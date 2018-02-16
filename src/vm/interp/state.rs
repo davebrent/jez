@@ -5,7 +5,7 @@ use err::RuntimeErr;
 use super::types::{InterpResult, Value};
 use super::stack::StackFrame;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct InterpState {
     pub reserved: usize,
     pub heap: Vec<Value>,

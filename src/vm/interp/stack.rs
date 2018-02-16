@@ -4,7 +4,7 @@ use err::RuntimeErr;
 
 use super::types::Value;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct StackFrame {
     pub stack: Vec<Value>,
     pub locals: HashMap<u64, usize>,

@@ -17,7 +17,7 @@ use err::{JezErr, RuntimeErr, SysErr};
 use lang::hash_str;
 
 pub use self::interp::{Instr, InterpState, Value};
-use self::interp::Interpreter;
+use self::interp::{BaseInterpreter, Interpreter};
 pub use self::math::{dur_to_millis, millis_to_dur};
 use self::midi::MidiProcessor;
 use self::time::{TimeEvent, TimerUnit};
@@ -46,7 +46,7 @@ struct SignalState {
 }
 
 pub struct Machine {
-    pub interp: Interpreter<SeqState>,
+    pub interp: Box<Interpreter<SeqState>>,
     backend: Sender<Command>,
     bus_recv: Receiver<Command>,
     functions: HashMap<u64, usize>,
@@ -71,7 +71,11 @@ impl Machine {
             backend: backend,
             bus_recv: bus_recv,
             functions: funcs,
-            interp: Interpreter::new(instrs.to_vec(), &words::all(), SeqState::new()),
+            interp: Box::new(BaseInterpreter::new(
+                instrs.to_vec(),
+                &words::all(),
+                SeqState::new(),
+            )),
             midi: MidiProcessor::new(bus_send.clone()),
         }
     }
@@ -102,7 +106,7 @@ impl Machine {
 
     pub fn exec_realtime(&mut self) -> Result<Control, JezErr> {
         let (mut signals, mut timers) = try!(self.setup());
-        if self.interp.data.tracks.is_empty() {
+        if self.interp.data_mut().tracks.is_empty() {
             return Ok(Control::Stop);
         }
 
@@ -126,11 +130,13 @@ impl Machine {
 
     pub fn eval(&mut self, func: &str, rev: usize) -> Result<Value, JezErr> {
         let func = hash_str(func);
-
-        self.interp.data.revision = rev;
-        self.interp.data.duration = 0.0;
-        self.interp.data.events.clear();
-        self.interp.state.reset();
+        {
+            let data = self.interp.data_mut();
+            data.revision = rev;
+            data.duration = 0.0;
+            data.events.clear();
+        }
+        self.interp.reset();
 
         match self.interp.eval(self.functions[&func]) {
             Err(err) => Err(From::from(err)),
@@ -157,24 +163,24 @@ impl Machine {
         // Create tracks as defined by block 1
         if let Some(val) = try!(self.interp.eval_block(1)) {
             let (start, end) = try!(val.as_range());
+            let state = self.interp.state();
             for (i, ptr) in (start..end).enumerate() {
-                let sym = try!(try!(self.interp.state.heap_get(ptr)).as_sym());
-                self.interp.data.tracks.push(Track::new(i, sym));
+                let sym = try!(try!(state.heap_get(ptr)).as_sym());
+                let data = self.interp.data_mut();
+                data.tracks.push(Track::new(i, sym));
             }
         }
 
         // Reset interpreter and call into `main`
-        self.interp.data.revision = 0;
-        self.interp.data.duration = 0.0;
-        self.interp.data.events.clear();
-        self.interp.state.reset();
+        self.interp.data_mut().reset(0);
+        self.interp.reset();
         match self.functions.get(&hash_str("main")) {
             Some(pc) => try!(self.interp.eval(*pc)),
             None => None,
         };
 
         // Schedule track functions to be interpreted
-        for track in &self.interp.data.tracks {
+        for track in &self.interp.data_mut().tracks {
             let track = Signal::Track(track.id, 0, track.func);
             let cmd = TimeEvent::Timeout(0.0, track);
             signals.output.send(cmd).ok();
@@ -261,27 +267,29 @@ impl Machine {
         rev: usize,
         func: u64,
     ) -> Result<Control, JezErr> {
-        self.interp.data.revision = rev;
-        self.interp.data.duration = 0.0;
-        self.interp.data.events.clear();
-        self.interp.state.reset();
+        self.interp.data_mut().reset(rev);
+        self.interp.reset();
         try!(self.interp.eval(self.functions[&func]));
 
         // Apply track effects
         let track = &mut self.interp.data.tracks[num];
         let dur = self.interp.data.duration;
+        let data = self.interp.data_mut();
         for fx in &mut track.effects {
             let fx = Rc::get_mut(fx).unwrap();
-            self.interp.data.events = fx.apply(dur, &self.interp.data.events);
+            data.events = fx.apply(dur, &data.events);
         }
 
-        for event in &self.interp.data.events {
+        for event in &data.events {
             let cmd = TimeEvent::Timeout(event.onset, Signal::Event(*event));
             signals.output.send(cmd).ok();
         }
 
         let msg = Signal::Track(num, rev + 1, func);
-        signals.output.send(TimeEvent::Timeout(dur, msg)).ok();
+        signals
+            .output
+            .send(TimeEvent::Timeout(data.duration, msg))
+            .ok();
         Ok(Control::Continue)
     }
 }

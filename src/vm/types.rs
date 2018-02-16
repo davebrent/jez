@@ -76,4 +76,10 @@ impl SeqState {
             rng: StdRng::from_seed(&[0, 0, 0, 0]),
         }
     }
+
+    pub fn reset(&mut self, rev: usize) {
+        self.revision = rev;
+        self.duration = 0.0;
+        self.events.clear();
+    }
 }
