@@ -267,18 +267,12 @@ impl Machine {
         self.interp.state.reset();
         try!(self.interp.eval(self.functions[&func]));
 
-        // Apply the tracks filters
+        // Apply track effects
         let track = &mut self.interp.data.tracks[num];
         let dur = self.interp.data.duration;
-        for filter in &mut track.filters {
-            let f = try!(Rc::get_mut(filter).ok_or(JezErr::RuntimeErr(RuntimeErr::InvalidArgs,)));
-            self.interp.data.events = f.apply(dur, &self.interp.data.events);
-        }
-
-        // Avoid recursive scheduling of this handler
-        let dur = self.interp.data.duration;
-        if dur == 0.0 {
-            return Err(From::from(RuntimeErr::InvalidArgs));
+        for fx in &mut track.effects {
+            let fx = Rc::get_mut(fx).unwrap();
+            self.interp.data.events = fx.apply(dur, &self.interp.data.events);
         }
 
         for event in &self.interp.data.events {

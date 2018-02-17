@@ -44,7 +44,7 @@ pub type Keyword = fn(&mut SeqState, &mut InterpState) -> InterpResult;
 pub struct Track {
     pub id: usize,
     pub func: u64,
-    pub filters: Vec<Rc<Effect>>,
+    pub effects: Vec<Rc<Effect>>,
 }
 
 impl Track {
@@ -52,7 +52,7 @@ impl Track {
         Track {
             id: id,
             func: func,
-            filters: Vec::new(),
+            effects: Vec::new(),
         }
     }
 }

@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
 use err::RuntimeErr;
-use vm::fx::{MarkovFilter, MidiVelocityMapper, PitchQuantizeFilter};
+use vm::fx::{MarkovChain, MidiVelocityMapper, PitchQuantizer};
 use vm::interp::InterpState;
 use vm::types::{Result, SeqState};
 
-pub fn pitch_quantize_filter(seq: &mut SeqState, state: &mut InterpState) -> Result {
+pub fn pitch_quantizer(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let scale = try!(try!(state.pop()).as_sym());
     let octave = try!(state.pop_num()) as usize;
     let key = try!(try!(state.pop()).as_sym());
@@ -19,17 +19,17 @@ pub fn pitch_quantize_filter(seq: &mut SeqState, state: &mut InterpState) -> Res
         None => return Err(RuntimeErr::InvalidArgs),
     };
 
-    let filter = match PitchQuantizeFilter::new(key, octave, scale) {
-        Some(filter) => filter,
+    let fx = match PitchQuantizer::new(key, octave, scale) {
+        Some(fx) => fx,
         None => return Err(RuntimeErr::InvalidArgs),
     };
 
-    track.filters.push(Rc::new(filter));
+    track.effects.push(Rc::new(fx));
     Ok(None)
 }
 
-/// Assign a markov filter to a track
-pub fn markov_filter(seq: &mut SeqState, state: &mut InterpState) -> Result {
+/// Assign a markov chain to a track
+pub fn markov_chain(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let capacity = try!(state.pop_num()) as usize;
     let order = try!(state.pop_num()) as usize;
     let sym = try!(try!(state.pop()).as_sym());
@@ -43,15 +43,15 @@ pub fn markov_filter(seq: &mut SeqState, state: &mut InterpState) -> Result {
         .find(|ref mut track| track.func == sym)
     {
         Some(track) => {
-            let filter = MarkovFilter::new(order, capacity, seq.rng);
-            track.filters.push(Rc::new(filter));
+            let fx = MarkovChain::new(order, capacity, seq.rng);
+            track.effects.push(Rc::new(fx));
             Ok(None)
         }
         None => Err(RuntimeErr::InvalidArgs),
     }
 }
 
-pub fn midi_velocity_filter(seq: &mut SeqState, state: &mut InterpState) -> Result {
+pub fn midi_velocity_mapper(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let param = try!(try!(state.pop()).as_sym());
     let device = try!(try!(state.pop()).as_sym());
     let name = try!(try!(state.pop()).as_sym());
@@ -65,7 +65,7 @@ pub fn midi_velocity_filter(seq: &mut SeqState, state: &mut InterpState) -> Resu
     };
 
     match MidiVelocityMapper::new(device, param) {
-        Some(filter) => track.filters.push(Rc::new(filter)),
+        Some(fx) => track.effects.push(Rc::new(fx)),
         None => return Err(RuntimeErr::InvalidArgs),
     };
 

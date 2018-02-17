@@ -4,14 +4,14 @@ use lang::hash_str;
 use vm::types::{Effect, Event, EventValue};
 
 #[derive(Clone, Debug)]
-pub struct PitchQuantizeFilter {
+pub struct PitchQuantizer {
     key: usize,
     scale: Vec<usize>,
     octave: usize,
 }
 
-impl PitchQuantizeFilter {
-    pub fn new(key: u64, octave: usize, scale: u64) -> Option<PitchQuantizeFilter> {
+impl PitchQuantizer {
+    pub fn new(key: u64, octave: usize, scale: u64) -> Option<PitchQuantizer> {
         let mut keys = HashMap::new();
         keys.insert(hash_str("C"), 0);
         keys.insert(hash_str("C#"), 1);
@@ -56,7 +56,7 @@ impl PitchQuantizeFilter {
             None => return None,
         };
 
-        Some(PitchQuantizeFilter {
+        Some(PitchQuantizer {
             key: key,
             scale: scale,
             octave: octave,
@@ -71,7 +71,7 @@ impl PitchQuantizeFilter {
     }
 }
 
-impl Effect for PitchQuantizeFilter {
+impl Effect for PitchQuantizer {
     fn apply(&mut self, _: f64, events: &[Event]) -> Vec<Event> {
         let mut output = Vec::with_capacity(events.len());
         for event in events {
@@ -90,27 +90,27 @@ impl Effect for PitchQuantizeFilter {
 mod tests {
     use super::*;
 
-    fn filter(key: &'static str, scale: &'static str, octave: usize) -> PitchQuantizeFilter {
-        PitchQuantizeFilter::new(hash_str(key), octave, hash_str(scale)).unwrap()
+    fn fx(key: &'static str, scale: &'static str, octave: usize) -> PitchQuantizer {
+        PitchQuantizer::new(hash_str(key), octave, hash_str(scale)).unwrap()
     }
 
     #[test]
     fn test_octave() {
-        let f = filter("C", "harmonic_minor", 1);
+        let f = fx("C", "harmonic_minor", 1);
         assert_eq!(f.quantize(0.0), 12.0);
     }
 
     #[test]
     fn test_wrap_around_pitches() {
         // D Marva = [D, D#, Eb, F#, Ab, A, B, C#]
-        let f = filter("D", "marva", 0);
+        let f = fx("D", "marva", 0);
         assert_eq!(f.quantize(0.0) /* 1st degree */, 2.0 /* D */);
         assert_eq!(f.quantize(6.0) /* 6th degree */, 13.0 /* C# */);
     }
 
     #[test]
     fn test_shifting_pitches() {
-        let f = filter("C", "harmonic_minor", 0);
+        let f = fx("C", "harmonic_minor", 0);
         assert_eq!(f.quantize(9.0) /* 9th degree */, 15.0 /* D# */);
     }
 }

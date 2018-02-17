@@ -3,5 +3,5 @@ mod pitch;
 mod prob;
 
 pub use self::midi::MidiVelocityMapper;
-pub use self::pitch::PitchQuantizeFilter;
-pub use self::prob::MarkovFilter;
+pub use self::pitch::PitchQuantizer;
+pub use self::prob::MarkovChain;

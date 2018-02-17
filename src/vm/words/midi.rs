@@ -7,6 +7,9 @@ use vm::types::{Destination, Event, EventValue, Result, SeqState};
 pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let chan = try!(state.pop_num()) as u8;
     let dur = try!(state.pop_num());
+    if dur == 0.0 {
+        return Err(RuntimeErr::InvalidArgs);
+    }
 
     let mut output = Vec::new();
 

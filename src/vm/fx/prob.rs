@@ -31,7 +31,7 @@ struct ProbTree {
 }
 
 #[derive(Clone)]
-pub struct MarkovFilter {
+pub struct MarkovChain {
     order: usize,
     capacity: usize,
     input: Vec<State>,
@@ -84,9 +84,9 @@ impl ProbTree {
     }
 }
 
-impl MarkovFilter {
-    pub fn new(order: usize, capacity: usize, rng: StdRng) -> MarkovFilter {
-        MarkovFilter {
+impl MarkovChain {
+    pub fn new(order: usize, capacity: usize, rng: StdRng) -> MarkovChain {
+        MarkovChain {
             order: order,
             capacity: capacity,
             input: vec![],
@@ -275,7 +275,7 @@ impl MarkovFilter {
     }
 }
 
-impl Effect for MarkovFilter {
+impl Effect for MarkovChain {
     fn apply(&mut self, dur: f64, events: &[Event]) -> Vec<Event> {
         self.observe(dur, events);
 
@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_start_key() {
-        let mut f = MarkovFilter::new(2, 16, random());
+        let mut f = MarkovChain::new(2, 16, random());
 
         let events = vec![
             event(0.0, 100.0, 1.0),
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_continuous_stream() {
-        let mut f = MarkovFilter::new(1, 8, random());
+        let mut f = MarkovChain::new(1, 8, random());
         let events = vec![
             event(0.0, 100.0, 1.0),
             event(100.0, 100.0, 2.0),

@@ -32,9 +32,9 @@ fn debug(words: &mut Module) {
 }
 
 fn fx(words: &mut Module) {
-    words.insert("pitch_quantize_filter", fx::pitch_quantize_filter);
-    words.insert("markov_filter", fx::markov_filter);
-    words.insert("midi_velocity_filter", fx::midi_velocity_filter);
+    words.insert("pitch_quantizer", fx::pitch_quantizer);
+    words.insert("markov_chain", fx::markov_chain);
+    words.insert("midi_velocity_mapper", fx::midi_velocity_mapper);
 }
 
 fn list(words: &mut Module) {
