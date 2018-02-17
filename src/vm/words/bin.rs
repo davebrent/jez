@@ -37,7 +37,7 @@ mod tests {
     fn test_binlist() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.push(Value::Number(5.0)).unwrap();
         state.push(Value::Number(12.0)).unwrap();
         bin_list(&mut seq, &mut state).unwrap();
@@ -59,7 +59,7 @@ mod tests {
     fn test_graycode() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.push(Value::Number(12.0)).unwrap();
         gray_code(&mut seq, &mut state).unwrap();
         assert_eq!(state.pop_num().unwrap() as i64, 10);

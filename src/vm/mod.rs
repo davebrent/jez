@@ -17,7 +17,7 @@ use err::{JezErr, RuntimeErr, SysErr};
 use lang::hash_str;
 
 pub use self::interp::{Instr, InterpState, Value};
-use self::interp::{BaseInterpreter, Interpreter};
+use self::interp::{BaseInterpreter, Interpreter, StackTraceInterpreter};
 pub use self::math::{dur_to_millis, millis_to_dur};
 use self::midi::MidiProcessor;
 use self::time::{TimeEvent, TimerUnit};
@@ -67,15 +67,19 @@ impl Machine {
             }
         }
 
+        let interp = Box::new(BaseInterpreter::new(
+            instrs.to_vec(),
+            &words::all(),
+            SeqState::new(),
+        ));
+
+        let interp = Box::new(StackTraceInterpreter::new(interp));
+
         Machine {
             backend: backend,
             bus_recv: bus_recv,
             functions: funcs,
-            interp: Box::new(BaseInterpreter::new(
-                instrs.to_vec(),
-                &words::all(),
-                SeqState::new(),
-            )),
+            interp: interp,
             midi: MidiProcessor::new(bus_send.clone()),
         }
     }
@@ -207,7 +211,7 @@ impl Machine {
                 Signal::Event(event) => self.handle_event_signal(event),
                 Signal::Track(num, rev, func) => self.handle_track_signal(signals, num, rev, func),
             },
-            _ => Err(From::from(RuntimeErr::InvalidArgs)),
+            _ => Err(From::from(RuntimeErr::InvalidArgs(None))),
         }
     }
 
@@ -272,12 +276,11 @@ impl Machine {
         try!(self.interp.eval(self.functions[&func]));
 
         // Apply track effects
-        let track = &mut self.interp.data.tracks[num];
-        let dur = self.interp.data.duration;
         let data = self.interp.data_mut();
+        let track = &mut data.tracks[num];
         for fx in &mut track.effects {
             let fx = Rc::get_mut(fx).unwrap();
-            data.events = fx.apply(dur, &data.events);
+            data.events = fx.apply(data.duration, &data.events);
         }
 
         for event in &data.events {

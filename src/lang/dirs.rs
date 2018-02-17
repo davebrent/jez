@@ -203,4 +203,11 @@ impl<'a> Argument<'a> {
             _ => Err(AssemErr::DuplicateVariable),
         }
     }
+
+    pub fn loc(&self) -> Result<Location, AssemErr> {
+        match *self {
+            Argument::Arg(ref val) => Ok(val.loc),
+            _ => Err(AssemErr::DuplicateVariable),
+        }
+    }
 }

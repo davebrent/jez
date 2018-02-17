@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::{DefaultHasher, Entry};
 use std::hash::Hasher;
 
-use super::dirs::{Argument, Code, Directive, Name, Symbol, Value};
+use super::dirs::{Argument, Code, Directive, Location, Name, Symbol, Value};
 use err::AssemErr;
 use vm::Instr;
 
@@ -19,6 +19,7 @@ struct Assembler<'a> {
     instrs: Vec<Instr>,
     string_map: HashMap<&'a str, usize>,
     strings: Vec<&'a str>,
+    debug: Vec<(usize, Location)>,
 }
 
 impl<'a> Assembler<'a> {
@@ -30,6 +31,7 @@ impl<'a> Assembler<'a> {
             instrs: Vec::new(),
             string_map: HashMap::new(),
             strings: Vec::new(),
+            debug: Vec::new(),
         }
     }
 
@@ -69,7 +71,10 @@ impl<'a> Assembler<'a> {
 
     /// Define new keywords/functions
     fn define_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
-        let name = try!(try!(dir.arg_at(0)).as_value());
+        let arg = try!(dir.arg_at(0));
+        let name = try!(arg.as_value());
+        self.debug.push((self.instrs.len(), try!(arg.loc())));
+
         let name = hash_str(try!(name.as_keyword()));
         let args = try!(try!(try!(dir.arg_at(1)).as_value()).as_num()) as u64;
         self.emit_func(name, args, dir)
@@ -77,7 +82,10 @@ impl<'a> Assembler<'a> {
 
     /// Define new track functions
     fn track_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
-        let name = try!(try!(dir.arg_at(0)).as_value());
+        let arg = try!(dir.arg_at(0));
+        let name = try!(arg.as_value());
+        self.debug.push((self.instrs.len(), try!(arg.loc())));
+
         let name = hash_str(try!(name.as_keyword()));
         try!(self.emit_func(name, 0, dir));
         self.tracks.push(name);
@@ -106,6 +114,7 @@ impl<'a> Assembler<'a> {
                 },
                 Code::Value(ref val) => self.from_value(val),
             };
+            self.debug.push((self.instrs.len(), token.loc));
             self.instrs.push(instr);
         }
 
@@ -114,7 +123,11 @@ impl<'a> Assembler<'a> {
         Ok(())
     }
 
-    pub fn assemble(&mut self, dirs: &'a [Directive]) -> Result<Vec<Instr>, AssemErr> {
+    pub fn assemble(
+        &mut self,
+        prog: &'a str,
+        dirs: &'a [Directive],
+    ) -> Result<Vec<Instr>, AssemErr> {
         for dir in dirs {
             let res = match dir.name.data {
                 Name::Version => self.version_directive(dir),
@@ -132,6 +145,19 @@ impl<'a> Assembler<'a> {
         for key in &global_keys {
             self.instrs.push(self.globals[*key]);
             self.instrs.push(Instr::StoreGlob(hash_str(key)));
+        }
+
+        // Map instructions to tokens
+        for &(pc, loc) in &self.debug {
+            let tk = &prog[loc.begin..loc.end];
+            let id = self.strings.len();
+            self.strings.push(tk);
+            self.instrs.push(Instr::SourceLoc(
+                pc as u64,
+                id as u64,
+                loc.line as u64,
+                loc.col as u64,
+            ));
         }
 
         // Pack string literals
@@ -193,8 +219,8 @@ impl<'a> Assembler<'a> {
     }
 }
 
-pub fn assemble(dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
-    Assembler::new().assemble(dirs)
+pub fn assemble(prog: &str, dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
+    Assembler::new().assemble(prog, dirs)
 }
 
 #[cfg(test)]
@@ -226,7 +252,7 @@ mod tests {
             },
         ];
 
-        let result = assemble(&dirs).unwrap();
+        let result = assemble("", &dirs).unwrap();
         let instrs = vec![
             Instr::Begin(17450787904383802648),
             Instr::LoadString(0),
@@ -235,6 +261,10 @@ mod tests {
             Instr::Return,
             Instr::End(17450787904383802648),
             Instr::Begin(0),
+            Instr::SourceLoc(0, 2, 1, 0),
+            Instr::SourceLoc(1, 3, 1, 0),
+            Instr::SourceLoc(2, 4, 1, 0),
+            Instr::SourceLoc(3, 5, 1, 0),
             // abc
             Instr::StoreString(0, 3),
             Instr::RawData(97),
@@ -245,6 +275,10 @@ mod tests {
             Instr::RawData(100),
             Instr::RawData(101),
             Instr::RawData(102),
+            Instr::StoreString(2, 0),
+            Instr::StoreString(3, 0),
+            Instr::StoreString(4, 0),
+            Instr::StoreString(5, 0),
             Instr::Return,
             Instr::End(0),
             Instr::Begin(1),
@@ -308,7 +342,7 @@ mod tests {
             },
         ];
 
-        let result = assemble(&dirs).unwrap();
+        let result = assemble("", &dirs).unwrap();
         let instrs = vec![
             Instr::Begin(15647602356402206823),
             Instr::LoadNumber(2.7),
@@ -325,6 +359,18 @@ mod tests {
             Instr::StoreGlob(4644417185603328019),
             Instr::LoadNumber(2.0),
             Instr::StoreGlob(10025803482645881038),
+            Instr::SourceLoc(0, 0, 1, 0),
+            Instr::SourceLoc(1, 1, 1, 0),
+            Instr::SourceLoc(2, 2, 1, 0),
+            Instr::SourceLoc(5, 3, 1, 0),
+            Instr::SourceLoc(6, 4, 1, 0),
+            Instr::SourceLoc(7, 5, 1, 0),
+            Instr::StoreString(0, 0),
+            Instr::StoreString(1, 0),
+            Instr::StoreString(2, 0),
+            Instr::StoreString(3, 0),
+            Instr::StoreString(4, 0),
+            Instr::StoreString(5, 0),
             Instr::Return,
             Instr::End(0),
             Instr::Begin(1),

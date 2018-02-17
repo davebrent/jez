@@ -180,7 +180,11 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
                     let task = timer_task(time, host_send.clone());
                     tasks.push(task);
                 }
-                Err(_) => return Err(From::from(RuntimeErr::InvalidArgs)),
+                Err(_) => {
+                    let msg = String::from("Invalid time argument");
+                    let err = RuntimeErr::InvalidArgs(Some(msg));
+                    return Err(From::from(err));
+                }
             }
         }
 

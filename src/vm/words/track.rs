@@ -16,7 +16,7 @@ mod tests {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
         seq.revision = 99;
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         revision(&mut seq, &mut state).unwrap();
         assert_eq!(state.pop_num().unwrap(), 99.0);
     }

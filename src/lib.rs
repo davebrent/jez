@@ -31,7 +31,7 @@ pub use vm::{millis_to_dur, Command, Control, Destination, Event, EventValue, In
 
 pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
     let dirs = try!(lang::parser(txt));
-    let instrs = try!(lang::assemble(&dirs));
+    let instrs = try!(lang::assemble(txt, &dirs));
     Ok(instrs)
 }
 

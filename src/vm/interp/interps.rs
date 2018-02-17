@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write;
 
 use err::RuntimeErr;
 use lang::hash_str;
@@ -23,7 +24,7 @@ pub trait Interpreter<S> {
     fn instrs(&self) -> &[Instr];
 
     /// Execute a single instruction
-    fn execute(&mut self, instr: Instr) -> InterpResult;
+    fn execute(&mut self, pc: usize, instr: Instr) -> InterpResult;
 
     /// Evaluate all instructions from a program counter
     fn eval(&mut self, pc: usize) -> InterpResult;
@@ -38,7 +39,7 @@ pub trait Interpreter<S> {
                 }
             }
         }
-        Err(RuntimeErr::InvalidArgs)
+        Err(RuntimeErr::InvalidArgs(None))
     }
 }
 
@@ -76,7 +77,6 @@ pub struct BaseInterpreter<S> {
     state: InterpState,
     instrs: Vec<Instr>,
     words: HashMap<u64, Keyword<S>>,
-    strings: HashMap<u64, String>,
 }
 
 impl<S> BaseInterpreter<S> {
@@ -95,7 +95,6 @@ impl<S> BaseInterpreter<S> {
             words: words,
             data: data,
             state: InterpState::new(),
-            strings: HashMap::new(),
         };
 
         interpreter.eval_block(0).ok();
@@ -122,7 +121,7 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
         self.state.reset();
     }
 
-    fn execute(&mut self, instr: Instr) -> InterpResult {
+    fn execute(&mut self, pc: usize, instr: Instr) -> InterpResult {
         match instr {
             Instr::Null => self.state.push(Value::Null),
 
@@ -130,7 +129,7 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
 
             Instr::LoadSymbol(s) => self.state.push(Value::Symbol(s)),
 
-            Instr::Call(args, pc) => self.state.call(args, pc),
+            Instr::Call(args, ret) => self.state.call(pc, args, ret),
 
             Instr::Return => self.state.ret(),
 
@@ -172,18 +171,19 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
                 if let Some(func) = self.words.get(&word) {
                     func(&mut self.data, &mut self.state)
                 } else {
-                    Err(RuntimeErr::UnknownKeyword(word))
+                    Err(RuntimeErr::UnknownKeyword(None))
                 }
             }
 
             Instr::LoadString(id) => {
                 // Look up the string and push to the stack
-                match self.strings.get(&id) {
+                let string = self.state.strings.get(&id).map(|s| s.clone());
+                match string {
                     Some(string) => {
-                        try!(self.state.push(Value::Str(string.clone())));
+                        try!(self.state.push(Value::Str(string)));
                         Ok(None)
                     }
-                    None => Err(RuntimeErr::InvalidArgs),
+                    None => Err(RuntimeErr::InvalidArgs(None)),
                 }
             }
 
@@ -195,12 +195,12 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
                     let pc = self.state.pc + i as usize + 1;
                     match self.instrs[pc] {
                         Instr::RawData(byte) => bytes.push(byte),
-                        _ => return Err(RuntimeErr::InvalidString),
+                        _ => return Err(RuntimeErr::InvalidArgs(None)),
                     };
                 }
                 match String::from_utf8(bytes) {
-                    Ok(string) => self.strings.insert(id, string),
-                    Err(_) => return Err(RuntimeErr::InvalidString),
+                    Ok(string) => self.state.strings.insert(id, string),
+                    Err(_) => return Err(RuntimeErr::InvalidArgs(None)),
                 };
                 self.state.pc += len as usize;
                 Ok(None)
@@ -211,16 +211,103 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
     }
 
     fn eval(&mut self, pc: usize) -> InterpResult {
-        try!(self.state.call(0, pc));
+        try!(self.state.call(pc, 0, pc));
         while self.state.pc < self.instrs.len() && !self.state.exit {
-            let instr = self.instrs[self.state.pc];
-            match try!(self.execute(instr)) {
+            let pc = self.state.pc;
+            let instr = self.instrs[pc];
+            match try!(self.execute(pc, instr)) {
                 None => (),
                 Some(val) => return Ok(Some(val)),
             }
             self.state.pc += 1;
         }
         Ok(None)
+    }
+}
+
+/// An interpreter that adds stack trace support to another interpreter
+pub struct StackTraceInterpreter<S> {
+    inner: Box<Interpreter<S>>,
+}
+
+impl<S> StackTraceInterpreter<S> {
+    pub fn new(interp: Box<Interpreter<S>>) -> StackTraceInterpreter<S> {
+        StackTraceInterpreter { inner: interp }
+    }
+
+    fn stack_trace(&self) -> String {
+        let state = self.inner.state();
+        // There should always be source loc strings created by the assembler
+        assert!(!state.strings.is_empty());
+
+        let mut msg = String::new();
+        writeln!(&mut msg, "Traceback (most recent call last)").unwrap();
+        for frame in &state.frames {
+            self.fmt_source_loc(&mut msg, frame.begin - 1);
+        }
+        self.fmt_source_loc(&mut msg, state.pc);
+        msg
+    }
+
+    fn source_loc(&self, pc: u64) -> Option<(u64, u64, u64)> {
+        for (_, instr) in self.instrs().to_vec().iter().enumerate() {
+            if let Instr::SourceLoc(other, id, line, col) = *instr {
+                if other == pc {
+                    return Some((id, line, col));
+                }
+            }
+        }
+        None
+    }
+
+    fn fmt_source_loc(&self, stream: &mut String, pc: usize) {
+        let state = self.inner.state();
+        match self.source_loc(pc as u64) {
+            Some((i, line, col)) => {
+                let token = &state.strings[&i];
+                writeln!(stream, "> '{}' at line {} col {}", token, line, col).ok();
+            }
+            None => {
+                let instr = self.inner.instrs()[pc];
+                writeln!(stream, "> Unknown pc={} instr={:?}", pc, instr).ok();
+            }
+        }
+    }
+}
+
+impl<S> Interpreter<S> for StackTraceInterpreter<S> {
+    fn instrs(&self) -> &[Instr] {
+        self.inner.instrs()
+    }
+
+    fn state(&self) -> InterpState {
+        self.inner.state()
+    }
+
+    fn data_mut(&mut self) -> &mut S {
+        self.inner.data_mut()
+    }
+
+    fn reset(&mut self) {
+        self.inner.reset();
+    }
+
+    fn execute(&mut self, pc: usize, instr: Instr) -> InterpResult {
+        self.inner.execute(pc, instr)
+    }
+
+    fn eval(&mut self, pc: usize) -> InterpResult {
+        match self.inner.eval(pc) {
+            Ok(val) => Ok(val),
+            Err(err) => {
+                let msg = Some(self.stack_trace());
+                Err(match err {
+                    RuntimeErr::UnknownKeyword(_) => RuntimeErr::UnknownKeyword(msg),
+                    RuntimeErr::InvalidArgs(_) => RuntimeErr::InvalidArgs(msg),
+                    RuntimeErr::StackExhausted(_) => RuntimeErr::StackExhausted(msg),
+                })
+            }
+        }
     }
 }
 

@@ -16,7 +16,7 @@ pub fn hop_jump(_: &mut SeqState, state: &mut InterpState) -> Result {
     let onsets = try!(state.pop_num()) as usize;
 
     if onsets * hopsize >= pulses {
-        return Err(RuntimeErr::InvalidArgs);
+        return Err(RuntimeErr::InvalidArgs(None));
     }
 
     let mut rhythm: Vec<u8> = vec![0; pulses];

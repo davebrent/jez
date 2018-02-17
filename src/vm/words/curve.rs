@@ -7,7 +7,7 @@ use vm::types::{Result, SeqState};
 pub fn linear(_: &mut SeqState, state: &mut InterpState) -> Result {
     let (start, end) = try!(try!(state.pop()).as_range());
     if end - start != 2 {
-        return Err(RuntimeErr::InvalidArgs);
+        return Err(RuntimeErr::InvalidArgs(None));
     }
 
     let c0 = try!(try!(state.heap_get(start)).as_num());

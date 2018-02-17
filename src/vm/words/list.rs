@@ -113,7 +113,7 @@ mod tests {
     fn test_range() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.push(Value::Number(2.0)).unwrap();
         state.push(Value::Number(6.0)).unwrap();
         range(&mut seq, &mut state).unwrap();
@@ -133,7 +133,7 @@ mod tests {
     fn repeat_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.push(Value::Number(12.0)).unwrap();
         state.push(Value::Number(3.0)).unwrap();
         repeat(&mut seq, &mut state).unwrap();
@@ -148,7 +148,7 @@ mod tests {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
         seq.revision = 3;
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.push(Value::Number(3.14)).unwrap();
         state.push(Value::Number(2.17)).unwrap();
         state.push(Value::Number(3.0)).unwrap();
@@ -162,7 +162,7 @@ mod tests {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
         seq.revision = 3;
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.push(Value::Number(3.14)).unwrap();
         state.push(Value::Number(2.17)).unwrap();
         state.push(Value::Number(4.0)).unwrap();
@@ -175,7 +175,7 @@ mod tests {
     fn reverse_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
         state.heap_push(Value::Number(3.0));
@@ -191,7 +191,7 @@ mod tests {
     fn rotate_keyword() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
         state.heap_push(Value::Number(3.0));

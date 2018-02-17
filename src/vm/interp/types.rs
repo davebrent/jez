@@ -26,6 +26,7 @@ pub enum Instr {
     GroupBegin,
     GroupEnd,
     Null,
+    SourceLoc(u64, u64, u64, u64),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -45,21 +46,21 @@ impl Value {
     pub fn as_num(&self) -> Result<f64, RuntimeErr> {
         match *self {
             Value::Number(num) => Ok(num),
-            _ => Err(RuntimeErr::InvalidArgs),
+            _ => Err(RuntimeErr::InvalidArgs(None)),
         }
     }
 
     pub fn as_range(&self) -> Result<(usize, usize), RuntimeErr> {
         match *self {
             Value::List(a, b) | Value::Group(a, b) | Value::Seq(a, b) => Ok((a, b)),
-            _ => Err(RuntimeErr::InvalidArgs),
+            _ => Err(RuntimeErr::InvalidArgs(None)),
         }
     }
 
     pub fn as_sym(&self) -> Result<u64, RuntimeErr> {
         match *self {
             Value::Symbol(sym) => Ok(sym),
-            _ => Err(RuntimeErr::InvalidArgs),
+            _ => Err(RuntimeErr::InvalidArgs(None)),
         }
     }
 }

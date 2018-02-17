@@ -96,21 +96,19 @@ impl fmt::Display for ParseErr {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum RuntimeErr {
-    UnknownKeyword(u64),
-    InvalidArgs,
-    InvalidString,
-    StackExhausted,
+    UnknownKeyword(Option<String>),
+    InvalidArgs(Option<String>),
+    StackExhausted(Option<String>),
 }
 
 impl Error for RuntimeErr {
     fn description(&self) -> &str {
         match *self {
             RuntimeErr::UnknownKeyword(_) => "unknown keyword",
-            RuntimeErr::InvalidArgs => "invalid arguments",
-            RuntimeErr::InvalidString => "invalid string",
-            RuntimeErr::StackExhausted => "stack exhausted",
+            RuntimeErr::InvalidArgs(_) => "invalid arguments",
+            RuntimeErr::StackExhausted(_) => "stack exhausted",
         }
     }
 
@@ -122,17 +120,29 @@ impl Error for RuntimeErr {
 impl fmt::Display for RuntimeErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            RuntimeErr::UnknownKeyword(hash) => {
-                write!(f, "encountered unknown keyword (hash = {})", hash)
-            }
-            RuntimeErr::InvalidArgs => write!(f, "invalid arguments"),
-            RuntimeErr::InvalidString => write!(f, "invalid string"),
-            RuntimeErr::StackExhausted => write!(f, "stack exhausted"),
+            RuntimeErr::UnknownKeyword(ref reason) => {
+                match *reason {
+                    Some(ref reason) => write!(f, "{}Unknown keyword", reason),
+                    None => write!(f, "unknown keyword"),
+                }
+            },
+            RuntimeErr::InvalidArgs(ref reason) => {
+                match *reason {
+                    Some(ref reason) => write!(f, "{}Invalid arguments", reason),
+                    None => write!(f, "invalid arguments"),
+                }
+            },
+            RuntimeErr::StackExhausted(ref reason) => {
+                match *reason {
+                    Some(ref reason) => write!(f, "{}Stack exhausted", reason),
+                    None => write!(f, "stack exhausted"),
+                }
+            },
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum JezErr {
     AssemErr(AssemErr),
     ParseErr(ParseErr),
@@ -198,7 +208,7 @@ impl fmt::Display for JezErr {
         match *self {
             JezErr::AssemErr(ref err) => write!(f, "Assembly error {}", err),
             JezErr::ParseErr(ref err) => write!(f, "Parse error {}", err),
-            JezErr::RuntimeErr(ref err) => write!(f, "Runtime error {}", err),
+            JezErr::RuntimeErr(ref err) => write!(f, "{}", err),
             JezErr::SysErr(ref err) => write!(f, "System error {}", err),
             JezErr::IoErr => write!(f, "IO error"),
         }

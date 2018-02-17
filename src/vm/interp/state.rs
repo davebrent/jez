@@ -11,6 +11,7 @@ pub struct InterpState {
     pub heap: Vec<Value>,
     pub pc: usize,
     pub globals: HashMap<u64, usize>,
+    pub strings: HashMap<u64, String>,
     pub frames: Vec<StackFrame>,
     pub exit: bool,
 }
@@ -22,6 +23,7 @@ impl InterpState {
             reserved: 0,
             heap: vec![],
             globals: HashMap::new(),
+            strings: HashMap::new(),
             frames: vec![],
             exit: false,
         }
@@ -29,21 +31,21 @@ impl InterpState {
 
     fn frame(&self) -> Result<&StackFrame, RuntimeErr> {
         match self.frames.last() {
-            None => Err(RuntimeErr::StackExhausted),
+            None => Err(RuntimeErr::StackExhausted(None)),
             Some(frame) => Ok(frame),
         }
     }
 
     fn frame_mut(&mut self) -> Result<&mut StackFrame, RuntimeErr> {
         match self.frames.last_mut() {
-            None => Err(RuntimeErr::StackExhausted),
+            None => Err(RuntimeErr::StackExhausted(None)),
             Some(frame) => Ok(frame),
         }
     }
 
     pub fn heap_slice_mut(&mut self, start: usize, end: usize) -> Result<&mut [Value], RuntimeErr> {
         if start > end || end > self.heap_len() {
-            return Err(RuntimeErr::InvalidArgs);
+            return Err(RuntimeErr::InvalidArgs(None));
         }
         Ok(&mut self.heap[start..end])
     }
@@ -51,7 +53,7 @@ impl InterpState {
     pub fn heap_get(&self, ptr: usize) -> Result<Value, RuntimeErr> {
         match self.heap.get(ptr) {
             Some(val) => Ok(val.clone()),
-            None => Err(RuntimeErr::InvalidArgs),
+            None => Err(RuntimeErr::InvalidArgs(None)),
         }
     }
 
@@ -64,10 +66,10 @@ impl InterpState {
         self.heap_len()
     }
 
-    pub fn call(&mut self, args: usize, pc: usize) -> InterpResult {
+    pub fn call(&mut self, loc: usize, args: usize, pc: usize) -> InterpResult {
         // Push a new stack frame copying across any arguments, if any, from
         // the previous frame
-        let mut frame = StackFrame::new(self.pc);
+        let mut frame = StackFrame::new(loc, self.pc);
         if args != 0 {
             let caller = try!(self.frame_mut());
             for _ in 0..args {
@@ -82,7 +84,7 @@ impl InterpState {
 
     pub fn ret(&mut self) -> InterpResult {
         match self.frames.pop() {
-            None => Err(RuntimeErr::StackExhausted),
+            None => Err(RuntimeErr::StackExhausted(None)),
             Some(mut frame) => {
                 // If this is the last stack frame, return the 'top of stack'
                 // value as the final result. Otherwise 'None' and continue
@@ -117,13 +119,13 @@ impl InterpState {
     pub fn pop_num(&mut self) -> Result<f64, RuntimeErr> {
         match try!(self.pop()) {
             Value::Number(num) => Ok(num),
-            _ => Err(RuntimeErr::InvalidArgs),
+            _ => Err(RuntimeErr::InvalidArgs(None)),
         }
     }
 
     pub fn push(&mut self, val: Value) -> InterpResult {
         match self.frames.last_mut() {
-            None => Err(RuntimeErr::StackExhausted),
+            None => Err(RuntimeErr::StackExhausted(None)),
             Some(frame) => {
                 try!(frame.push(val));
                 Ok(None)
@@ -159,7 +161,7 @@ impl InterpState {
         };
         match ptr {
             Some(ptr) => self.heap_get(*ptr),
-            None => Err(RuntimeErr::InvalidArgs),
+            None => Err(RuntimeErr::InvalidArgs(None)),
         }
     }
 

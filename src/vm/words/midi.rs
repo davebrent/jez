@@ -8,7 +8,7 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let chan = try!(state.pop_num()) as u8;
     let dur = try!(state.pop_num());
     if dur == 0.0 {
-        return Err(RuntimeErr::InvalidArgs);
+        return Err(RuntimeErr::InvalidArgs(None));
     }
 
     let mut output = Vec::new();
@@ -51,13 +51,13 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
             Value::List(start, end) => {
                 let len = end - start;
                 if len == 0 || len > 3 {
-                    return Err(RuntimeErr::InvalidArgs);
+                    return Err(RuntimeErr::InvalidArgs(None));
                 }
 
                 let (value, default) = match try!(state.heap_get(start)) {
                     Value::Curve(points) => (EventValue::Curve(points), 0),
                     Value::Number(pitch) => (EventValue::Trigger(pitch), 127),
-                    _ => return Err(RuntimeErr::InvalidArgs),
+                    _ => return Err(RuntimeErr::InvalidArgs(None)),
                 };
 
                 let dest = Destination::Midi(
@@ -80,7 +80,7 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
                     value: value,
                 });
             }
-            _ => return Err(RuntimeErr::InvalidArgs),
+            _ => return Err(RuntimeErr::InvalidArgs(None)),
         }
     }
 
@@ -97,7 +97,7 @@ mod tests {
     fn test_simultaneous_events() {
         let mut state = InterpState::new();
         let mut seq = SeqState::new();
-        state.call(0, 1).unwrap();
+        state.call(0, 0, 1).unwrap();
         state.heap_push(Value::Number(1.0));
         state.heap_push(Value::Number(2.0));
         state.heap_push(Value::Number(3.0));
