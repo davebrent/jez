@@ -9,7 +9,7 @@ required-features = ["binary"]
 
 [lib]
 name = "jez"
-crate-type = ["rlib", "dylib"]
+crate-type = ["lib"]
 
 [dependencies]
 byteorder = "1.2.1"
