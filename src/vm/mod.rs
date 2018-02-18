@@ -7,13 +7,12 @@ mod types;
 mod words;
 
 use std::collections::HashMap;
-use std::convert::From;
 use std::rc::Rc;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
-use err::{JezErr, RuntimeErr, SysErr};
+use err::Error;
 use lang::hash_str;
 
 pub use self::interp::{Instr, InterpState, Value};
@@ -84,7 +83,7 @@ impl Machine {
         }
     }
 
-    pub fn exec(&mut self, duration: Duration, delta: Duration) -> Result<Control, JezErr> {
+    pub fn exec(&mut self, duration: Duration, delta: Duration) -> Result<Control, Error> {
         let (mut signals, mut timers) = try!(self.setup());
         let mut elapsed = Duration::new(0, 0);
 
@@ -108,7 +107,7 @@ impl Machine {
         Ok(Control::Stop)
     }
 
-    pub fn exec_realtime(&mut self) -> Result<Control, JezErr> {
+    pub fn exec_realtime(&mut self) -> Result<Control, Error> {
         let (mut signals, mut timers) = try!(self.setup());
         if self.interp.data_mut().tracks.is_empty() {
             return Ok(Control::Stop);
@@ -132,7 +131,7 @@ impl Machine {
         Ok(Control::Continue)
     }
 
-    pub fn eval(&mut self, func: &str, rev: usize) -> Result<Value, JezErr> {
+    pub fn eval(&mut self, func: &str, rev: usize) -> Result<Value, Error> {
         let func = hash_str(func);
         {
             let data = self.interp.data_mut();
@@ -143,7 +142,7 @@ impl Machine {
         self.interp.reset();
 
         match self.interp.eval(self.functions[&func]) {
-            Err(err) => Err(From::from(err)),
+            Err(err) => Err(err),
             Ok(val) => Ok(match val {
                 Some(val) => val,
                 None => Value::Null,
@@ -151,7 +150,7 @@ impl Machine {
         }
     }
 
-    fn setup(&mut self) -> Result<(SignalState, TimerUnit<Signal>), JezErr> {
+    fn setup(&mut self) -> Result<(SignalState, TimerUnit<Signal>), Error> {
         let (timer_to_vm_send, timer_to_vm_recv) = channel();
         let (vm_to_timer_send, vm_to_timer_recv) = channel();
         let signals = SignalState {
@@ -203,7 +202,7 @@ impl Machine {
         &mut self,
         cmd: TimeEvent<Signal>,
         signals: &mut SignalState,
-    ) -> Result<Control, JezErr> {
+    ) -> Result<Control, Error> {
         match cmd {
             TimeEvent::Timer(time, signal) => match signal {
                 Signal::Bus => self.handle_bus_signal(signals),
@@ -211,12 +210,12 @@ impl Machine {
                 Signal::Event(event) => self.handle_event_signal(event),
                 Signal::Track(num, rev, func) => self.handle_track_signal(signals, num, rev, func),
             },
-            _ => Err(From::from(RuntimeErr::InvalidArgs(None))),
+            _ => Err(exception!()),
         }
     }
 
     // Read internal and external commands
-    fn handle_bus_signal(&mut self, signals: &mut SignalState) -> Result<Control, JezErr> {
+    fn handle_bus_signal(&mut self, signals: &mut SignalState) -> Result<Control, Error> {
         while let Ok(msg) = self.bus_recv.try_recv() {
             match msg {
                 Command::Event(_) => (),
@@ -235,7 +234,7 @@ impl Machine {
                 | Command::MidiNoteOff(_, _)
                 | Command::MidiCtl(_, _, _) => {
                     if self.backend.send(msg).is_err() {
-                        return Err(From::from(SysErr::UnreachableBackend));
+                        return Err(error!(UnreachableBackend));
                     }
                 }
             };
@@ -244,9 +243,9 @@ impl Machine {
     }
 
     // Route sequenced events
-    fn handle_event_signal(&mut self, event: Event) -> Result<Control, JezErr> {
+    fn handle_event_signal(&mut self, event: Event) -> Result<Control, Error> {
         if self.backend.send(Command::Event(event)).is_err() {
-            return Err(From::from(SysErr::UnreachableBackend));
+            return Err(error!(UnreachableBackend));
         }
 
         match event.dest {
@@ -258,7 +257,7 @@ impl Machine {
     }
 
     // Update midi messages (note, ctrl, clock etc.)
-    fn handle_midi_signal(&mut self, elapsed: &Duration) -> Result<Control, JezErr> {
+    fn handle_midi_signal(&mut self, elapsed: &Duration) -> Result<Control, Error> {
         self.midi.update(elapsed);
         Ok(Control::Continue)
     }
@@ -270,7 +269,7 @@ impl Machine {
         num: usize,
         rev: usize,
         func: u64,
-    ) -> Result<Control, JezErr> {
+    ) -> Result<Control, Error> {
         self.interp.data_mut().reset(rev);
         self.interp.reset();
         try!(self.interp.eval(self.functions[&func]));

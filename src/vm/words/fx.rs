@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use err::RuntimeErr;
 use vm::fx::{MarkovChain, MidiVelocityMapper, PitchQuantizer};
 use vm::interp::InterpState;
 use vm::types::{Result, SeqState};
@@ -16,12 +15,12 @@ pub fn pitch_quantizer(seq: &mut SeqState, state: &mut InterpState) -> Result {
         .find(|ref mut track| track.func == sym)
     {
         Some(track) => track,
-        None => return Err(RuntimeErr::InvalidArgs(None)),
+        None => return Err(error!(InvalidArgs)),
     };
 
     let fx = match PitchQuantizer::new(key, octave, scale) {
         Some(fx) => fx,
-        None => return Err(RuntimeErr::InvalidArgs(None)),
+        None => return Err(error!(InvalidArgs)),
     };
 
     track.effects.push(Rc::new(fx));
@@ -35,7 +34,7 @@ pub fn markov_chain(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let sym = try!(try!(state.pop()).as_sym());
 
     if order == 0 || capacity == 0 {
-        return Err(RuntimeErr::InvalidArgs(None));
+        return Err(error!(InvalidArgs));
     }
 
     match seq.tracks
@@ -47,7 +46,7 @@ pub fn markov_chain(seq: &mut SeqState, state: &mut InterpState) -> Result {
             track.effects.push(Rc::new(fx));
             Ok(None)
         }
-        None => Err(RuntimeErr::InvalidArgs(None)),
+        None => Err(error!(InvalidArgs)),
     }
 }
 
@@ -61,12 +60,12 @@ pub fn midi_velocity_mapper(seq: &mut SeqState, state: &mut InterpState) -> Resu
         .find(|ref mut track| track.func == name)
     {
         Some(track) => track,
-        None => return Err(RuntimeErr::InvalidArgs(None)),
+        None => return Err(error!(InvalidArgs)),
     };
 
     match MidiVelocityMapper::new(device, param) {
         Some(fx) => track.effects.push(Rc::new(fx)),
-        None => return Err(RuntimeErr::InvalidArgs(None)),
+        None => return Err(error!(InvalidArgs)),
     };
 
     Ok(None)

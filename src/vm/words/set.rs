@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::result;
 
-use err::RuntimeErr;
+use err::Error;
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
@@ -24,7 +24,7 @@ pub fn sieve(_: &mut SeqState, state: &mut InterpState) -> Result {
     Ok(None)
 }
 
-pub fn _pop_set(state: &mut InterpState) -> result::Result<BTreeSet<usize>, RuntimeErr> {
+pub fn _pop_set(state: &mut InterpState) -> result::Result<BTreeSet<usize>, Error> {
     let (start, end) = try!(try!(state.pop()).as_range());
     let mut output = BTreeSet::new();
 

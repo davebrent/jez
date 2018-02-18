@@ -1,8 +1,8 @@
-use err::RuntimeErr;
+use err::Error;
 
 use vm::math::Curve;
 
-pub type InterpResult = Result<Option<Value>, RuntimeErr>;
+pub type InterpResult = Result<Option<Value>, Error>;
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Instr {
@@ -43,24 +43,24 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn as_num(&self) -> Result<f64, RuntimeErr> {
+    pub fn as_num(&self) -> Result<f64, Error> {
         match *self {
             Value::Number(num) => Ok(num),
-            _ => Err(RuntimeErr::InvalidArgs(None)),
+            _ => Err(error!(InvalidArgs)),
         }
     }
 
-    pub fn as_range(&self) -> Result<(usize, usize), RuntimeErr> {
+    pub fn as_range(&self) -> Result<(usize, usize), Error> {
         match *self {
             Value::List(a, b) | Value::Group(a, b) | Value::Seq(a, b) => Ok((a, b)),
-            _ => Err(RuntimeErr::InvalidArgs(None)),
+            _ => Err(error!(InvalidArgs)),
         }
     }
 
-    pub fn as_sym(&self) -> Result<u64, RuntimeErr> {
+    pub fn as_sym(&self) -> Result<u64, Error> {
         match *self {
             Value::Symbol(sym) => Ok(sym),
-            _ => Err(RuntimeErr::InvalidArgs(None)),
+            _ => Err(error!(InvalidArgs)),
         }
     }
 }

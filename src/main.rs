@@ -1,20 +1,20 @@
 extern crate docopt;
+#[macro_use]
 extern crate jez;
 #[macro_use]
 extern crate serde_derive;
 
-use std::convert::From;
 use std::fs;
 use std::io;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use docopt::Docopt;
 
-use jez::{make_program, make_sink, millis_to_dur, Command, Control, Instr, JezErr, Machine,
-          RuntimeErr, SinkArgs};
+use jez::{make_program, make_sink, millis_to_dur, Command, Control, Error, Instr, Machine,
+          SinkArgs};
 
 const USAGE: &str = "
 Jez.
@@ -65,7 +65,7 @@ enum TaskStatus {
     Completed,
 }
 
-type Task = Box<FnMut() -> Result<TaskStatus, JezErr> + Send>;
+type Task = Box<FnMut() -> Result<TaskStatus, Error> + Send>;
 
 /// Send a `stop` command after a specified period of time
 fn timer_task(millis: f64, channel: Sender<Command>) -> Task {
@@ -87,7 +87,7 @@ fn watcher_task(
     filepath: String,
     instrs: Vec<Instr>,
     channel: Sender<Command>,
-) -> Result<Task, JezErr> {
+) -> Result<Task, Error> {
     let meta_data = try!(fs::metadata(filepath.clone()));
     let mod_time = try!(meta_data.modified());
 
@@ -130,7 +130,7 @@ fn run_until_first(tasks: Vec<Task>) {
     }
 }
 
-fn run_app(args: &Args) -> Result<(), JezErr> {
+fn run_app(args: &Args) -> Result<(), Error> {
     let sink_args = SinkArgs::new(
         &args.flag_osc_host,
         &args.flag_osc_client,
@@ -181,9 +181,7 @@ fn run_app(args: &Args) -> Result<(), JezErr> {
                     tasks.push(task);
                 }
                 Err(_) => {
-                    let msg = String::from("Invalid time argument");
-                    let err = RuntimeErr::InvalidArgs(Some(msg));
-                    return Err(From::from(err));
+                    return Err(error!(InvalidArgs, "Invalid time"));
                 }
             }
         }
@@ -218,7 +216,7 @@ fn main() {
     let code = match run_app(&args) {
         Ok(_) => 0,
         Err(err) => {
-            writeln!(io::stderr(), "Error: {}", err).unwrap();
+            eprintln!("{}", err);
             1
         }
     };

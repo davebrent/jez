@@ -1,4 +1,3 @@
-use err::RuntimeErr;
 use vm::interp::{InterpState, Value};
 use vm::math::path_to_curve;
 use vm::types::{Result, SeqState};
@@ -7,7 +6,7 @@ use vm::types::{Result, SeqState};
 pub fn linear(_: &mut SeqState, state: &mut InterpState) -> Result {
     let (start, end) = try!(try!(state.pop()).as_range());
     if end - start != 2 {
-        return Err(RuntimeErr::InvalidArgs(None));
+        return Err(error!(InvalidArgs));
     }
 
     let c0 = try!(try!(state.heap_get(start)).as_num());

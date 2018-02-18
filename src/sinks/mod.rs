@@ -6,9 +6,7 @@ mod sink;
 #[cfg(feature = "with-websocket")]
 mod ws;
 
-use std::convert::From;
-
-use err::{JezErr, SysErr};
+use err::Error;
 
 pub use self::console::Console;
 pub use self::osc::Osc;
@@ -42,7 +40,7 @@ impl<'a> SinkArgs<'a> {
     }
 }
 
-pub fn factory(name: &str, args: &SinkArgs) -> Result<Box<Sink>, JezErr> {
+pub fn factory(name: &str, args: &SinkArgs) -> Result<Box<Sink>, Error> {
     let sink: Box<Sink> = match name {
         "console" | "" => Box::new(Console::new()),
         "osc" => Box::new(try!(Osc::new(args.osc_host_addr, args.osc_client_addr))),
@@ -50,13 +48,13 @@ pub fn factory(name: &str, args: &SinkArgs) -> Result<Box<Sink>, JezErr> {
         "portmidi" => Box::new(try!(Portmidi::new(args.midi_device_id))),
         #[cfg(feature = "with-websocket")]
         "websocket" => Box::new(try!(WebSocket::new(args.ws_host_addr))),
-        _ => return Err(From::from(SysErr::UnknownBackend)),
+        _ => return Err(error!(UnknownBackend, name)),
     };
 
     Ok(sink)
 }
 
-pub fn make_sink(names: &str, args: &SinkArgs) -> Result<Box<Sink>, JezErr> {
+pub fn make_sink(names: &str, args: &SinkArgs) -> Result<Box<Sink>, Error> {
     let mut sinks = vec![];
     for name in names.split(',') {
         let sink = try!(factory(name, args));

@@ -1,7 +1,6 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use rand::{Rng, SeedableRng};
 
-use err::RuntimeErr;
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
@@ -19,7 +18,7 @@ pub fn rand_seed(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let seed = try!(state.pop_num()) as i64;
     let mut wtr = vec![];
     if wtr.write_i64::<LittleEndian>(seed).is_err() {
-        return Err(RuntimeErr::InvalidArgs(None));
+        return Err(error!(InvalidArgs));
     }
     let seed: Vec<usize> = wtr.iter().map(|n| *n as usize).collect();
     seq.rng.reseed(seed.as_slice());

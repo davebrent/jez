@@ -3,7 +3,7 @@ use std::collections::hash_map::{DefaultHasher, Entry};
 use std::hash::Hasher;
 
 use super::dirs::{Argument, Code, Directive, Location, Name, Symbol, Value};
-use err::AssemErr;
+use err::Error;
 use vm::Instr;
 
 pub fn hash_str(text: &str) -> u64 {
@@ -36,33 +36,33 @@ impl<'a> Assembler<'a> {
     }
 
     /// Check the language version matches the expected version
-    fn version_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
+    fn version_directive(&mut self, dir: &'a Directive) -> Result<(), Error> {
         if dir.args.len() != 1 {
-            return Err(AssemErr::UnsupportedVersion(0));
+            return Err(error!(UnsupportedVersion));
         }
 
         let arg = try!(try!(try!(dir.arg_at(0)).as_value()).as_num());
         let ver = arg as u64;
         if ver != 0 {
-            return Err(AssemErr::UnsupportedVersion(ver));
+            return Err(error!(UnsupportedVersion));
         }
 
         Ok(())
     }
 
     /// Declare and initialize global variables
-    fn globals_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
+    fn globals_directive(&mut self, dir: &'a Directive) -> Result<(), Error> {
         for token in &dir.args {
             match *token {
                 Argument::Kwarg(ref key, ref val) => {
                     if self.globals.contains_key(key.data) {
-                        return Err(AssemErr::DuplicateVariable);
+                        return Err(error!(DuplicateVariable));
                     }
                     let instr = self.from_value(&val.data);
                     self.globals.insert(key.data, instr);
                 }
                 Argument::Arg(_) => {
-                    return Err(AssemErr::DuplicateVariable);
+                    return Err(error!(DuplicateVariable));
                 }
             }
         }
@@ -70,7 +70,7 @@ impl<'a> Assembler<'a> {
     }
 
     /// Define new keywords/functions
-    fn define_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
+    fn define_directive(&mut self, dir: &'a Directive) -> Result<(), Error> {
         let arg = try!(dir.arg_at(0));
         let name = try!(arg.as_value());
         self.debug.push((self.instrs.len(), try!(arg.loc())));
@@ -81,7 +81,7 @@ impl<'a> Assembler<'a> {
     }
 
     /// Define new track functions
-    fn track_directive(&mut self, dir: &'a Directive) -> Result<(), AssemErr> {
+    fn track_directive(&mut self, dir: &'a Directive) -> Result<(), Error> {
         let arg = try!(dir.arg_at(0));
         let name = try!(arg.as_value());
         self.debug.push((self.instrs.len(), try!(arg.loc())));
@@ -92,9 +92,9 @@ impl<'a> Assembler<'a> {
         Ok(())
     }
 
-    fn emit_func(&mut self, name: u64, args: u64, dir: &'a Directive) -> Result<(), AssemErr> {
+    fn emit_func(&mut self, name: u64, args: u64, dir: &'a Directive) -> Result<(), Error> {
         if self.funcs.contains_key(&name) {
-            return Err(AssemErr::DuplicateFunction);
+            return Err(error!(DuplicateFunction));
         }
 
         self.funcs.insert(name, (args as usize, self.instrs.len()));
@@ -123,11 +123,7 @@ impl<'a> Assembler<'a> {
         Ok(())
     }
 
-    pub fn assemble(
-        &mut self,
-        prog: &'a str,
-        dirs: &'a [Directive],
-    ) -> Result<Vec<Instr>, AssemErr> {
+    pub fn assemble(&mut self, prog: &'a str, dirs: &'a [Directive]) -> Result<Vec<Instr>, Error> {
         for dir in dirs {
             let res = match dir.name.data {
                 Name::Version => self.version_directive(dir),
@@ -219,7 +215,7 @@ impl<'a> Assembler<'a> {
     }
 }
 
-pub fn assemble(prog: &str, dirs: &[Directive]) -> Result<Vec<Instr>, AssemErr> {
+pub fn assemble(prog: &str, dirs: &[Directive]) -> Result<Vec<Instr>, Error> {
     Assembler::new().assemble(prog, dirs)
 }
 

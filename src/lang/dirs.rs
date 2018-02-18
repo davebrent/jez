@@ -1,6 +1,6 @@
 use std::fmt;
 
-use err::AssemErr;
+use err::Error;
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Value<'a> {
@@ -94,10 +94,10 @@ pub struct Directive<'a> {
 }
 
 impl<'a> Directive<'a> {
-    pub fn arg_at(&self, idx: usize) -> Result<Argument, AssemErr> {
+    pub fn arg_at(&self, idx: usize) -> Result<Argument, Error> {
         match self.args.get(idx) {
             Some(arg) => Ok(*arg),
-            None => Err(AssemErr::DuplicateVariable),
+            None => Err(error!(DuplicateVariable)),
         }
     }
 }
@@ -181,33 +181,33 @@ impl<'a> fmt::Display for Directive<'a> {
 }
 
 impl<'a> Value<'a> {
-    pub fn as_num(&self) -> Result<f64, AssemErr> {
+    pub fn as_num(&self) -> Result<f64, Error> {
         match *self {
             Value::Number(num) => Ok(num),
-            _ => Err(AssemErr::DuplicateVariable),
+            _ => Err(error!(InvalidArgs)),
         }
     }
 
-    pub fn as_keyword(&self) -> Result<&str, AssemErr> {
+    pub fn as_keyword(&self) -> Result<&str, Error> {
         match *self {
             Value::Keyword(word) => Ok(word),
-            _ => Err(AssemErr::DuplicateVariable),
+            _ => Err(error!(InvalidArgs)),
         }
     }
 }
 
 impl<'a> Argument<'a> {
-    pub fn as_value(&self) -> Result<Value<'a>, AssemErr> {
+    pub fn as_value(&self) -> Result<Value<'a>, Error> {
         match *self {
             Argument::Arg(ref val) => Ok(val.data),
-            _ => Err(AssemErr::DuplicateVariable),
+            _ => Err(error!(InvalidArgs)),
         }
     }
 
-    pub fn loc(&self) -> Result<Location, AssemErr> {
+    pub fn loc(&self) -> Result<Location, Error> {
         match *self {
             Argument::Arg(ref val) => Ok(val.loc),
-            _ => Err(AssemErr::DuplicateVariable),
+            _ => Err(error!(InvalidArgs)),
         }
     }
 }

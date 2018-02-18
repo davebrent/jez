@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use err::RuntimeErr;
+use err::Error;
 
 use super::types::{InterpResult, Value};
 use super::stack::StackFrame;
@@ -29,31 +29,31 @@ impl InterpState {
         }
     }
 
-    fn frame(&self) -> Result<&StackFrame, RuntimeErr> {
+    fn frame(&self) -> Result<&StackFrame, Error> {
         match self.frames.last() {
-            None => Err(RuntimeErr::StackExhausted(None)),
+            None => Err(error!(StackExhausted)),
             Some(frame) => Ok(frame),
         }
     }
 
-    fn frame_mut(&mut self) -> Result<&mut StackFrame, RuntimeErr> {
+    fn frame_mut(&mut self) -> Result<&mut StackFrame, Error> {
         match self.frames.last_mut() {
-            None => Err(RuntimeErr::StackExhausted(None)),
+            None => Err(error!(StackExhausted)),
             Some(frame) => Ok(frame),
         }
     }
 
-    pub fn heap_slice_mut(&mut self, start: usize, end: usize) -> Result<&mut [Value], RuntimeErr> {
+    pub fn heap_slice_mut(&mut self, start: usize, end: usize) -> Result<&mut [Value], Error> {
         if start > end || end > self.heap_len() {
-            return Err(RuntimeErr::InvalidArgs(None));
+            return Err(error!(InvalidArgs));
         }
         Ok(&mut self.heap[start..end])
     }
 
-    pub fn heap_get(&self, ptr: usize) -> Result<Value, RuntimeErr> {
+    pub fn heap_get(&self, ptr: usize) -> Result<Value, Error> {
         match self.heap.get(ptr) {
             Some(val) => Ok(val.clone()),
-            None => Err(RuntimeErr::InvalidArgs(None)),
+            None => Err(error!(InvalidArgs)),
         }
     }
 
@@ -84,7 +84,7 @@ impl InterpState {
 
     pub fn ret(&mut self) -> InterpResult {
         match self.frames.pop() {
-            None => Err(RuntimeErr::StackExhausted(None)),
+            None => Err(error!(StackExhausted)),
             Some(mut frame) => {
                 // If this is the last stack frame, return the 'top of stack'
                 // value as the final result. Otherwise 'None' and continue
@@ -106,26 +106,26 @@ impl InterpState {
         }
     }
 
-    pub fn last(&self) -> Result<Value, RuntimeErr> {
+    pub fn last(&self) -> Result<Value, Error> {
         let frame = try!(self.frame());
         Ok(try!(frame.last()))
     }
 
-    pub fn pop(&mut self) -> Result<Value, RuntimeErr> {
+    pub fn pop(&mut self) -> Result<Value, Error> {
         let frame = try!(self.frame_mut());
         Ok(try!(frame.pop()))
     }
 
-    pub fn pop_num(&mut self) -> Result<f64, RuntimeErr> {
+    pub fn pop_num(&mut self) -> Result<f64, Error> {
         match try!(self.pop()) {
             Value::Number(num) => Ok(num),
-            _ => Err(RuntimeErr::InvalidArgs(None)),
+            _ => Err(error!(InvalidArgs)),
         }
     }
 
     pub fn push(&mut self, val: Value) -> InterpResult {
         match self.frames.last_mut() {
-            None => Err(RuntimeErr::StackExhausted(None)),
+            None => Err(error!(StackExhausted)),
             Some(frame) => {
                 try!(frame.push(val));
                 Ok(None)
@@ -133,7 +133,7 @@ impl InterpState {
         }
     }
 
-    pub fn store(&mut self, name: u64, val: Value) -> Result<(), RuntimeErr> {
+    pub fn store(&mut self, name: u64, val: Value) -> Result<(), Error> {
         let ptr = self.heap_len();
         self.heap_push(val);
         match self.frames.last_mut() {
@@ -143,14 +143,14 @@ impl InterpState {
         Ok(())
     }
 
-    pub fn store_glob(&mut self, name: u64, val: Value) -> Result<(), RuntimeErr> {
+    pub fn store_glob(&mut self, name: u64, val: Value) -> Result<(), Error> {
         let ptr = self.heap_len();
         self.heap_push(val);
         self.globals.insert(name, ptr);
         Ok(())
     }
 
-    pub fn lookup(&mut self, name: u64) -> Result<Value, RuntimeErr> {
+    pub fn lookup(&mut self, name: u64) -> Result<Value, Error> {
         let ptr = match self.frame() {
             Ok(frame) => frame.locals.get(&name),
             Err(_) => None,
@@ -161,7 +161,7 @@ impl InterpState {
         };
         match ptr {
             Some(ptr) => self.heap_get(*ptr),
-            None => Err(RuntimeErr::InvalidArgs(None)),
+            None => Err(error!(InvalidArgs)),
         }
     }
 

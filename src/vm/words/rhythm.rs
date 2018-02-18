@@ -1,6 +1,5 @@
 use std::iter;
 
-use err::RuntimeErr;
 use vm::interp::{InterpState, Value};
 use vm::types::{Result, SeqState};
 
@@ -16,7 +15,7 @@ pub fn hop_jump(_: &mut SeqState, state: &mut InterpState) -> Result {
     let onsets = try!(state.pop_num()) as usize;
 
     if onsets * hopsize >= pulses {
-        return Err(RuntimeErr::InvalidArgs(None));
+        return Err(error!(InvalidArgs));
     }
 
     let mut rhythm: Vec<u8> = vec![0; pulses];

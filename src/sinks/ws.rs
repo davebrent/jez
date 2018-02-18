@@ -3,15 +3,15 @@ use std::thread;
 
 use ws;
 
-use err::SysErr;
+use err::Error;
 use vm::Command;
 
 use super::osc::Osc;
 use super::sink::Sink;
 
-impl From<ws::Error> for SysErr {
-    fn from(_: ws::Error) -> SysErr {
-        SysErr::UnreachableBackend
+impl From<ws::Error> for Error {
+    fn from(_: ws::Error) -> Error {
+        error!(UnreachableBackend)
     }
 }
 
@@ -33,7 +33,7 @@ struct WebSocketServer {
 pub struct WebSocket {
     channel: Receiver<WebSocketEvent>,
     clients: Vec<(usize, ws::Sender)>,
-    _incoming: thread::JoinHandle<Result<(), SysErr>>,
+    _incoming: thread::JoinHandle<Result<(), Error>>,
 }
 
 impl ws::Handler for WebSocketHandler {
@@ -50,11 +50,11 @@ impl ws::Handler for WebSocketHandler {
 }
 
 impl WebSocketServer {
-    pub fn new(channel: Sender<WebSocketEvent>) -> Result<WebSocketServer, SysErr> {
+    pub fn new(channel: Sender<WebSocketEvent>) -> Result<WebSocketServer, Error> {
         Ok(WebSocketServer { channel: channel })
     }
 
-    pub fn run_forever(&mut self, host_addr: &str) -> Result<(), SysErr> {
+    pub fn run_forever(&mut self, host_addr: &str) -> Result<(), Error> {
         let mut ids = 0;
         try!(ws::listen(host_addr, |out| {
             ids += 1;
@@ -69,7 +69,7 @@ impl WebSocketServer {
 }
 
 impl WebSocket {
-    pub fn new(host_addr: &str) -> Result<Self, SysErr> {
+    pub fn new(host_addr: &str) -> Result<Self, Error> {
         let (tx, rx) = channel();
 
         let mut server = try!(WebSocketServer::new(tx));

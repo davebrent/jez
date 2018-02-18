@@ -1,5 +1,3 @@
-use err::RuntimeErr;
-
 use vm::interp::{InterpState, Value};
 use vm::types::{Destination, Event, EventValue, Result, SeqState};
 
@@ -8,7 +6,7 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let chan = try!(state.pop_num()) as u8;
     let dur = try!(state.pop_num());
     if dur == 0.0 {
-        return Err(RuntimeErr::InvalidArgs(None));
+        return Err(error!(InvalidArgs));
     }
 
     let mut output = Vec::new();
@@ -51,13 +49,13 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
             Value::List(start, end) => {
                 let len = end - start;
                 if len == 0 || len > 3 {
-                    return Err(RuntimeErr::InvalidArgs(None));
+                    return Err(error!(InvalidArgs));
                 }
 
                 let (value, default) = match try!(state.heap_get(start)) {
                     Value::Curve(points) => (EventValue::Curve(points), 0),
                     Value::Number(pitch) => (EventValue::Trigger(pitch), 127),
-                    _ => return Err(RuntimeErr::InvalidArgs(None)),
+                    _ => return Err(error!(InvalidArgs)),
                 };
 
                 let dest = Destination::Midi(
@@ -80,7 +78,7 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
                     value: value,
                 });
             }
-            _ => return Err(RuntimeErr::InvalidArgs(None)),
+            _ => return Err(error!(InvalidArgs)),
         }
     }
 

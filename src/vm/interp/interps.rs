@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use err::RuntimeErr;
+use err::Error;
 use lang::hash_str;
 
 pub use super::types::{Instr, InterpResult, Value};
@@ -39,7 +39,7 @@ pub trait Interpreter<S> {
                 }
             }
         }
-        Err(RuntimeErr::InvalidArgs(None))
+        Err(exception!())
     }
 }
 
@@ -171,7 +171,7 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
                 if let Some(func) = self.words.get(&word) {
                     func(&mut self.data, &mut self.state)
                 } else {
-                    Err(RuntimeErr::UnknownKeyword(None))
+                    Err(error!(UnknownKeyword))
                 }
             }
 
@@ -183,7 +183,7 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
                         try!(self.state.push(Value::Str(string)));
                         Ok(None)
                     }
-                    None => Err(RuntimeErr::InvalidArgs(None)),
+                    None => Err(error!(InvalidArgs)),
                 }
             }
 
@@ -195,12 +195,12 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
                     let pc = self.state.pc + i as usize + 1;
                     match self.instrs[pc] {
                         Instr::RawData(byte) => bytes.push(byte),
-                        _ => return Err(RuntimeErr::InvalidArgs(None)),
+                        _ => return Err(exception!()),
                     };
                 }
                 match String::from_utf8(bytes) {
                     Ok(string) => self.state.strings.insert(id, string),
-                    Err(_) => return Err(RuntimeErr::InvalidArgs(None)),
+                    Err(_) => return Err(exception!()),
                 };
                 self.state.pc += len as usize;
                 Ok(None)
@@ -241,10 +241,12 @@ impl<S> StackTraceInterpreter<S> {
         assert!(!state.strings.is_empty());
 
         let mut msg = String::new();
-        writeln!(&mut msg, "Traceback (most recent call last)").unwrap();
+        write!(&mut msg, "Traceback (most recent call last)").unwrap();
         for frame in &state.frames {
+            write!(&mut msg, "\n").ok();
             self.fmt_source_loc(&mut msg, frame.begin - 1);
         }
+        write!(&mut msg, "\n").ok();
         self.fmt_source_loc(&mut msg, state.pc);
         msg
     }
@@ -265,11 +267,11 @@ impl<S> StackTraceInterpreter<S> {
         match self.source_loc(pc as u64) {
             Some((i, line, col)) => {
                 let token = &state.strings[&i];
-                writeln!(stream, "> '{}' at line {} col {}", token, line, col).ok();
+                write!(stream, "> '{}' at line {} col {}", token, line, col).ok();
             }
             None => {
                 let instr = self.inner.instrs()[pc];
-                writeln!(stream, "> Unknown pc={} instr={:?}", pc, instr).ok();
+                write!(stream, "> Unknown pc={} instr={:?}", pc, instr).ok();
             }
         }
     }
@@ -300,12 +302,11 @@ impl<S> Interpreter<S> for StackTraceInterpreter<S> {
         match self.inner.eval(pc) {
             Ok(val) => Ok(val),
             Err(err) => {
-                let msg = Some(self.stack_trace());
-                Err(match err {
-                    RuntimeErr::UnknownKeyword(_) => RuntimeErr::UnknownKeyword(msg),
-                    RuntimeErr::InvalidArgs(_) => RuntimeErr::InvalidArgs(msg),
-                    RuntimeErr::StackExhausted(_) => RuntimeErr::StackExhausted(msg),
-                })
+                let mut trace = self.stack_trace();
+                if let Some(reason) = err.reason {
+                    write!(&mut trace, "\n{}", reason).ok();
+                }
+                Err(Error::with(err.kind, &trace))
             }
         }
     }

@@ -1,3 +1,4 @@
+#[macro_use]
 mod err;
 mod lang;
 mod sinks;
@@ -23,13 +24,12 @@ use std::mem;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
-pub use err::JezErr;
-pub use err::RuntimeErr;
+pub use err::{Error, Kind, Location};
 pub use sinks::{make_sink, SinkArgs};
 pub use vm::{millis_to_dur, Command, Control, Destination, Event, EventValue, Instr, InterpState,
              Machine, Value};
 
-pub fn make_program(txt: &str) -> Result<Vec<Instr>, err::JezErr> {
+pub fn make_program(txt: &str) -> Result<Vec<Instr>, Error> {
     let dirs = try!(lang::parser(txt));
     let instrs = try!(lang::assemble(txt, &dirs));
     Ok(instrs)
@@ -43,7 +43,7 @@ pub struct Simulation {
     pub messages: Vec<Command>,
 }
 
-pub fn eval(rev: usize, func: &str, prog: &str) -> Result<(Value, InterpState), JezErr> {
+pub fn eval(rev: usize, func: &str, prog: &str) -> Result<(Value, InterpState), Error> {
     let (back_send, _) = channel();
     let (host_send, host_recv) = channel();
 
@@ -54,7 +54,7 @@ pub fn eval(rev: usize, func: &str, prog: &str) -> Result<(Value, InterpState), 
     Ok((value, machine.interp.state()))
 }
 
-pub fn simulate(dur: Duration, dt: Duration, prog: &str) -> Result<Simulation, JezErr> {
+pub fn simulate(dur: Duration, dt: Duration, prog: &str) -> Result<Simulation, Error> {
     let (back_send, back_recv) = channel();
     let (host_send, host_recv) = channel();
 

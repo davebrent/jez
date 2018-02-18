@@ -2,14 +2,14 @@ use std::fmt;
 
 use portmidi as pm;
 
-use err::SysErr;
+use err::Error;
 use vm::Command;
 
 use super::sink::{Device, Sink};
 
-impl From<pm::Error> for SysErr {
-    fn from(_: pm::Error) -> SysErr {
-        SysErr::UnreachableBackend
+impl From<pm::Error> for Error {
+    fn from(_: pm::Error) -> Error {
+        error!(UnreachableBackend)
     }
 }
 
@@ -31,7 +31,7 @@ impl fmt::Display for PortmidiDevice {
 impl Device for PortmidiDevice {}
 
 impl Portmidi {
-    pub fn new(id: Option<usize>) -> Result<Self, SysErr> {
+    pub fn new(id: Option<usize>) -> Result<Self, Error> {
         let ctx = try!(pm::PortMidi::new());
 
         let id = match id {

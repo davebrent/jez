@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use err::RuntimeErr;
+use err::Error;
 
 use super::types::Value;
 
@@ -22,21 +22,21 @@ impl StackFrame {
         }
     }
 
-    pub fn last(&self) -> Result<Value, RuntimeErr> {
+    pub fn last(&self) -> Result<Value, Error> {
         match self.stack.last() {
             Some(val) => Ok(val.clone()),
-            None => Err(RuntimeErr::StackExhausted(None)),
+            None => Err(error!(StackExhausted)),
         }
     }
 
-    pub fn pop(&mut self) -> Result<Value, RuntimeErr> {
+    pub fn pop(&mut self) -> Result<Value, Error> {
         match self.stack.pop() {
             Some(val) => Ok(val),
-            None => Err(RuntimeErr::StackExhausted(None)),
+            None => Err(error!(StackExhausted)),
         }
     }
 
-    pub fn push(&mut self, val: Value) -> Result<(), RuntimeErr> {
+    pub fn push(&mut self, val: Value) -> Result<(), Error> {
         self.stack.push(val);
         Ok(())
     }

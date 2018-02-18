@@ -1,37 +1,8 @@
-use std::error::Error;
-use std::fmt;
-
-use err::ParseErr;
+use std::fmt::Write;
 
 use super::dirs::{Argument, Code, Directive, Location, Name, Symbol, Token, Value};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Status {
-    UnexpectedToken,
-    Incomplete,
-}
-
-impl Error for Status {
-    fn description(&self) -> &str {
-        match *self {
-            Status::UnexpectedToken => "unknown token",
-            Status::Incomplete => "incomplete",
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        None
-    }
-}
-
-impl fmt::Display for Status {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Status::UnexpectedToken => write!(f, "unknown token"),
-            Status::Incomplete => write!(f, "incomplete"),
-        }
-    }
-}
+use err::Error;
 
 fn is_alphabetic(chr: char) -> bool {
     (chr as u8 >= 0x41 && chr as u8 <= 0x5A) || (chr as u8 >= 0x61 && chr as u8 <= 0x7A)
@@ -122,16 +93,16 @@ impl<'a> TokenStream<'a> {
         }
     }
 
-    pub fn expect(&mut self, c: char) -> Result<(), Status> {
+    pub fn expect(&mut self, c: char) -> Result<(), Error> {
         match self.next() {
             Some((tk, _)) => {
                 if c == tk {
                     Ok(())
                 } else {
-                    Err(Status::UnexpectedToken)
+                    Err(error!(UnexpectedToken))
                 }
             }
-            None => Err(Status::Incomplete),
+            None => Err(error!(IncompleteInput)),
         }
     }
 
@@ -210,23 +181,18 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         Parser { stream: stream }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Directive<'s>>, ParseErr> {
+    pub fn parse(&mut self) -> Result<Vec<Directive<'s>>, Error> {
         let mut dirs = vec![];
 
         while !self.stream.is_empty() {
             match self.parse_directive() {
                 Ok(dir) => dirs.push(dir),
-                Err(status) => {
+                Err(err) => {
                     let line = self.stream.loc.line;
                     let col = self.stream.loc.col;
-                    match status {
-                        Status::Incomplete => {
-                            return Err(ParseErr::Incomplete(line, col));
-                        }
-                        Status::UnexpectedToken => {
-                            return Err(ParseErr::UnexpectedToken(line, col));
-                        }
-                    }
+                    let mut msg = String::new();
+                    write!(&mut msg, "Error on line {} at column {}", line, col).ok();
+                    return Err(Error::with(err.kind, &msg));
                 }
             };
         }
@@ -234,10 +200,10 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         Ok(dirs)
     }
 
-    fn parse_name(&mut self) -> Result<Token<Name>, Status> {
+    fn parse_name(&mut self) -> Result<Token<Name>, Error> {
         let (tk, loc) = match self.stream.take_while(|c| c.is_alphabetic()) {
             Some(tk) => tk,
-            None => return Err(Status::Incomplete),
+            None => return Err(error!(IncompleteInput)),
         };
 
         let name = match tk {
@@ -245,20 +211,20 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             "globals" => Name::Globals,
             "def" => Name::Def,
             "track" => Name::Track,
-            _ => return Err(Status::UnexpectedToken),
+            _ => return Err(error!(UnexpectedToken)),
         };
 
         Ok(Token::new(name, loc))
     }
 
-    fn parse_word(&mut self) -> Result<Token<&'s str>, Status> {
+    fn parse_word(&mut self) -> Result<Token<&'s str>, Error> {
         match self.stream.peek() {
             Some((token, _)) => {
                 if !is_alphabetic(token) {
-                    return Err(Status::UnexpectedToken);
+                    return Err(error!(UnexpectedToken));
                 }
             }
-            None => return Err(Status::Incomplete),
+            None => return Err(error!(IncompleteInput)),
         };
 
         let res = self.stream
@@ -266,14 +232,14 @@ impl<'c, 's: 'c> Parser<'c, 's> {
 
         match res {
             Some((string, loc)) => Ok(Token::new(string, loc)),
-            None => Err(Status::Incomplete),
+            None => Err(error!(IncompleteInput)),
         }
     }
 
-    fn parse_value(&mut self) -> Result<Token<Value<'s>>, Status> {
+    fn parse_value(&mut self) -> Result<Token<Value<'s>>, Error> {
         let tk = match self.stream.peek() {
             Some((tk, _)) => tk,
-            None => return Err(Status::Incomplete),
+            None => return Err(error!(IncompleteInput)),
         };
 
         let val = match tk {
@@ -309,10 +275,10 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         Ok(val)
     }
 
-    fn parse_arg(&mut self) -> Result<Argument<'s>, Status> {
+    fn parse_arg(&mut self) -> Result<Argument<'s>, Error> {
         let tk = match self.stream.peek() {
             Some((tk, _)) => tk,
-            None => return Err(Status::Incomplete),
+            None => return Err(error!(IncompleteInput)),
         };
 
         if tk == '@' {
@@ -326,15 +292,15 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         }
     }
 
-    fn parse_variable(&mut self) -> Result<Token<&'s str>, Status> {
+    fn parse_variable(&mut self) -> Result<Token<&'s str>, Error> {
         self.stream.next().unwrap(); // @
         self.parse_word()
     }
 
-    fn parse_code(&mut self) -> Result<Token<Code<'s>>, Status> {
+    fn parse_code(&mut self) -> Result<Token<Code<'s>>, Error> {
         let (token, loc) = match self.stream.peek() {
             Some((token, loc)) => (token, loc),
-            None => return Err(Status::Incomplete),
+            None => return Err(error!(IncompleteInput)),
         };
 
         let val = match token {
@@ -380,14 +346,14 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         Ok(val)
     }
 
-    fn parse_directive(&mut self) -> Result<Directive<'s>, Status> {
+    fn parse_directive(&mut self) -> Result<Directive<'s>, Error> {
         let token = match self.stream.peek() {
             Some((token, _)) => token,
-            None => return Err(Status::Incomplete),
+            None => return Err(error!(IncompleteInput)),
         };
 
         if token != '.' {
-            return Err(Status::UnexpectedToken);
+            return Err(error!(UnexpectedToken));
         }
 
         self.stream.next().unwrap(); // .
@@ -405,7 +371,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
 
         let token = match self.stream.peek() {
             Some((token, _)) => token,
-            None => return Err(Status::Incomplete),
+            None => return Err(error!(IncompleteInput)),
         };
 
         if token == ':' {
@@ -427,7 +393,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
     }
 }
 
-pub fn parser(txt: &str) -> Result<Vec<Directive>, ParseErr> {
+pub fn parser(txt: &str) -> Result<Vec<Directive>, Error> {
     let mut stream = TokenStream::new(txt);
     let mut parser = Parser::new(&mut stream);
     parser.parse()

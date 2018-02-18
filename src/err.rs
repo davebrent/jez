@@ -1,216 +1,148 @@
-use std::convert::From;
-use std::error::Error;
-use std::fmt;
 use std::io;
+use std::convert::From;
+use std::error;
+use std::fmt;
+use std::fmt::Write;
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub enum SysErr {
-    UnknownBackend,
-    UnreachableBackend,
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Location {
+    pub filename: &'static str,
+    pub line: u32,
+    pub column: u32,
 }
 
-impl Error for SysErr {
-    fn description(&self) -> &str {
-        match *self {
-            SysErr::UnknownBackend => "unknown backend",
-            SysErr::UnreachableBackend => "unreachable backend",
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        None
-    }
-}
-
-impl fmt::Display for SysErr {
+impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            SysErr::UnknownBackend => write!(f, "Unknown backend"),
-            SysErr::UnreachableBackend => write!(f, "Unreachable backend"),
-        }
+        let filename = self.filename;
+        write!(
+            f,
+            "file '{}' at line {} column {}",
+            filename, self.line, self.column
+        )
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub enum AssemErr {
-    UnsupportedVersion(u64),
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub enum Kind {
+    Internal(Location),
+    UnreachableBackend,
+    UnknownBackend,
+    UnsupportedVersion,
     DuplicateVariable,
     DuplicateFunction,
-}
-
-impl Error for AssemErr {
-    fn description(&self) -> &str {
-        match *self {
-            AssemErr::UnsupportedVersion(_) => "unsupported version",
-            AssemErr::DuplicateVariable => "duplicate variable",
-            AssemErr::DuplicateFunction => "duplicate function",
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        None
-    }
-}
-
-impl fmt::Display for AssemErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            AssemErr::UnsupportedVersion(req) => {
-                write!(f, "unsupported version '{}', requires 0", req)
-            }
-            AssemErr::DuplicateVariable => write!(f, "duplicate variable"),
-            AssemErr::DuplicateFunction => write!(f, "duplicate function"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
-pub enum ParseErr {
-    Incomplete(usize, usize),
-    UnexpectedToken(usize, usize),
-}
-
-impl Error for ParseErr {
-    fn description(&self) -> &str {
-        match *self {
-            ParseErr::Incomplete(_, _) => "incomplete token",
-            ParseErr::UnexpectedToken(_, _) => "unknown token",
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        None
-    }
-}
-
-impl fmt::Display for ParseErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ParseErr::Incomplete(line, col) => {
-                write!(f, "incomplete token on line {} col {}", line, col)
-            }
-            ParseErr::UnexpectedToken(line, col) => {
-                write!(f, "unknown token on line {} col {}", line, col)
-            }
-        }
-    }
+    IncompleteInput,
+    UnexpectedToken,
+    UnknownKeyword,
+    StackExhausted,
+    InvalidArgs,
+    Io,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
-pub enum RuntimeErr {
-    UnknownKeyword(Option<String>),
-    InvalidArgs(Option<String>),
-    StackExhausted(Option<String>),
+pub struct Error {
+    pub kind: Kind,
+    pub reason: Option<String>,
 }
 
-impl Error for RuntimeErr {
-    fn description(&self) -> &str {
-        match *self {
-            RuntimeErr::UnknownKeyword(_) => "unknown keyword",
-            RuntimeErr::InvalidArgs(_) => "invalid arguments",
-            RuntimeErr::StackExhausted(_) => "stack exhausted",
+impl Error {
+    pub fn new(kind: Kind) -> Error {
+        Error {
+            kind: kind,
+            reason: None,
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    pub fn with(kind: Kind, reason: &str) -> Error {
+        Error {
+            kind: kind,
+            reason: Some(String::from(reason)),
+        }
+    }
+}
+
+impl error::Error for Error {
+    fn cause(&self) -> Option<&error::Error> {
         None
     }
-}
 
-impl fmt::Display for RuntimeErr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            RuntimeErr::UnknownKeyword(ref reason) => {
-                match *reason {
-                    Some(ref reason) => write!(f, "{}Unknown keyword", reason),
-                    None => write!(f, "unknown keyword"),
-                }
-            },
-            RuntimeErr::InvalidArgs(ref reason) => {
-                match *reason {
-                    Some(ref reason) => write!(f, "{}Invalid arguments", reason),
-                    None => write!(f, "invalid arguments"),
-                }
-            },
-            RuntimeErr::StackExhausted(ref reason) => {
-                match *reason {
-                    Some(ref reason) => write!(f, "{}Stack exhausted", reason),
-                    None => write!(f, "stack exhausted"),
-                }
-            },
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub enum JezErr {
-    AssemErr(AssemErr),
-    ParseErr(ParseErr),
-    RuntimeErr(RuntimeErr),
-    SysErr(SysErr),
-    IoErr,
-}
-
-impl From<AssemErr> for JezErr {
-    fn from(err: AssemErr) -> JezErr {
-        JezErr::AssemErr(err)
-    }
-}
-
-impl From<ParseErr> for JezErr {
-    fn from(err: ParseErr) -> JezErr {
-        JezErr::ParseErr(err)
-    }
-}
-
-impl From<RuntimeErr> for JezErr {
-    fn from(err: RuntimeErr) -> JezErr {
-        JezErr::RuntimeErr(err)
-    }
-}
-
-impl From<SysErr> for JezErr {
-    fn from(err: SysErr) -> JezErr {
-        JezErr::SysErr(err)
-    }
-}
-
-impl From<io::Error> for JezErr {
-    fn from(_: io::Error) -> JezErr {
-        JezErr::IoErr
-    }
-}
-
-impl Error for JezErr {
     fn description(&self) -> &str {
-        match *self {
-            JezErr::AssemErr(ref err) => err.description(),
-            JezErr::ParseErr(ref err) => err.description(),
-            JezErr::RuntimeErr(ref err) => err.description(),
-            JezErr::SysErr(ref err) => err.description(),
-            JezErr::IoErr => "io error",
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        match *self {
-            JezErr::AssemErr(ref err) => Some(err as &Error),
-            JezErr::ParseErr(ref err) => Some(err as &Error),
-            JezErr::RuntimeErr(ref err) => Some(err as &Error),
-            JezErr::SysErr(ref err) => Some(err as &Error),
-            JezErr::IoErr => None,
+        match self.kind {
+            Kind::Internal(_) => "internal error",
+            Kind::UnreachableBackend => "unreachable backend",
+            Kind::UnknownBackend => "unknown backend",
+            Kind::UnsupportedVersion => "unsupported version",
+            Kind::DuplicateVariable => "duplicate variable",
+            Kind::DuplicateFunction => "duplicate function",
+            Kind::IncompleteInput => "incomplete input",
+            Kind::UnexpectedToken => "unexpected token",
+            Kind::UnknownKeyword => "unknown keyword",
+            Kind::StackExhausted => "stack exhausted",
+            Kind::InvalidArgs => "invalid arguments",
+            Kind::Io => "I/O failure",
         }
     }
 }
 
-impl fmt::Display for JezErr {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            JezErr::AssemErr(ref err) => write!(f, "Assembly error {}", err),
-            JezErr::ParseErr(ref err) => write!(f, "Parse error {}", err),
-            JezErr::RuntimeErr(ref err) => write!(f, "{}", err),
-            JezErr::SysErr(ref err) => write!(f, "System error {}", err),
-            JezErr::IoErr => write!(f, "IO error"),
+        if let Some(ref reason) = self.reason {
+            writeln!(f, "{}", reason).ok();
         }
+
+        match self.kind {
+            Kind::Internal(ref loc) => write!(f, "Internal error in {}", loc),
+            Kind::UnreachableBackend => write!(f, "Unreachable backend"),
+            Kind::UnknownBackend => write!(f, "Unknown backend"),
+            Kind::UnsupportedVersion => write!(f, "Unsupported version"),
+            Kind::DuplicateVariable => write!(f, "Duplicate variable"),
+            Kind::DuplicateFunction => write!(f, "Duplicate function"),
+            Kind::IncompleteInput => write!(f, "Incomplete input"),
+            Kind::UnexpectedToken => write!(f, "Unexpected token"),
+            Kind::UnknownKeyword => write!(f, "Unknown keyword"),
+            Kind::StackExhausted => write!(f, "Stack exhausted"),
+            Kind::InvalidArgs => write!(f, "Invalid arguments"),
+            Kind::Io => write!(f, "I/O failure"),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! error {
+    ( $type:ident ) => (
+        $crate::Error::new($crate::Kind::$type)
+    );
+    ( $type:ident, $message:expr ) => (
+        $crate::Error::with($crate::Kind::$type, $message)
+    );
+}
+
+#[macro_export]
+macro_rules! exception {
+    () => (
+        $crate::Error::new(
+            $crate::Kind::Internal($crate::Location{
+                filename: file!(),
+                line: line!(),
+                column: column!(),
+            })
+        )
+    );
+    ( $message:expr ) => (
+        $crate::Error::with(
+            $crate::Kind::Internal($crate::Location{
+                filename: file!(),
+                line: line!(),
+                column: column!(),
+            }),
+            $message
+        );
+    );
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
+        let mut msg = String::new();
+        write!(&mut msg, "{}", err).ok();
+        error!(Io, &msg)
     }
 }

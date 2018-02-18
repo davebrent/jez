@@ -1,26 +1,19 @@
-use std::io::Error;
 use std::net::UdpSocket;
 
 use rosc::{OscMessage, OscPacket, OscType};
 use rosc::encoder;
 
-use err::SysErr;
+use err::Error;
 use vm::Command;
 
 use super::sink::Sink;
-
-impl From<Error> for SysErr {
-    fn from(_: Error) -> SysErr {
-        SysErr::UnreachableBackend
-    }
-}
 
 pub struct Osc {
     sock: UdpSocket,
 }
 
 impl Osc {
-    pub fn new(host_addr: &str, client_addr: &str) -> Result<Self, SysErr> {
+    pub fn new(host_addr: &str, client_addr: &str) -> Result<Self, Error> {
         let sock = try!(UdpSocket::bind(host_addr));
         try!(sock.connect(client_addr));
         Ok(Osc { sock: sock })
