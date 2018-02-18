@@ -1,7 +1,0 @@
-.version 0
-
-.def main 0:
-  't1 1 100 markov_chain
-
-.track t1:
-  (1 ~ ~ 1 2 ~ 1 ~) 1000 0 midi_out
