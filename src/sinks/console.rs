@@ -15,7 +15,7 @@ impl Sink for Console {
         "console"
     }
 
-    fn recieve(&mut self, cmd: Command) {
+    fn process(&mut self, cmd: Command) {
         println!("{:?}", cmd);
     }
 }

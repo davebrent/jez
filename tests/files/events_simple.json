@@ -1,0 +1,86 @@
+[
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 50.0,
+      "onset": 0.0,
+      "value": {
+        "Trigger": 64.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      64,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      64
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 50.0,
+      "onset": 100.0,
+      "value": {
+        "Trigger": 68.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      68,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      68
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 50.0,
+      "onset": 200.0,
+      "value": {
+        "Trigger": 48.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      48,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      48
+    ]
+  }
+]

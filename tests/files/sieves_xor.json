@@ -1,0 +1,394 @@
+[
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 0.0,
+      "value": {
+        "Trigger": 0.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      0,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 25.0,
+      "value": {
+        "Trigger": 5.0
+      }
+    }
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      0
+    ]
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      5,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 50.0,
+      "value": {
+        "Trigger": 6.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      6,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      5
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 75.0,
+      "value": {
+        "Trigger": 9.0
+      }
+    }
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      6
+    ]
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      9,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 100.0,
+      "value": {
+        "Trigger": 10.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      10,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      9
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 125.0,
+      "value": {
+        "Trigger": 15.0
+      }
+    }
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      10
+    ]
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      15,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 150.0,
+      "value": {
+        "Trigger": 17.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      17,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      15
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 175.0,
+      "value": {
+        "Trigger": 18.0
+      }
+    }
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      17
+    ]
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      18,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 200.0,
+      "value": {
+        "Trigger": 19.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      19,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      18
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 225.0,
+      "value": {
+        "Trigger": 21.0
+      }
+    }
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      19
+    ]
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      21,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 250.0,
+      "value": {
+        "Trigger": 26.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      26,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      21
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 275.0,
+      "value": {
+        "Trigger": 27.0
+      }
+    }
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      26
+    ]
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      27,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 300.0,
+      "value": {
+        "Trigger": 30.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      30,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      27
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "dur": 25.0,
+      "onset": 325.0,
+      "value": {
+        "Trigger": 31.0
+      }
+    }
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      30
+    ]
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      31,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      31
+    ]
+  }
+]

@@ -1,4 +1,3 @@
-use std::sync::mpsc::Sender;
 use std::time::Duration;
 
 use super::math::{dur_to_millis, millis_to_dur, point_on_curve, Curve};
@@ -21,16 +20,15 @@ struct NoteState {
     pitch: u8,
 }
 
-#[derive(Debug)]
 pub struct MidiProcessor {
-    output: Sender<Command>,
+    output: Box<FnMut(Command)>,
     off_events: Vec<NoteState>,
     ctl_events: Vec<CtrlState>,
     last_update: Duration,
 }
 
 impl MidiProcessor {
-    pub fn new(output: Sender<Command>) -> Self {
+    pub fn new(output: Box<FnMut(Command)>) -> MidiProcessor {
         MidiProcessor {
             output: output,
             off_events: Vec::new(),
@@ -52,7 +50,7 @@ impl MidiProcessor {
     pub fn stop(&mut self) {
         while let Some(note) = self.off_events.pop() {
             let cmd = Command::MidiNoteOff(note.channel, note.pitch);
-            self.output.send(cmd).ok();
+            (self.output)(cmd);
         }
     }
 
@@ -72,7 +70,7 @@ impl MidiProcessor {
         self.off_events
             .retain(|&evt| !(evt.channel == chan && evt.pitch == ptch));
         if len != self.off_events.len() {
-            self.output.send(Command::MidiNoteOff(chan, ptch)).ok();
+            (self.output)(Command::MidiNoteOff(chan, ptch));
         }
 
         self.off_events.push(NoteState {
@@ -82,7 +80,7 @@ impl MidiProcessor {
         });
         self.off_events
             .sort_by(|a, b| b.duration.partial_cmp(&a.duration).unwrap());
-        self.output.send(Command::MidiNoteOn(chan, ptch, vel)).ok();
+        (self.output)(Command::MidiNoteOn(chan, ptch, vel));
     }
 
     fn handle_ctl_event(&mut self, event: Event, curve: Curve) {
@@ -115,7 +113,7 @@ impl MidiProcessor {
 
         if send_init {
             let cmd = Command::MidiCtl(chan, ctl, initial);
-            self.output.send(cmd).ok();
+            (self.output)(cmd);
         }
     }
 
@@ -128,8 +126,8 @@ impl MidiProcessor {
             let cc = point_on_curve(evt.t, &evt.curve)[1].round() as u8;
             if cc != evt.previous {
                 evt.previous = cc;
-                let msg = Command::MidiCtl(evt.channel, evt.controller, cc);
-                self.output.send(msg).ok();
+                let cmd = Command::MidiCtl(evt.channel, evt.controller, cc);
+                (self.output)(cmd);
             }
         }
 
@@ -151,8 +149,8 @@ impl MidiProcessor {
                 self.off_events.push(note);
                 break;
             } else {
-                let msg = Command::MidiNoteOff(note.channel, note.pitch);
-                self.output.send(msg).ok();
+                let cmd = Command::MidiNoteOff(note.channel, note.pitch);
+                (self.output)(cmd);
             }
         }
     }

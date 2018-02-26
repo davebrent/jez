@@ -1,0 +1,4 @@
+.version 0
+
+.track t1:
+  (64 ~ 68 ~ 48) 250 1 midi_out

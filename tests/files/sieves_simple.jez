@@ -1,0 +1,10 @@
+.version 0
+
+.track t1:
+  0 10 range = @seq
+
+  @seq 3 2 sieve
+  @seq intersection
+
+  0 swap 10 swap onsets
+  250 1 midi_out

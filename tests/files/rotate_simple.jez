@@ -1,0 +1,5 @@
+.version 0
+
+.track t1:
+  ( 1 2 3 4 ) 5 rotate
+  200 1 midi_out

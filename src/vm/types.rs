@@ -31,6 +31,9 @@ pub enum Command {
     MidiNoteOn(u8, u8, u8),
     Stop,
     Reload,
+    MidiClock,
+    Clock,
+    Track(usize, usize, u64),
 }
 
 pub trait Effect {

@@ -1,0 +1,11 @@
+.version 0
+
+.track t1:
+  0 32 range = @seq
+
+  @seq 7 3 sieve = @seq1
+  @seq 7 5 sieve = @seq2
+  @seq 3 0 sieve = @seq3
+
+  @seq1 @seq2 union @seq3 symmetric_difference
+  350 1 midi_out

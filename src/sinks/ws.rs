@@ -6,7 +6,7 @@ use ws;
 use err::Error;
 use vm::Command;
 
-use super::osc::Osc;
+use super::osc::encode;
 use super::sink::Sink;
 
 impl From<ws::Error> for Error {
@@ -89,7 +89,7 @@ impl Sink for WebSocket {
         "websocket"
     }
 
-    fn recieve(&mut self, cmd: Command) {
+    fn process(&mut self, cmd: Command) {
         while let Ok(event) = self.channel.try_recv() {
             match event {
                 WebSocketEvent::Connected(id, client) => {
@@ -101,7 +101,7 @@ impl Sink for WebSocket {
             }
         }
 
-        if let Some(data) = Osc::encode(cmd) {
+        if let Some(data) = encode(cmd) {
             for &(_, ref client) in &self.clients {
                 client.send(data.clone()).ok();
             }

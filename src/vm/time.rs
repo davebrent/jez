@@ -31,7 +31,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct TimerUnit<T>
+pub struct Clock<T>
 where
     T: Clone + Debug,
 {
@@ -42,12 +42,12 @@ where
     elapsed: Duration,
 }
 
-impl<T> TimerUnit<T>
+impl<T> Clock<T>
 where
     T: Clone + Debug,
 {
-    pub fn new(output: Sender<TimeEvent<T>>, input: Receiver<TimeEvent<T>>) -> TimerUnit<T> {
-        TimerUnit {
+    pub fn new(output: Sender<TimeEvent<T>>, input: Receiver<TimeEvent<T>>) -> Clock<T> {
+        Clock {
             input: input,
             output: output,
             timers: Vec::new(),
@@ -155,7 +155,7 @@ mod tests {
         let (send1, recv1) = channel();
         let (_, recv2) = channel();
 
-        let mut unit = TimerUnit::new(send1, recv2);
+        let mut unit = Clock::new(send1, recv2);
         unit.timeout(0.0, 10);
         unit.timeout(100.0, 30);
         unit.timeout(10.0, 20);
@@ -184,7 +184,7 @@ mod tests {
         let (send1, recv1) = channel();
         let (_, recv2) = channel();
 
-        let mut unit = TimerUnit::new(send1, recv2);
+        let mut unit = Clock::new(send1, recv2);
         unit.interval(10.0, 10);
         unit.interval(20.0, 30);
 

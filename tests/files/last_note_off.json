@@ -1,0 +1,114 @@
+[
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "onset": 0.0,
+      "dur": 62.5,
+      "value": {
+        "Trigger": 64.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      64,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "onset": 62.5,
+      "dur": 62.5,
+      "value": {
+        "Trigger": 66.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      66,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      64
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "onset": 125.0,
+      "dur": 62.5,
+      "value": {
+        "Trigger": 68.0
+      }
+    }
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      66
+    ]
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      68,
+      127
+    ]
+  },
+  {
+    "Event": {
+      "dest": {
+        "Midi": [
+          1,
+          127
+        ]
+      },
+      "onset": 187.5,
+      "dur": 62.5,
+      "value": {
+        "Trigger": 70.0
+      }
+    }
+  },
+  {
+    "MidiNoteOn": [
+      1,
+      70,
+      127
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      68
+    ]
+  },
+  {
+    "MidiNoteOff": [
+      1,
+      70
+    ]
+  }
+]

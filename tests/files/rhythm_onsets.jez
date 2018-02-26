@@ -1,0 +1,5 @@
+.version 0
+
+.track t1:
+  5 10 ( 0 1 2 7 8 10 ) onsets
+  300 1 midi_out

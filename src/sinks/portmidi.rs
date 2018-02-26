@@ -73,7 +73,7 @@ impl Sink for Portmidi {
         devices
     }
 
-    fn recieve(&mut self, cmd: Command) {
+    fn process(&mut self, cmd: Command) {
         let msg = match cmd {
             Command::MidiNoteOn(chn, pitch, vel) => pm::MidiMessage {
                 status: 144 + chn,

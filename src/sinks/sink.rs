@@ -9,7 +9,7 @@ pub trait Device: fmt::Display {}
 pub trait Sink: Send {
     fn name(&self) -> &str;
 
-    fn recieve(&mut self, cmd: Command);
+    fn process(&mut self, cmd: Command);
 
     fn devices(&self) -> Vec<Box<Device>> {
         vec![]
@@ -17,7 +17,7 @@ pub trait Sink: Send {
 
     fn run_forever(&mut self, channel: Receiver<Command>) {
         while let Ok(msg) = channel.recv() {
-            self.recieve(msg);
+            self.process(msg);
         }
     }
 }
@@ -56,9 +56,9 @@ impl Sink for CompositeSink {
         devices
     }
 
-    fn recieve(&mut self, cmd: Command) {
+    fn process(&mut self, cmd: Command) {
         for sink in &mut self.inner {
-            sink.recieve(cmd);
+            sink.process(cmd);
         }
     }
 }
@@ -95,14 +95,14 @@ impl Sink for ThreadedSink {
         };
         thread::spawn(move || {
             while let Ok(cmd) = channel.recv() {
-                sink.recieve(cmd);
+                sink.process(cmd);
             }
         });
     }
 
-    fn recieve(&mut self, cmd: Command) {
+    fn process(&mut self, cmd: Command) {
         if let Some(ref mut sink) = self.inner {
-            sink.recieve(cmd);
+            sink.process(cmd);
         }
     }
 }

@@ -9,18 +9,17 @@ use std::io;
 use std::io::Read;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use docopt::Docopt;
 
-use jez::{make_program, make_sink, millis_to_dur, Command, Control, Error, Instr, Machine,
-          SinkArgs};
+use jez::{simulate, Backend, Command, Error, Machine, Program, Sink, Status};
 
 const USAGE: &str = "
 Jez.
 
 Usage:
-  jez [options] list
+  jez [options] info
   jez [options] [<file>]
   jez (-h | --help)
   jez --version
@@ -30,33 +29,37 @@ Options:
   --version             Show version.
   --verbose             Print more output.
   --watch               Reload input file on changes.
+  --simulate            Run as a non-realtime simulation.
   --time=MS             Length of time (in milliseconds) to run for.
   --sink=NAME           Specify the output sink(s) [default: console].
-  --osc-host=ADDRESS    OSC host address [default: 127.0.0.1:34254].
-  --osc-client=ADDRESS  OSC client address [default: 127.0.0.1:3000].
+  --udp-host=ADDRESS    UDP host address [default: 127.0.0.1:34254].
+  --udp-client=ADDRESS  UDP client address [default: 127.0.0.1:3000].
   --midi-out=DEVICE     Midi output device id.
   --ws-host=ADDRESS     Websocket host address [default: 127.0.0.1:2794].
 
 Sinks:
   console
   portmidi
-  osc
+  udp
   websocket
 ";
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Deserialize)]
 struct Args {
     flag_sink: String,
     flag_time: String,
+    flag_simulate: bool,
     flag_watch: bool,
     flag_verbose: bool,
     flag_version: bool,
-    flag_osc_host: String,
-    flag_osc_client: String,
+    flag_udp_host: String,
+    flag_udp_client: String,
     flag_midi_out: Option<usize>,
     flag_ws_host: String,
     arg_file: String,
-    cmd_list: bool,
+    cmd_info: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -67,25 +70,9 @@ enum TaskStatus {
 
 type Task = Box<FnMut() -> Result<TaskStatus, Error> + Send>;
 
-/// Send a `stop` command after a specified period of time
-fn timer_task(millis: f64, channel: Sender<Command>) -> Task {
-    let start = Instant::now();
-    let end = millis_to_dur(millis);
-
-    Box::new(move || {
-        if start.elapsed() >= end {
-            channel.send(Command::Stop).unwrap();
-            Ok(TaskStatus::Completed)
-        } else {
-            Ok(TaskStatus::Continue)
-        }
-    })
-}
-
-/// Send a `reload` command when a program file changes
 fn watcher_task(
     filepath: String,
-    instrs: Vec<Instr>,
+    program: Program,
     channel: Sender<Command>,
 ) -> Result<Task, Error> {
     let meta_data = try!(fs::metadata(filepath.clone()));
@@ -100,7 +87,7 @@ fn watcher_task(
             let mut fp = try!(fs::File::open(filepath.clone()));
             try!(fp.read_to_string(&mut txt));
 
-            if instrs != try!(make_program(txt.as_str())) {
+            if program != try!(Program::new(txt.as_str())) {
                 channel.send(Command::Reload).unwrap();
                 return Ok(TaskStatus::Completed);
             }
@@ -110,7 +97,6 @@ fn watcher_task(
     }))
 }
 
-/// Run all tasks until one is completed
 fn run_until_first(tasks: Vec<Task>) {
     let mut tasks = tasks;
     let res = Duration::new(0, 1_000_000); // 1ms
@@ -130,17 +116,51 @@ fn run_until_first(tasks: Vec<Task>) {
     }
 }
 
+fn make_sink(names: &str, args: &Args) -> Result<Sink, Error> {
+    let mut requests = vec![];
+    for name in names.split(',') {
+        requests.push(match name {
+            "console" | "" => Backend::Console,
+            "udp" => Backend::Udp(&args.flag_udp_host, &args.flag_udp_client),
+            "portmidi" => Backend::PortMidi(args.flag_midi_out),
+            "websocket" => Backend::WebSocket(&args.flag_ws_host),
+            _ => return Err(error!(UnknownBackend, name)),
+        });
+    }
+    Sink::new(&requests)
+}
+
+fn read_program(file_path: &str) -> Result<String, Error> {
+    let mut txt = String::new();
+    if file_path.is_empty() {
+        try!(io::stdin().read_to_string(&mut txt));
+    } else {
+        let mut fp = try!(fs::File::open(file_path));
+        try!(fp.read_to_string(&mut txt));
+    }
+    Ok(txt)
+}
+
 fn run_app(args: &Args) -> Result<(), Error> {
-    let sink_args = SinkArgs::new(
-        &args.flag_osc_host,
-        &args.flag_osc_client,
-        &args.flag_ws_host,
-        args.flag_midi_out,
-    );
+    if args.flag_simulate {
+        let txt = try!(read_program(&args.arg_file));
+        let dur = if args.flag_time.is_empty() {
+            60000.0
+        } else {
+            match args.flag_time.parse::<f64>() {
+                Ok(time) => time,
+                Err(_) => return Err(error!(InvalidArgs, "Invalid time")),
+            }
+        };
+        let data = try!(simulate(dur, 1.0, &txt));
+        println!("{}", data);
+        return Ok(());
+    }
 
-    let mut sink = try!(make_sink(&args.flag_sink, &sink_args));
+    let mut sink = try!(make_sink(&args.flag_sink, &args));
 
-    if args.cmd_list {
+    if args.cmd_info {
+        println!("Sink: {}", sink.name());
         let devices = sink.devices();
         for dev in &devices {
             println!("{}", dev);
@@ -152,37 +172,32 @@ fn run_app(args: &Args) -> Result<(), Error> {
     sink.run_forever(sink_recv);
 
     loop {
-        let mut txt = String::new();
-        if args.arg_file.is_empty() {
-            try!(io::stdin().read_to_string(&mut txt));
-        } else {
-            let mut fp = try!(fs::File::open(args.arg_file.clone()));
-            try!(fp.read_to_string(&mut txt));
-        }
+        let txt = try!(read_program(&args.arg_file));
+        let program = try!(Program::new(txt.as_str()));
 
-        let instrs = try!(make_program(txt.as_str()));
+        let (host_to_mach_send, host_to_mach_recv) = channel();
 
-        let (host_send, host_recv) = channel();
         let mut tasks: Vec<Task> = vec![];
-
         if args.flag_watch && !args.arg_file.is_empty() {
             let task = try!(watcher_task(
                 args.arg_file.clone(),
-                instrs.clone(),
-                host_send.clone(),
+                program.clone(),
+                host_to_mach_send.clone(),
             ));
             tasks.push(task);
         }
 
+        let mach_to_sink_send = sink_send.clone();
+        let mut machine = try!(Machine::new(
+            &program,
+            Box::new(move || host_to_mach_recv.try_recv().ok()),
+            Box::new(move |cmd| mach_to_sink_send.send(cmd).unwrap_or(())),
+        ));
+
         if !args.flag_time.is_empty() {
             match args.flag_time.parse::<f64>() {
-                Ok(time) => {
-                    let task = timer_task(time, host_send.clone());
-                    tasks.push(task);
-                }
-                Err(_) => {
-                    return Err(error!(InvalidArgs, "Invalid time"));
-                }
+                Ok(time) => machine.schedule(time, Command::Stop),
+                Err(_) => return Err(error!(InvalidArgs, "Invalid time")),
             }
         }
 
@@ -190,15 +205,13 @@ fn run_app(args: &Args) -> Result<(), Error> {
             thread::spawn(move || run_until_first(tasks));
         }
 
-        let mut machine = Machine::new(sink_send.clone(), host_send.clone(), host_recv, &instrs);
+        match try!(machine.run_forever()) {
+            Status::Stop => return Ok(()),
+            Status::Reload | Status::Continue => (),
+        };
 
-        match try!(machine.exec_realtime()) {
-            Control::Stop => return Ok(()),
-            _ => {
-                if args.flag_verbose {
-                    println!("Reloading {}", args.arg_file);
-                }
-            }
+        if args.flag_verbose {
+            println!("Reloading {}", args.arg_file);
         }
     }
 }
@@ -209,7 +222,7 @@ fn main() {
         .unwrap_or_else(|e| e.exit());
 
     if args.flag_version {
-        println!("v0.6.0");
+        println!("v{}", VERSION);
         return;
     }
 
