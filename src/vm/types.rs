@@ -1,5 +1,4 @@
 use rand::{SeedableRng, StdRng};
-use std::rc::Rc;
 
 use super::interp::{InterpResult, InterpState};
 use super::math::Curve;
@@ -58,11 +57,10 @@ pub trait Effect {
 pub type Result = InterpResult;
 pub type Keyword = fn(&mut SeqState, &mut InterpState) -> InterpResult;
 
-#[derive(Clone)]
 pub struct Track {
     pub id: usize,
     pub func: u64,
-    pub effects: Vec<Rc<Effect>>,
+    pub effects: Vec<Box<Effect>>,
     pub real_time: f64,
     pub schedule_time: f64,
 }
@@ -79,7 +77,6 @@ impl Track {
     }
 }
 
-#[derive(Clone)]
 pub struct SeqState {
     pub revision: usize,
     pub events: Vec<Event>,

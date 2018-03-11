@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use vm::fx::{MarkovChain, MidiVelocityMapper, PitchQuantizer};
 use vm::interp::InterpState;
 use vm::types::{Result, SeqState};
@@ -23,7 +21,7 @@ pub fn pitch_quantizer(seq: &mut SeqState, state: &mut InterpState) -> Result {
         None => return Err(error!(InvalidArgs)),
     };
 
-    track.effects.push(Rc::new(fx));
+    track.effects.push(Box::new(fx));
     Ok(None)
 }
 
@@ -43,7 +41,7 @@ pub fn markov_chain(seq: &mut SeqState, state: &mut InterpState) -> Result {
     {
         Some(track) => {
             let fx = MarkovChain::new(order, capacity, seq.rng);
-            track.effects.push(Rc::new(fx));
+            track.effects.push(Box::new(fx));
             Ok(None)
         }
         None => Err(error!(InvalidArgs)),
@@ -64,7 +62,7 @@ pub fn midi_velocity_mapper(seq: &mut SeqState, state: &mut InterpState) -> Resu
     };
 
     match MidiVelocityMapper::new(device, param) {
-        Some(fx) => track.effects.push(Rc::new(fx)),
+        Some(fx) => track.effects.push(Box::new(fx)),
         None => return Err(error!(InvalidArgs)),
     };
 

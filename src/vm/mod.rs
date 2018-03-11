@@ -7,7 +7,6 @@ mod types;
 mod words;
 
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use err::Error;
 use lang::hash_str;
@@ -159,7 +158,6 @@ impl Machine {
         let track = &mut data.tracks[num];
 
         for fx in &mut track.effects {
-            let fx = Rc::get_mut(fx).unwrap();
             data.events = fx.apply(data.duration, &data.events);
         }
 
