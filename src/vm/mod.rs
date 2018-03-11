@@ -1,26 +1,24 @@
 mod fx;
+mod handler;
 mod interp;
 mod math;
-mod midi;
 mod time;
 mod types;
 mod words;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::time::Duration;
 
 use err::Error;
 use lang::hash_str;
 
 pub use self::interp::{Instr, InterpState, Value};
 use self::interp::{BaseInterpreter, Interpreter, StackTraceInterpreter};
-pub use self::math::{dur_to_millis, millis_to_dur};
-use self::midi::MidiProcessor;
 use self::time::Clock as InternalClock;
-pub use self::time::TimeEvent;
+pub use self::time::{millis_to_dur, Schedule};
 pub use self::types::{Command, Destination, Event, EventValue};
 use self::types::{SeqState, Track};
+use self::handler::{EventHandler, NoteInterceptor};
 
 pub type Clock = InternalClock<Command>;
 
@@ -75,129 +73,107 @@ fn interpreter(
     Ok((funcs, interp))
 }
 
-type Schedule = Box<FnMut(TimeEvent<Command>)>;
-type Out = Box<FnMut(Command)>;
+type Timer = Box<FnMut(Schedule<Command>)>;
 type In = Box<FnMut() -> Option<Command>>;
+type Out = Box<FnMut(Command)>;
 
 pub struct Machine {
     interp: Box<Interpreter<SeqState>>,
-    clock: Schedule,
+    clock: Timer,
     sink: Out,
     input: In,
     functions: HashMap<u64, usize>,
-    midi: MidiProcessor,
+    handler: EventHandler,
 }
 
 impl Machine {
-    pub fn new(
-        sink: Out,
-        mut clock: Schedule,
-        bus: Out,
-        input: In,
-        instrs: &[Instr],
-    ) -> Result<Machine, Error> {
-        // Construct the interpreter and its state
+    pub fn new(input: In, sink: Out, clock: Timer, instrs: &[Instr]) -> Result<Machine, Error> {
         let (funcs, mut interp) = try!(self::interpreter(instrs));
+        let mut cmds = vec![];
 
-        // Schedule all tracks for the first time
         for track in &interp.data_mut().tracks {
-            let track = Command::Track(track.id, 0, track.func);
-            let cmd = TimeEvent::Timeout(0.0, track);
-            clock(cmd);
+            cmds.push(Command::Track(track.id, 0, track.func));
         }
 
-        Ok(Machine {
-            sink: sink,
+        let mut note_interceptor = NoteInterceptor::new(sink);
+        let mut machine = Machine {
+            sink: Box::new(move |cmd| {
+                note_interceptor.filter(cmd);
+            }),
             clock: clock,
             input: input,
             functions: funcs,
             interp: interp,
-            midi: MidiProcessor::new(bus),
-        })
+            handler: EventHandler::new(),
+        };
+
+        for cmd in &cmds {
+            try!(machine.process(*cmd));
+        }
+
+        Ok(machine)
     }
 
-    pub fn process(&mut self, cmd: Command, delta: &Duration) -> Result<Status, Error> {
+    pub fn process(&mut self, cmd: Command) -> Result<Status, Error> {
         let status = try!(match cmd {
-            Command::Clock => self.handle_clock_cmd(),
-            Command::MidiClock => self.handle_midi_cmd(&delta),
-            Command::Event(event) => self.handle_event_cmd(event),
-            Command::Track(num, rev, func) => self.handle_track_cmd(num, rev, func),
             Command::Stop => Ok(Status::Stop),
-            _ => return Err(exception!()),
+            Command::Reload => Ok(Status::Reload),
+            Command::Clock => self.handle_clock_cmd(),
+            Command::Track(num, rev, func) => self.handle_track_cmd(num, rev, func),
+            _ => {
+                (self.sink)(cmd);
+                Ok(Status::Continue)
+            }
         });
 
         if let Status::Continue = status {
             Ok(Status::Continue)
         } else {
-            self.midi.stop();
-            self.handle_clock_cmd().ok();
             Ok(status)
         }
     }
 
-    // Read internal and external commands
     fn handle_clock_cmd(&mut self) -> Result<Status, Error> {
-        while let Some(cmd) = (self.input)() {
+        if let Some(cmd) = (self.input)() {
             match cmd {
-                Command::Event(_) => (),
                 Command::Stop => {
-                    (self.clock)(TimeEvent::Stop);
+                    (self.clock)(Schedule::Stop);
                     return Ok(Status::Stop);
                 }
                 Command::Reload => {
-                    (self.clock)(TimeEvent::Stop);
+                    (self.clock)(Schedule::Stop);
                     return Ok(Status::Reload);
                 }
-                Command::MidiNoteOn(_, _, _)
-                | Command::MidiNoteOff(_, _)
-                | Command::MidiCtl(_, _, _) => (self.sink)(cmd),
                 _ => return Err(exception!()),
             };
         }
         Ok(Status::Continue)
     }
 
-    // Route sequenced events
-    fn handle_event_cmd(&mut self, event: Event) -> Result<Status, Error> {
-        (self.sink)(Command::Event(event));
-        match event.dest {
-            Destination::Midi(_, _) => {
-                self.midi.process(event);
-                Ok(Status::Continue)
-            }
-        }
-    }
-
-    // Update midi messages (note, ctrl, clock etc.)
-    fn handle_midi_cmd(&mut self, elapsed: &Duration) -> Result<Status, Error> {
-        self.midi.update(elapsed);
-        Ok(Status::Continue)
-    }
-
-    // Call a track function scheduling its produced events
     fn handle_track_cmd(&mut self, num: usize, rev: usize, func: u64) -> Result<Status, Error> {
-        // Evaluate the track function
         self.interp.data_mut().reset(rev);
         self.interp.reset();
         try!(self.interp.eval(self.functions[&func]));
 
-        // Apply effects
         let data = self.interp.data_mut();
         let track = &mut data.tracks[num];
+
         for fx in &mut track.effects {
             let fx = Rc::get_mut(fx).unwrap();
             data.events = fx.apply(data.duration, &data.events);
         }
 
-        // Schedule events
-        for event in &data.events {
-            let cmd = TimeEvent::Timeout(event.onset, Command::Event(*event));
-            (self.clock)(cmd);
+        for event in &mut data.events {
+            event.onset += track.real_time;
+            self.handler.handle(&mut self.clock, *event);
         }
 
-        // Re-schedule the track
+        // Tracks are scheduled one revision _ahead_ of the clock
+        track.real_time += data.duration;
+        track.schedule_time +=
+            if rev == 0 { 0.0 } else { data.duration };
         let cmd = Command::Track(num, rev + 1, func);
-        (self.clock)(TimeEvent::Timeout(data.duration, cmd));
+        (self.clock)(Schedule::At(track.schedule_time, cmd));
         Ok(Status::Continue)
     }
 }

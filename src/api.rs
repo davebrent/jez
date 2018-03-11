@@ -6,7 +6,7 @@ use serde_json;
 
 use err::Error;
 use lang::{assemble, parser, Directive};
-use vm::{millis_to_dur, Clock, Command, Instr, Machine as VmMachine, Status, TimeEvent};
+use vm::{millis_to_dur, Clock, Command, Instr, Machine as VmMachine, Schedule, Status};
 use sinks::{factory, Backend, CompositeSink, Device, Sink as SinkTrait, ThreadedSink};
 
 pub struct Sink {
@@ -54,7 +54,7 @@ pub struct Program {
 pub struct Machine {
     clock: Option<Clock>,
     machine: VmMachine,
-    channel: Receiver<TimeEvent<Command>>,
+    channel: Receiver<Schedule<Command>>,
 }
 
 impl Program {
@@ -66,23 +66,17 @@ impl Program {
 }
 
 impl Machine {
-    pub fn new(prog: &Program, mut input: Input, output: Output) -> Result<Machine, Error> {
-        let (host_to_mach_send, host_to_mach_recv) = channel();
+    pub fn new(prog: &Program, input: Input, output: Output) -> Result<Machine, Error> {
         let (clock_to_mach_send, clock_to_mach_recv) = channel();
         let (mach_to_clock_send, mach_to_clock_recv) = channel();
 
         let mut clock = Clock::new(clock_to_mach_send, mach_to_clock_recv);
-        clock.interval(2.0, Command::MidiClock);
-        clock.interval(0.5, Command::Clock);
+        clock.interval(1000.0, Command::Clock);
 
         let machine = try!(VmMachine::new(
+            input,
             output,
             Box::new(move |evt| mach_to_clock_send.send(evt).unwrap_or(())),
-            Box::new(move |cmd| host_to_mach_send.send(cmd).unwrap_or(())),
-            Box::new(move || match host_to_mach_recv.try_recv() {
-                Ok(cmd) => Some(cmd),
-                Err(_) => input(),
-            }),
             &prog.instrs,
         ));
 
@@ -109,8 +103,8 @@ impl Machine {
         };
 
         while let Ok(event) = self.channel.try_recv() {
-            if let TimeEvent::Timer(delta, cmd) = event {
-                let status = try!(self.machine.process(cmd, &delta));
+            if let Schedule::At(_, cmd) = event {
+                let status = try!(self.machine.process(cmd));
                 match status {
                     Status::Continue => (),
                     Status::Stop | Status::Reload => return Ok(status),
@@ -120,7 +114,7 @@ impl Machine {
             }
         }
 
-        clock.tick(&delta);
+        clock.tick(delta);
         Ok(Status::Continue)
     }
 
@@ -133,8 +127,8 @@ impl Machine {
         thread::spawn(move || clock.run_forever());
 
         while let Ok(event) = self.channel.recv() {
-            if let TimeEvent::Timer(delta, cmd) = event {
-                let status = try!(self.machine.process(cmd, &delta));
+            if let Schedule::At(_, cmd) = event {
+                let status = try!(self.machine.process(cmd));
                 match status {
                     Status::Continue => (),
                     Status::Stop | Status::Reload => return Ok(status),

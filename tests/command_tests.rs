@@ -6,9 +6,12 @@ macro_rules! command_test {
         // Run a program for a duration and compare its output commands
         let program = include_str!(concat!("files/", $name, ".jez"));
         let expected = include_str!(concat!("files/", $name, ".json"));
-        let data = jez::simulate($duration, 1.0, program).unwrap();
+        let data = jez::simulate($duration, 0.5, program).unwrap();
         let actual: serde_json::Value = serde_json::from_str(&data).unwrap();
         let expected: serde_json::Value = serde_json::from_str(&expected).unwrap();
+        if actual["commands"] != expected {
+            println!("{}", serde_json::to_string_pretty(&actual["commands"]).unwrap());
+        }
         assert_eq!(actual["commands"], expected);
     );
 }

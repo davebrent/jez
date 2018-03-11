@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 pub type Point = [f64; 2];
 pub type Curve = [f64; 8];
 
@@ -40,18 +38,6 @@ pub fn point_on_curve(t: f64, curve: &Curve) -> Point {
     [x, y]
 }
 
-pub fn millis_to_dur(millis: f64) -> Duration {
-    let secs = (millis / 1000.0).floor();
-    let nanos = (millis - (secs * 1000.0)) * 1000000.0;
-    Duration::new(secs as u64, nanos as u32)
-}
-
-pub fn dur_to_millis(dur: &Duration) -> f64 {
-    let secs = dur.as_secs() as f64 * 1000.0;
-    let nanos = f64::from(dur.subsec_nanos()) / 1000000.0;
-    secs + nanos
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,12 +50,5 @@ mod tests {
         assert_eq!(point_on_curve(1.5, &curve), [1.0, 128.0]);
         assert_eq!(point_on_curve(-1.5, &curve), [0.0, 0.0]);
         assert_eq!(point_on_curve(0.5, &curve), [0.5, 64.0]);
-    }
-
-    #[test]
-    fn test_time_fns() {
-        let dur = millis_to_dur(2500.0);
-        assert_eq!(dur, Duration::new(2, 500000000));
-        assert_eq!(dur_to_millis(&dur), 2500.0);
     }
 }

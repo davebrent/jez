@@ -3,8 +3,9 @@ use std::rc::Rc;
 
 use super::interp::{InterpResult, InterpState};
 use super::math::Curve;
+use super::time::Priority;
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Eq)]
 pub enum Destination {
     Midi(u8, u8),
 }
@@ -31,9 +32,23 @@ pub enum Command {
     MidiNoteOn(u8, u8, u8),
     Stop,
     Reload,
-    MidiClock,
     Clock,
     Track(usize, usize, u64),
+}
+
+impl Priority for Command {
+    fn priority(&self) -> usize {
+        match *self {
+            Command::MidiNoteOff(_, _) => 0,
+            Command::Stop => 1,
+            Command::Reload => 2,
+            Command::Clock => 3,
+            Command::Track(_, _, _) => 4,
+            Command::Event(_) => 5,
+            Command::MidiNoteOn(_, _, _) => 6,
+            Command::MidiCtl(_, _, _) => 7,
+        }
+    }
 }
 
 pub trait Effect {
@@ -48,6 +63,8 @@ pub struct Track {
     pub id: usize,
     pub func: u64,
     pub effects: Vec<Rc<Effect>>,
+    pub real_time: f64,
+    pub schedule_time: f64,
 }
 
 impl Track {
@@ -56,6 +73,8 @@ impl Track {
             id: id,
             func: func,
             effects: Vec::new(),
+            real_time: 0.0,
+            schedule_time: 0.0,
         }
     }
 }

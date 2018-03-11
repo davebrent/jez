@@ -1,126 +1,165 @@
 use std::clone::Clone;
+use std::cmp::{Eq, Ord, Ordering, PartialOrd};
+use std::collections::BinaryHeap;
 use std::fmt::Debug;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use super::math::millis_to_dur;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[allow(dead_code)]
-pub enum TimeEvent<T>
-where
-    T: Clone + Debug,
-{
-    Stop,
-    Timer(Duration, T),
-    Timeout(f64, T),
-    Interval(f64, T),
+pub trait Priority {
+    fn priority(&self) -> usize;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Schedule<T>
+where
+    T: Copy + Clone + Debug + Priority,
+{
+    Stop,
+    At(f64, T),
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Timer<T>
 where
-    T: Clone + Debug,
+    T: Copy + Clone + Debug + Priority,
 {
-    pub dur: Duration,
-    pub elapsed: Duration,
-    pub dispatched_at: Duration,
-    pub recurring: bool,
+    pub t: Duration,
+    pub interval: Option<Duration>,
     pub data: T,
+}
+
+impl<T> PartialEq for Timer<T>
+where
+    T: Copy + Clone + Debug + Priority,
+{
+    fn eq(&self, other: &Timer<T>) -> bool {
+        self.t == other.t
+    }
+}
+
+impl<T> Eq for Timer<T>
+where
+    T: Copy + Clone + Debug + Priority,
+{
+}
+
+impl<T> PartialOrd for Timer<T>
+where
+    T: Copy + Clone + Debug + Priority,
+{
+    fn partial_cmp(&self, other: &Timer<T>) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T> Ord for Timer<T>
+where
+    T: Copy + Clone + Debug + Priority,
+{
+    fn cmp(&self, other: &Timer<T>) -> Ordering {
+        let order = self.t.cmp(&other.t).reverse();
+        match order {
+            Ordering::Equal => {
+                let a = self.data.priority();
+                let b = other.data.priority();
+                a.cmp(&b).reverse()
+            }
+            _ => order,
+        }
+    }
+}
+
+pub fn millis_to_dur(millis: f64) -> Duration {
+    let secs = (millis / 1000.0).floor();
+    let nanos = (millis - (secs * 1000.0)) * 1000000.0;
+    Duration::new(secs as u64, nanos as u32)
+}
+
+pub fn dur_to_millis(dur: Duration) -> f64 {
+    let secs = dur.as_secs() as f64 * 1000.0;
+    let nanos = f64::from(dur.subsec_nanos()) / 1000000.0;
+    secs + nanos
 }
 
 #[derive(Debug)]
 pub struct Clock<T>
 where
-    T: Clone + Debug,
+    T: Copy + Clone + Debug + Priority,
 {
-    input: Receiver<TimeEvent<T>>,
-    output: Sender<TimeEvent<T>>,
-    timers: Vec<Timer<T>>,
-    enabled: bool,
+    input: Receiver<Schedule<T>>,
+    output: Sender<Schedule<T>>,
+    timers: BinaryHeap<Timer<T>>,
     elapsed: Duration,
 }
 
 impl<T> Clock<T>
 where
-    T: Clone + Debug,
+    T: Copy + Clone + Debug + Priority,
 {
-    pub fn new(output: Sender<TimeEvent<T>>, input: Receiver<TimeEvent<T>>) -> Clock<T> {
+    pub fn new(output: Sender<Schedule<T>>, input: Receiver<Schedule<T>>) -> Clock<T> {
         Clock {
             input: input,
             output: output,
-            timers: Vec::new(),
-            enabled: false,
+            timers: BinaryHeap::new(),
             elapsed: Duration::new(0, 0),
         }
     }
 
-    pub fn update(&mut self, delta: &Duration) {
-        self.elapsed += *delta;
-
-        for timer in &mut self.timers {
-            timer.elapsed += *delta;
-        }
-
-        while let Some(timer) = self.timers.pop() {
-            if timer.elapsed < timer.dur {
-                self.timers.push(timer);
-                break;
-            } else {
-                let elapsed = self.elapsed;
-                let data = timer.data.clone();
-                self.output.send(TimeEvent::Timer(elapsed, data)).ok();
-
-                if timer.recurring {
-                    let mut next = timer;
-                    next.elapsed = Duration::new(0, 0);
-                    next.dispatched_at = self.elapsed + next.dur;
-                    self.push_timer(next);
-                }
-            }
-        }
-    }
-
-    pub fn timeout(&mut self, dur: f64, data: T) {
-        let dur = millis_to_dur(dur);
-        let elapsed = self.elapsed;
-        self.push_timer(Timer {
-            dur: dur,
-            dispatched_at: elapsed + dur,
-            elapsed: Duration::new(0, 0),
+    pub fn timeout(&mut self, t: f64, data: T) {
+        let t = millis_to_dur(t);
+        self.timers.push(Timer {
+            t: t,
             data: data,
-            recurring: false,
+            interval: None,
         });
     }
 
-    pub fn interval(&mut self, dur: f64, data: T) {
-        let dur = millis_to_dur(dur);
-        let elapsed = self.elapsed;
-        self.push_timer(Timer {
-            dur: dur,
-            dispatched_at: elapsed + dur,
-            elapsed: Duration::new(0, 0),
+    pub fn interval(&mut self, t: f64, data: T) {
+        let t = millis_to_dur(t);
+        self.timers.push(Timer {
+            t: t,
             data: data,
-            recurring: true,
+            interval: Some(t),
         });
     }
 
-    fn push_timer(&mut self, timer: Timer<T>) {
-        self.timers.push(timer);
-        self.timers
-            .sort_by(|a, b| b.dispatched_at.partial_cmp(&a.dispatched_at).unwrap());
+    fn next(&mut self) -> Option<Timer<T>> {
+        if match self.timers.peek() {
+            Some(timer) => timer.t <= self.elapsed,
+            None => false,
+        } {
+            self.timers.pop()
+        } else {
+            None
+        }
     }
 
-    pub fn tick(&mut self, delta: &Duration) -> bool {
-        self.update(delta);
-
+    pub fn tick(&mut self, delta: Duration) -> bool {
+        // Read input
         while let Ok(msg) = self.input.try_recv() {
             match msg {
-                TimeEvent::Stop => return false,
-                TimeEvent::Timeout(t, data) => self.timeout(t, data),
-                TimeEvent::Interval(t, data) => self.interval(t, data),
-                _ => continue,
+                Schedule::At(t, data) => self.timeout(t, data),
+                Schedule::Stop => return false,
+            };
+        }
+
+        // Update elapsed time
+        self.elapsed += delta;
+
+        // Process timers
+        while let Some(timer) = self.next() {
+            let elapsed = dur_to_millis(self.elapsed);
+            let evt = Schedule::At(elapsed, timer.data);
+            assert!(
+                dur_to_millis(timer.t).floor() == elapsed.floor(),
+                "Event dispatched at incorrect time"
+            );
+            self.output.send(evt).ok();
+            if timer.interval.is_some() {
+                let mut next = timer;
+                next.t = timer.t + timer.interval.unwrap();
+                self.timers.push(next);
             }
         }
 
@@ -129,17 +168,32 @@ where
 
     pub fn run_forever(&mut self) {
         let mut previous = Instant::now();
-        let res = Duration::new(0, 1);
+        let priority_time = millis_to_dur(1.5);
+        let default_sleep = millis_to_dur(20.0);
+
         loop {
             let now = Instant::now();
             let delta = now.duration_since(previous);
+            previous = now;
 
-            if self.tick(&delta) {
-                previous = now;
-                // Sleeping instead of `yield_now` to keep CPU usage down
-                thread::sleep(res);
-            } else {
+            if !self.tick(delta) {
                 break;
+            }
+
+            let target_time = match self.timers.peek() {
+                Some(timer) => match timer.t.checked_sub(self.elapsed) {
+                    Some(time) => time,
+                    None => default_sleep,
+                },
+                None => default_sleep,
+            };
+
+            if target_time > priority_time {
+                thread::sleep(target_time / 2);
+            } else {
+                for _ in 0..10 {
+                    thread::yield_now();
+                }
             }
         }
     }
@@ -150,32 +204,34 @@ mod tests {
     use super::*;
     use std::sync::mpsc::channel;
 
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    struct Event(usize);
+
+    impl Priority for Event {
+        fn priority(&self) -> usize {
+            self.0
+        }
+    }
+
     #[test]
     fn test_out_of_order_timeouts() {
         let (send1, recv1) = channel();
         let (_, recv2) = channel();
 
         let mut unit = Clock::new(send1, recv2);
-        unit.timeout(0.0, 10);
-        unit.timeout(100.0, 30);
-        unit.timeout(10.0, 20);
+        unit.timeout(100.0, Event(30));
+        unit.timeout(10.0, Event(20));
 
-        unit.tick(&millis_to_dur(5.0));
+        unit.tick(millis_to_dur(10.0));
         let res = recv1.try_recv();
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), TimeEvent::Timer(millis_to_dur(5.0), 10));
+        assert_eq!(res.unwrap(), Schedule::At(10.0, Event(20)));
         assert!(recv1.try_recv().is_err());
 
-        unit.tick(&millis_to_dur(5.0));
+        unit.tick(millis_to_dur(90.0));
         let res = recv1.try_recv();
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), TimeEvent::Timer(millis_to_dur(10.0), 20));
-        assert!(recv1.try_recv().is_err());
-
-        unit.tick(&millis_to_dur(90.0));
-        let res = recv1.try_recv();
-        assert!(res.is_ok());
-        assert_eq!(res.unwrap(), TimeEvent::Timer(millis_to_dur(100.0), 30));
+        assert_eq!(res.unwrap(), Schedule::At(100.0, Event(30)));
         assert!(recv1.try_recv().is_err());
     }
 
@@ -185,29 +241,36 @@ mod tests {
         let (_, recv2) = channel();
 
         let mut unit = Clock::new(send1, recv2);
-        unit.interval(10.0, 10);
-        unit.interval(20.0, 30);
+        unit.interval(10.0, Event(10));
+        unit.interval(20.0, Event(30));
 
-        unit.tick(&millis_to_dur(5.0));
+        unit.tick(millis_to_dur(5.0));
         assert!(recv1.try_recv().is_err());
 
-        unit.tick(&millis_to_dur(5.0));
+        unit.tick(millis_to_dur(5.0));
         let res = recv1.try_recv();
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), TimeEvent::Timer(millis_to_dur(10.0), 10));
+        assert_eq!(res.unwrap(), Schedule::At(10.0, Event(10)));
         assert!(recv1.try_recv().is_err());
 
-        unit.tick(&millis_to_dur(5.0));
+        unit.tick(millis_to_dur(5.0));
         assert!(recv1.try_recv().is_err());
 
-        unit.tick(&millis_to_dur(5.0));
+        unit.tick(millis_to_dur(5.0));
         let res = recv1.try_recv();
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), TimeEvent::Timer(millis_to_dur(20.0), 10));
+        assert_eq!(res.unwrap(), Schedule::At(20.0, Event(10)));
         let res = recv1.try_recv();
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), TimeEvent::Timer(millis_to_dur(20.0), 30));
+        assert_eq!(res.unwrap(), Schedule::At(20.0, Event(30)));
 
         assert!(recv1.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_time_fns() {
+        let dur = millis_to_dur(2500.0);
+        assert_eq!(dur, Duration::new(2, 500000000));
+        assert_eq!(dur_to_millis(dur), 2500.0);
     }
 }
