@@ -1,3 +1,6 @@
 target/
 **/*.rs.bk
 *.log
+*.mp4
+
+etc/sketches/node_modules

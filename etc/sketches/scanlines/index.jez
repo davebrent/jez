@@ -1,0 +1,25 @@
+.version 0
+
+.globals @pulse = 200
+
+.def main 0 :
+  't0 'C# 3 'natural_minor pitch_quantizer
+  't1 'C# 2 'natural_minor pitch_quantizer
+  't2 'C# 5 'natural_minor pitch_quantizer
+  't3 'C# 6 'natural_minor pitch_quantizer
+
+.track t0 :
+  ( [ 0 100 ] ~ ~ ~ [ 0 80 ] ~ ~ ) degrade @pulse 7 multiply
+  0 midi_out
+
+.track t1 :
+  ( ( ~ 1 ~ ~ ~ ~ ~ ) ( ~ ~ 1 ~ ~ 1 ~ ) ) @pulse 14 multiply
+  0 midi_out
+
+.track t2 :
+  ( [ 1 40 ] ~ [ 1 72 ] [ 1 72 ] ~ ) degrade @pulse 5 multiply
+  0 midi_out
+
+.track t3 :
+  ( 4 ~ ~ ~ ) degrade @pulse 4 multiply
+  0 midi_out
