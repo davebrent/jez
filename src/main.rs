@@ -152,7 +152,7 @@ fn run_app(args: &Args) -> Result<(), Error> {
                 Err(_) => return Err(error!(InvalidArgs, "Invalid time")),
             }
         };
-        let data = try!(simulate(dur, 1.0, &txt));
+        let data = try!(simulate(dur, 0.5, &txt));
         println!("{}", data);
         return Ok(());
     }
