@@ -1,0 +1,4 @@
+.version 0
+
+.track t0 :
+  ( [ 0 127 ] linear ) 500 0 midi_out
