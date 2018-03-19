@@ -1,0 +1,5 @@
+.version 0
+
+.track t0 :
+  ( 1 1 1 1 1 ) degrade 200
+  0 midi_out
