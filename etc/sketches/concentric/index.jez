@@ -1,0 +1,17 @@
+.version 0
+
+.track t0 :
+  ( 1 ) 8000
+  0 midi_out
+
+.track t1 :
+  ( 32 ) 4000
+  1 midi_out
+
+.track t2 :
+  ( ~ 32 ~ ) 4000 3 multiply
+  1 midi_out
+
+.track t3 :
+  ( 64 ) 9000
+  1 midi_out
