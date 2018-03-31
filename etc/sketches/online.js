@@ -5,10 +5,14 @@ const sketch = require('./scanlines');
 const canvas = document.getElementById('app');
 const context = canvas.getContext('2d');
 const state = sketch.setup({canvas, context});
+let previous = Date.now();
 
 if (sketch.draw) {
   (function loop () {
-    sketch.draw(state);
+    const now = Date.now();
+    const delta = now - previous;
+    previous = now;
+    sketch.draw(state, delta);
     requestAnimationFrame(loop);
   }());
 }

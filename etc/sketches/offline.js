@@ -115,7 +115,7 @@ function runSketch (sketchName, delta, duration, msgs) {
       }
     }
 
-    sketch.draw(state);
+    sketch.draw(state, delta);
     elapsed += delta;
 
     canvas.pngStream()
@@ -125,7 +125,8 @@ function runSketch (sketchName, delta, duration, msgs) {
 }
 
 const SKETCH_NAME = 'scanlines';
+const DURATION = 90000;
 
-runProgram(SKETCH_NAME, 20000)
+runProgram(SKETCH_NAME, DURATION)
   .then((cmds) => cmds.reduce(encodeCommands, []))
-  .then((msgs) => runSketch(SKETCH_NAME, 1000 / 60, 20000, msgs));
+  .then((msgs) => runSketch(SKETCH_NAME, 1000 / 60, DURATION, msgs));
