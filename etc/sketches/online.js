@@ -1,5 +1,5 @@
 const OSC = require('osc-js');
-const sketch = require('./scanlines');
+const sketch = require('./renderer');
 
 
 const canvas = document.getElementById('app');

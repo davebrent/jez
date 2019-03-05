@@ -2,6 +2,8 @@ module.exports = `
 precision mediump float;
 
 uniform sampler2D inputTexture;
+uniform sampler2D depthTexture;
+
 uniform vec2 resolution;
 
 void main() {
