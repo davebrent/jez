@@ -151,10 +151,16 @@ where
         while let Some(timer) = self.next() {
             let elapsed = dur_to_millis(self.elapsed);
             let evt = Schedule::At(elapsed, timer.data);
-            assert!(
-                dur_to_millis(timer.t).floor() == elapsed.floor(),
-                "Event dispatched at incorrect time"
-            );
+
+            let expected = dur_to_millis(timer.t);
+            if expected.floor() != elapsed.floor() {
+                let miss = elapsed - expected;
+                println!(
+                    "Event dispatched at incorrect time, off by {}ms",
+                    elapsed - expected
+                )
+            }
+
             self.output.send(evt).ok();
             if timer.interval.is_some() {
                 let mut next = timer;
