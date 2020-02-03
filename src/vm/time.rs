@@ -142,24 +142,22 @@ where
 
         // Update elapsed time
         self.elapsed += delta;
+        let elapsed = dur_to_millis(self.elapsed);
 
         // Process timers
         while let Some(timer) = self.next() {
-            let elapsed = dur_to_millis(self.elapsed);
-            let evt = Schedule::At(elapsed, timer.data);
-
             let expected = dur_to_millis(timer.t);
-            if expected.floor() != elapsed.floor() {
-                println!(
-                    "Event dispatched at incorrect time, off by {}ms",
-                    elapsed - expected
-                )
+            let event = Schedule::At(elapsed, timer.data);
+            self.output.send(event).ok();
+
+            let error = (elapsed - expected).abs();
+            if error > 1.0 {
+                eprintln!("Event dispatched at incorrect time, off by {}ms", error);
             }
 
-            self.output.send(evt).ok();
-            if timer.interval.is_some() {
+            if let Some(interval) = timer.interval {
                 let mut next = timer;
-                next.t = timer.t + timer.interval.unwrap();
+                next.t = timer.t + interval;
                 self.timers.push(next);
             }
         }
