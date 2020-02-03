@@ -72,9 +72,9 @@ impl InterpState {
         // the previous frame
         let mut frame = StackFrame::new(loc, self.pc);
         if args != 0 {
-            let caller = r#try!(self.frame_mut());
+            let caller = self.frame_mut()?;
             for _ in 0..args {
-                r#try!(frame.push(r#try!(caller.pop())));
+                frame.push(caller.pop()?)?;
             }
         }
         self.frames.push(frame);
@@ -99,7 +99,7 @@ impl InterpState {
                     self.exit = true;
                     Ok(Some(res))
                 } else {
-                    r#try!(self.push(res));
+                    self.push(res)?;
                     self.pc = frame.ret_addr;
                     Ok(None)
                 }
@@ -108,17 +108,17 @@ impl InterpState {
     }
 
     pub fn last(&self) -> Result<Value, Error> {
-        let frame = r#try!(self.frame());
-        Ok(r#try!(frame.last()))
+        let frame = self.frame()?;
+        Ok(frame.last()?)
     }
 
     pub fn pop(&mut self) -> Result<Value, Error> {
-        let frame = r#try!(self.frame_mut());
-        Ok(r#try!(frame.pop()))
+        let frame = self.frame_mut()?;
+        Ok(frame.pop()?)
     }
 
     pub fn pop_num(&mut self) -> Result<f64, Error> {
-        match r#try!(self.pop()) {
+        match self.pop()? {
             Value::Number(num) => Ok(num),
             _ => Err(error!(InvalidArgs)),
         }
@@ -128,7 +128,7 @@ impl InterpState {
         match self.frames.last_mut() {
             None => Err(error!(StackExhausted)),
             Some(frame) => {
-                r#try!(frame.push(val));
+                frame.push(val)?;
                 Ok(None)
             }
         }

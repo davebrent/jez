@@ -3,7 +3,7 @@ use crate::vm::types::{Result, SeqState};
 
 /// Puts the current cycle revision onto the stack
 pub fn revision(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    r#try!(state.push(Value::Number(seq.revision as f64)));
+    state.push(Value::Number(seq.revision as f64))?;
     Ok(None)
 }
 

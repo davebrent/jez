@@ -12,8 +12,8 @@ pub struct Udp {
 
 impl Udp {
     pub fn new(host_addr: &str, client_addr: &str) -> Result<Self, Error> {
-        let sock = r#try!(UdpSocket::bind(host_addr));
-        r#try!(sock.connect(client_addr));
+        let sock = UdpSocket::bind(host_addr)?;
+        sock.connect(client_addr)?;
         Ok(Udp { sock: sock })
     }
 }

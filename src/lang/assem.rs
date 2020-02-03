@@ -41,7 +41,7 @@ impl<'a> Assembler<'a> {
             return Err(error!(UnsupportedVersion));
         }
 
-        let arg = r#try!(r#try!(r#try!(dir.arg_at(0)).as_value()).as_num());
+        let arg = ((dir.arg_at(0)?).as_value()?).as_num()?;
         let ver = arg as u64;
         if ver != 0 {
             return Err(error!(UnsupportedVersion));
@@ -71,23 +71,23 @@ impl<'a> Assembler<'a> {
 
     /// Define new keywords/functions
     fn define_directive(&mut self, dir: &'a Directive) -> Result<(), Error> {
-        let arg = r#try!(dir.arg_at(0));
-        let name = r#try!(arg.as_value());
-        self.debug.push((self.instrs.len(), r#try!(arg.loc())));
+        let arg = dir.arg_at(0)?;
+        let name = arg.as_value()?;
+        self.debug.push((self.instrs.len(), arg.loc()?));
 
-        let name = hash_str(r#try!(name.as_keyword()));
-        let args = r#try!(r#try!(r#try!(dir.arg_at(1)).as_value()).as_num()) as u64;
+        let name = hash_str(name.as_keyword()?);
+        let args = ((dir.arg_at(1)?).as_value()?).as_num()? as u64;
         self.emit_func(name, args, dir)
     }
 
     /// Define new track functions
     fn track_directive(&mut self, dir: &'a Directive) -> Result<(), Error> {
-        let arg = r#try!(dir.arg_at(0));
-        let name = r#try!(arg.as_value());
-        self.debug.push((self.instrs.len(), r#try!(arg.loc())));
+        let arg = dir.arg_at(0)?;
+        let name = arg.as_value()?;
+        self.debug.push((self.instrs.len(), arg.loc()?));
 
-        let name = hash_str(r#try!(name.as_keyword()));
-        r#try!(self.emit_func(name, 0, dir));
+        let name = hash_str(name.as_keyword()?);
+        self.emit_func(name, 0, dir)?;
         self.tracks.push(name);
         Ok(())
     }
@@ -125,13 +125,12 @@ impl<'a> Assembler<'a> {
 
     pub fn assemble(&mut self, prog: &'a str, dirs: &'a [Directive]) -> Result<Vec<Instr>, Error> {
         for dir in dirs {
-            let res = match dir.name.data {
+            match dir.name.data {
                 Name::Version => self.version_directive(dir),
                 Name::Globals => self.globals_directive(dir),
                 Name::Def => self.define_directive(dir),
                 Name::Track => self.track_directive(dir),
-            };
-            r#try!(res);
+            }?;
         }
 
         self.instrs.push(Instr::Begin(0));

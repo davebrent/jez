@@ -18,7 +18,7 @@ impl Sink {
     pub fn new(requests: &[Backend]) -> Result<Sink, Error> {
         let mut sinks = vec![];
         for request in requests {
-            let sink = r#try!(factory(request));
+            let sink = factory(request)?;
             sinks.push(sink);
         }
         let sink = Box::new(CompositeSink::new(sinks));
@@ -60,8 +60,8 @@ pub struct Machine {
 
 impl Program {
     pub fn new(code: &str) -> Result<Program, Error> {
-        let dirs = r#try!(parser(code));
-        let instrs = r#try!(assemble(code, &dirs));
+        let dirs = parser(code)?;
+        let instrs = assemble(code, &dirs)?;
         Ok(Program { instrs: instrs })
     }
 }
@@ -74,12 +74,12 @@ impl Machine {
         let mut clock = Clock::new(clock_to_mach_send, mach_to_clock_recv);
         clock.interval(1000.0, Command::Clock);
 
-        let machine = r#try!(VmMachine::new(
+        let machine = VmMachine::new(
             input,
             output,
             Box::new(move |evt| mach_to_clock_send.send(evt).unwrap_or(())),
             &prog.instrs,
-        ));
+        )?;
 
         Ok(Machine {
             clock: Some(clock),
@@ -105,7 +105,7 @@ impl Machine {
 
         while let Ok(event) = self.channel.try_recv() {
             if let Schedule::At(_, cmd) = event {
-                let status = r#try!(self.machine.process(cmd));
+                let status = self.machine.process(cmd)?;
                 match status {
                     Status::Continue => (),
                     Status::Stop | Status::Reload => return Ok(status),
@@ -129,7 +129,7 @@ impl Machine {
 
         while let Ok(event) = self.channel.recv() {
             if let Schedule::At(_, cmd) = event {
-                let status = r#try!(self.machine.process(cmd));
+                let status = self.machine.process(cmd)?;
                 match status {
                     Status::Continue => (),
                     Status::Stop | Status::Reload => return Ok(status),
@@ -155,21 +155,21 @@ pub fn simulate(duration: f64, delta: f64, program: &str) -> Result<String, Erro
     }
 
     let (sender, receiver) = channel();
-    let directives = r#try!(parser(program));
-    let instructions = r#try!(assemble(program, &directives));
-    let mut machine = r#try!(Machine::new(
+    let directives = parser(program)?;
+    let instructions = assemble(program, &directives)?;
+    let mut machine = Machine::new(
         &Program {
             instrs: instructions.clone(),
         },
         Box::new(|| None),
-        Box::new(move |cmd| sender.send(cmd).unwrap_or(()))
-    ));
+        Box::new(move |cmd| sender.send(cmd).unwrap_or(())),
+    )?;
 
     machine.schedule(duration, Command::Stop);
 
     let mut commands = Vec::new();
     loop {
-        let status = r#try!(machine.update(delta));
+        let status = machine.update(delta)?;
         while let Ok(cmd) = receiver.try_recv() {
             commands.push(cmd);
         }

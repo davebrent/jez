@@ -45,7 +45,7 @@ pub trait Interpreter<S> {
 
 fn list_begin(state: &mut InterpState, begin: Instr) -> InterpResult {
     let val = Value::Instruction(begin);
-    r#try!(state.push(val));
+    state.push(val)?;
     Ok(None)
 }
 
@@ -55,13 +55,13 @@ where
 {
     let start = state.heap_len();
     loop {
-        let val = r#try!(state.pop());
+        let val = state.pop()?;
         match val {
             Value::Instruction(instr) => {
                 if instr == end {
                     let end = state.heap_len();
-                    r#try!(state.push(con(start, end)));
-                    r#try!(state.heap_slice_mut(start, end)).reverse();
+                    state.push(con(start, end))?;
+                    (state.heap_slice_mut(start, end)?).reverse();
                     return Ok(None);
                 } else {
                     state.heap_push(val)
@@ -134,20 +134,20 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
             Instr::Return => self.state.ret(),
 
             Instr::StoreGlob(name) => {
-                let val = r#try!(self.state.pop());
-                r#try!(self.state.store_glob(name, val));
+                let val = self.state.pop()?;
+                self.state.store_glob(name, val)?;
                 Ok(None)
             }
 
             Instr::StoreVar(name) => {
-                let val = r#try!(self.state.pop());
-                r#try!(self.state.store(name, val));
+                let val = self.state.pop()?;
+                self.state.store(name, val)?;
                 Ok(None)
             }
 
             Instr::LoadVar(name) => {
-                let val = r#try!(self.state.lookup(name));
-                r#try!(self.state.push(val));
+                let val = self.state.lookup(name)?;
+                self.state.push(val)?;
                 Ok(None)
             }
 
@@ -180,7 +180,7 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
                 let string = self.state.strings.get(&id).map(|s| s.clone());
                 match string {
                     Some(string) => {
-                        r#try!(self.state.push(Value::Str(string)));
+                        self.state.push(Value::Str(string))?;
                         Ok(None)
                     }
                     None => Err(error!(InvalidArgs)),
@@ -211,11 +211,11 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
     }
 
     fn eval(&mut self, pc: usize) -> InterpResult {
-        r#try!(self.state.call(pc, 0, pc));
+        self.state.call(pc, 0, pc)?;
         while self.state.pc < self.instrs.len() && !self.state.exit {
             let pc = self.state.pc;
             let instr = self.instrs[pc];
-            match r#try!(self.execute(pc, instr)) {
+            match self.execute(pc, instr)? {
                 None => (),
                 Some(val) => return Ok(Some(val)),
             }

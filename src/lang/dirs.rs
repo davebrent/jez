@@ -162,20 +162,20 @@ impl<'a> fmt::Display for Argument<'a> {
 
 impl<'a> fmt::Display for Directive<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        r#try!(write!(f, "{}", self.name.data));
+        write!(f, "{}", self.name.data)?;
 
         for arg in &self.args {
-            r#try!(write!(f, " "));
-            r#try!(write!(f, "{}", arg));
+            write!(f, " ")?;
+            write!(f, "{}", arg)?;
         }
 
         if !self.body.is_empty() {
-            r#try!(write!(f, ":\n "));
+            write!(f, ":\n ")?;
         }
 
         for code in &self.body {
-            r#try!(write!(f, " "));
-            r#try!(write!(f, "{}", code.data));
+            write!(f, " ")?;
+            write!(f, "{}", code.data)?;
         }
 
         write!(f, "\n")

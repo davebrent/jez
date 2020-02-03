@@ -56,14 +56,14 @@ impl WebSocketServer {
 
     pub fn run_forever(&mut self, host_addr: &str) -> Result<(), Error> {
         let mut ids = 0;
-        r#try!(ws::listen(host_addr, |out| {
+        ws::listen(host_addr, |out| {
             ids += 1;
             WebSocketHandler {
                 id: ids,
                 out: out,
                 channel: self.channel.clone(),
             }
-        }));
+        })?;
         Ok(())
     }
 }
@@ -72,7 +72,7 @@ impl WebSocket {
     pub fn new(host_addr: &str) -> Result<Self, Error> {
         let (tx, rx) = channel();
 
-        let mut server = r#try!(WebSocketServer::new(tx));
+        let mut server = WebSocketServer::new(tx)?;
         let host_addr = host_addr.to_string();
         let incoming = thread::spawn(move || server.run_forever(&host_addr));
 

@@ -73,19 +73,19 @@ fn watcher_task(
     program: Program,
     channel: Sender<Command>,
 ) -> Result<Task, Error> {
-    let meta_data = r#try!(fs::metadata(filepath.clone()));
-    let mod_time = r#try!(meta_data.modified());
+    let meta_data = fs::metadata(filepath.clone())?;
+    let mod_time = meta_data.modified()?;
 
     Ok(Box::new(move || {
-        let new_meta_data = r#try!(fs::metadata(filepath.clone()));
-        let new_mod_time = r#try!(new_meta_data.modified());
+        let new_meta_data = fs::metadata(filepath.clone())?;
+        let new_mod_time = new_meta_data.modified()?;
 
         if new_mod_time != mod_time {
             let mut txt = String::new();
-            let mut fp = r#try!(fs::File::open(filepath.clone()));
-            r#try!(fp.read_to_string(&mut txt));
+            let mut fp = fs::File::open(filepath.clone())?;
+            fp.read_to_string(&mut txt)?;
 
-            if program != r#try!(Program::new(txt.as_str())) {
+            if program != Program::new(txt.as_str())? {
                 channel.send(Command::Reload).unwrap();
                 return Ok(TaskStatus::Completed);
             }
@@ -131,17 +131,17 @@ fn make_sink(names: &str, args: &Args) -> Result<Sink, Error> {
 fn read_program(file_path: &str) -> Result<String, Error> {
     let mut txt = String::new();
     if file_path.is_empty() {
-        r#try!(io::stdin().read_to_string(&mut txt));
+        io::stdin().read_to_string(&mut txt)?;
     } else {
-        let mut fp = r#try!(fs::File::open(file_path));
-        r#try!(fp.read_to_string(&mut txt));
+        let mut fp = fs::File::open(file_path)?;
+        fp.read_to_string(&mut txt)?;
     }
     Ok(txt)
 }
 
 fn run_app(args: &Args) -> Result<(), Error> {
     if args.flag_simulate {
-        let txt = r#try!(read_program(&args.arg_file));
+        let txt = read_program(&args.arg_file)?;
         let dur = if args.flag_time.is_empty() {
             60000.0
         } else {
@@ -150,12 +150,12 @@ fn run_app(args: &Args) -> Result<(), Error> {
                 Err(_) => return Err(error!(InvalidArgs, "Invalid time")),
             }
         };
-        let data = r#try!(simulate(dur, 0.5, &txt));
+        let data = simulate(dur, 0.5, &txt)?;
         println!("{}", data);
         return Ok(());
     }
 
-    let mut sink = r#try!(make_sink(&args.flag_sink, &args));
+    let mut sink = make_sink(&args.flag_sink, &args)?;
 
     if args.cmd_info {
         println!("Sink: {}", sink.name());
@@ -170,27 +170,27 @@ fn run_app(args: &Args) -> Result<(), Error> {
     sink.run_forever(sink_recv);
 
     loop {
-        let txt = r#try!(read_program(&args.arg_file));
-        let program = r#try!(Program::new(txt.as_str()));
+        let txt = read_program(&args.arg_file)?;
+        let program = Program::new(txt.as_str())?;
 
         let (host_to_mach_send, host_to_mach_recv) = channel();
 
         let mut tasks: Vec<Task> = vec![];
         if args.flag_watch && !args.arg_file.is_empty() {
-            let task = r#try!(watcher_task(
+            let task = watcher_task(
                 args.arg_file.clone(),
                 program.clone(),
                 host_to_mach_send.clone(),
-            ));
+            )?;
             tasks.push(task);
         }
 
         let mach_to_sink_send = sink_send.clone();
-        let mut machine = r#try!(Machine::new(
+        let mut machine = Machine::new(
             &program,
             Box::new(move || host_to_mach_recv.try_recv().ok()),
             Box::new(move |cmd| mach_to_sink_send.send(cmd).unwrap_or(())),
-        ));
+        )?;
 
         if !args.flag_time.is_empty() {
             match args.flag_time.parse::<f64>() {
@@ -203,7 +203,7 @@ fn run_app(args: &Args) -> Result<(), Error> {
             thread::spawn(move || run_until_first(tasks));
         }
 
-        match r#try!(machine.run_forever()) {
+        match machine.run_forever()? {
             Status::Stop => return Ok(()),
             Status::Reload | Status::Continue => (),
         };

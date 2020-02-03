@@ -38,11 +38,11 @@ fn interpreter(
     ))));
 
     // Create tracks as defined by block 1 (the extension block)
-    if let Some(val) = r#try!(interp.eval_block(1)) {
-        let (start, end) = r#try!(val.as_range());
+    if let Some(val) = interp.eval_block(1)? {
+        let (start, end) = val.as_range()?;
         let state = interp.state();
         for (i, ptr) in (start..end).enumerate() {
-            let sym = r#try!(r#try!(state.heap_get(ptr)).as_sym());
+            let sym = (state.heap_get(ptr)?).as_sym()?;
             let data = interp.data_mut();
             data.tracks.push(Track::new(i, sym));
         }
@@ -61,7 +61,7 @@ fn interpreter(
     interp.reset();
     match funcs.get(&hash_str("main")).map(|p| *p) {
         Some(pc) => {
-            r#try!(interp.eval(pc));
+            interp.eval(pc)?;
         }
         None => (),
     };
@@ -87,7 +87,7 @@ pub struct Machine {
 
 impl Machine {
     pub fn new(input: In, sink: Out, clock: Timer, instrs: &[Instr]) -> Result<Machine, Error> {
-        let (funcs, mut interp) = r#try!(self::interpreter(instrs));
+        let (funcs, mut interp) = self::interpreter(instrs)?;
         let mut cmds = vec![];
 
         for track in &interp.data_mut().tracks {
@@ -107,14 +107,14 @@ impl Machine {
         };
 
         for cmd in &cmds {
-            r#try!(machine.process(*cmd));
+            machine.process(*cmd)?;
         }
 
         Ok(machine)
     }
 
     pub fn process(&mut self, cmd: Command) -> Result<Status, Error> {
-        let status = r#try!(match cmd {
+        let status = match cmd {
             Command::Stop => Ok(Status::Stop),
             Command::Reload => Ok(Status::Reload),
             Command::Clock => self.handle_clock_cmd(),
@@ -123,7 +123,7 @@ impl Machine {
                 (self.sink)(cmd);
                 Ok(Status::Continue)
             }
-        });
+        }?;
 
         if let Status::Continue = status {
             Ok(Status::Continue)
@@ -152,7 +152,7 @@ impl Machine {
     fn handle_track_cmd(&mut self, num: usize, rev: usize, func: u64) -> Result<Status, Error> {
         self.interp.data_mut().reset(rev);
         self.interp.reset();
-        r#try!(self.interp.eval(self.functions[&func]));
+        self.interp.eval(self.functions[&func])?;
 
         let data = self.interp.data_mut();
         let track = &mut data.tracks[num];

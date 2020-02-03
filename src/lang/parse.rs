@@ -245,12 +245,12 @@ impl<'c, 's: 'c> Parser<'c, 's> {
 
         let val = match tk {
             '@' => {
-                let var = r#try!(self.parse_variable());
+                let var = self.parse_variable()?;
                 Token::new(Value::Variable(var.data), var.loc)
             }
             '\'' => {
-                r#try!(self.stream.expect('\''));
-                let word = r#try!(self.parse_word());
+                self.stream.expect('\'')?;
+                let word = self.parse_word()?;
                 Token::new(Value::Symbol(word.data), word.loc)
             }
             '"' => {
@@ -268,7 +268,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
                     let num = raw.parse::<f64>().unwrap();
                     Token::new(Value::Number(num), loc)
                 } else {
-                    let word = r#try!(self.parse_word());
+                    let word = self.parse_word()?;
                     Token::new(Value::Keyword(word.data), word.loc)
                 }
             }
@@ -284,12 +284,12 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         };
 
         if tk == '@' {
-            let key = r#try!(self.parse_variable());
+            let key = self.parse_variable()?;
             self.stream.next().unwrap(); // =
-            let val = r#try!(self.parse_value());
+            let val = self.parse_value()?;
             Ok(Argument::Kwarg(key, val))
         } else {
-            let val = r#try!(self.parse_value());
+            let val = self.parse_value()?;
             Ok(Argument::Arg(val))
         }
     }
@@ -336,11 +336,11 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             }
             '=' => {
                 self.stream.next().unwrap();
-                let var = r#try!(self.parse_variable());
+                let var = self.parse_variable()?;
                 Token::new(Code::Symbol(Symbol::Assign(var.data)), loc)
             }
             _ => {
-                let val = r#try!(self.parse_value());
+                let val = self.parse_value()?;
                 Token::new(Code::Value(val.data), val.loc)
             }
         };
@@ -359,7 +359,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         }
 
         self.stream.next().unwrap(); // .
-        let name = r#try!(self.parse_name());
+        let name = self.parse_name()?;
         let mut args = vec![];
         let mut body = vec![];
 
@@ -367,7 +367,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             if tk == '.' || tk == ':' {
                 break;
             }
-            let arg = r#try!(self.parse_arg());
+            let arg = self.parse_arg()?;
             args.push(arg);
         }
 
@@ -382,7 +382,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
                 if tk == '.' {
                     break;
                 }
-                let code = r#try!(self.parse_code());
+                let code = self.parse_code()?;
                 body.push(code);
             }
         }

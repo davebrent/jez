@@ -23,11 +23,11 @@ pub fn factory(request: &Backend) -> Result<Box<dyn Sink>, Error> {
     #[allow(unreachable_patterns)]
     Ok(match *request {
         Backend::Console => Box::new(console::Console::new()),
-        Backend::Udp(host, client) => Box::new(r#try!(udp::Udp::new(host, client))),
+        Backend::Udp(host, client) => Box::new(udp::Udp::new(host, client)?),
         #[cfg(feature = "with-websocket")]
-        Backend::WebSocket(host) => Box::new(r#try!(ws::WebSocket::new(host))),
+        Backend::WebSocket(host) => Box::new(ws::WebSocket::new(host)?),
         #[cfg(feature = "with-portmidi")]
-        Backend::PortMidi(device) => Box::new(r#try!(portmidi::Portmidi::new(device))),
+        Backend::PortMidi(device) => Box::new(portmidi::Portmidi::new(device)?),
         _ => return Err(error!(UnknownBackend, &format!("{:?}", request))),
     })
 }

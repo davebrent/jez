@@ -32,7 +32,7 @@ impl Device for PortmidiDevice {}
 
 impl Portmidi {
     pub fn new(id: Option<usize>) -> Result<Self, Error> {
-        let ctx = r#try!(pm::PortMidi::new());
+        let ctx = pm::PortMidi::new()?;
 
         let id = match id {
             Some(id) => Some(id as i32),
@@ -44,8 +44,8 @@ impl Portmidi {
 
         let port = match id {
             Some(id) => {
-                let info = r#try!(ctx.device(id));
-                Some(r#try!(ctx.output_port(info, 1024)))
+                let info = ctx.device(id)?;
+                Some(ctx.output_port(info, 1024)?)
             }
             None => None,
         };

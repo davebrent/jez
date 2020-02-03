@@ -6,16 +6,16 @@ use crate::vm::types::{Result, SeqState};
 
 /// Push a random integer, within a range, onto the stack
 pub fn rand_range(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let max = r#try!(state.pop_num()) as i64;
-    let min = r#try!(state.pop_num()) as i64;
+    let max = state.pop_num()? as i64;
+    let min = state.pop_num()? as i64;
     let val = seq.rng.gen_range(min, max);
-    r#try!(state.push(Value::Number(val as f64)));
+    state.push(Value::Number(val as f64))?;
     Ok(None)
 }
 
 /// Seed the random number generator
 pub fn rand_seed(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let seed = r#try!(state.pop_num()) as i64;
+    let seed = state.pop_num()? as i64;
     let mut wtr = vec![];
     if wtr.write_i64::<LittleEndian>(seed).is_err() {
         return Err(error!(InvalidArgs));
