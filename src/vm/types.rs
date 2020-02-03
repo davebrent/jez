@@ -1,4 +1,5 @@
 use rand::{SeedableRng, StdRng};
+use serde::Serialize;
 
 use super::interp::{InterpResult, InterpState};
 use super::math::Curve;

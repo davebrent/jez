@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use crate::err::Error;
+use serde::Serialize;
 
 use super::types::Value;
+use crate::err::Error;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct StackFrame {

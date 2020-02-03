@@ -1,8 +1,5 @@
-extern crate docopt;
 #[macro_use]
 extern crate jez;
-#[macro_use]
-extern crate serde_derive;
 
 use std::fs;
 use std::io;
@@ -12,6 +9,7 @@ use std::thread;
 use std::time::Duration;
 
 use docopt::Docopt;
+use serde::Deserialize;
 
 use jez::{simulate, Backend, Command, Error, Machine, Program, Sink, Status};
 

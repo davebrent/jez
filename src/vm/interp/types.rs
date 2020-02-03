@@ -1,5 +1,6 @@
-use crate::err::Error;
+use serde::Serialize;
 
+use crate::err::Error;
 use crate::vm::math::Curve;
 
 pub type InterpResult = Result<Option<Value>, Error>;

@@ -1,5 +1,7 @@
 use std::fmt;
 
+use serde::Serialize;
+
 use crate::err::Error;
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]

@@ -4,6 +4,8 @@ use std::fmt;
 use std::fmt::Write;
 use std::io;
 
+use serde::Serialize;
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Location {
     pub filename: &'static str,

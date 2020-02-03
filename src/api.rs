@@ -2,6 +2,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::Duration;
 
+use serde::Serialize;
 use serde_json;
 
 use crate::err::Error;

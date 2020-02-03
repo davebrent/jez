@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use crate::err::Error;
+use serde::Serialize;
 
 use super::stack::StackFrame;
 use super::types::{InterpResult, Value};
+use crate::err::Error;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct InterpState {
