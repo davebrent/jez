@@ -1,13 +1,13 @@
 mod console;
-mod udp;
 mod osc;
 #[cfg(feature = "with-portmidi")]
 mod portmidi;
 mod sink;
+mod udp;
 #[cfg(feature = "with-websocket")]
 mod ws;
 
-use err::Error;
+use crate::err::Error;
 
 pub use self::sink::{CompositeSink, Device, Sink, ThreadedSink};
 
@@ -19,15 +19,15 @@ pub enum Backend<'a> {
     WebSocket(&'a str),
 }
 
-pub fn factory(request: &Backend) -> Result<Box<Sink>, Error> {
+pub fn factory(request: &Backend) -> Result<Box<dyn Sink>, Error> {
     #[allow(unreachable_patterns)]
     Ok(match *request {
         Backend::Console => Box::new(console::Console::new()),
-        Backend::Udp(host, client) => Box::new(try!(udp::Udp::new(host, client))),
+        Backend::Udp(host, client) => Box::new(r#try!(udp::Udp::new(host, client))),
         #[cfg(feature = "with-websocket")]
-        Backend::WebSocket(host) => Box::new(try!(ws::WebSocket::new(host))),
+        Backend::WebSocket(host) => Box::new(r#try!(ws::WebSocket::new(host))),
         #[cfg(feature = "with-portmidi")]
-        Backend::PortMidi(device) => Box::new(try!(portmidi::Portmidi::new(device))),
+        Backend::PortMidi(device) => Box::new(r#try!(portmidi::Portmidi::new(device))),
         _ => return Err(error!(UnknownBackend, &format!("{:?}", request))),
     })
 }

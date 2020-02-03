@@ -1,7 +1,7 @@
-use rosc::{OscMessage, OscPacket, OscType};
 use rosc::encoder;
+use rosc::{OscMessage, OscPacket, OscType};
 
-use vm::Command;
+use crate::vm::Command;
 
 pub fn encode(cmd: Command) -> Option<Vec<u8>> {
     match cmd {
@@ -13,7 +13,8 @@ pub fn encode(cmd: Command) -> Option<Vec<u8>> {
                     OscType::Int(i32::from(pitch)),
                     OscType::Int(i32::from(vel)),
                 ]),
-            })).unwrap(),
+            }))
+            .unwrap(),
         ),
         Command::MidiNoteOff(chn, pitch) => Some(
             encoder::encode(&OscPacket::Message(OscMessage {
@@ -22,7 +23,8 @@ pub fn encode(cmd: Command) -> Option<Vec<u8>> {
                     OscType::Int(i32::from(chn)),
                     OscType::Int(i32::from(pitch)),
                 ]),
-            })).unwrap(),
+            }))
+            .unwrap(),
         ),
         Command::MidiCtl(chn, ctl, val) => Some(
             encoder::encode(&OscPacket::Message(OscMessage {
@@ -32,7 +34,8 @@ pub fn encode(cmd: Command) -> Option<Vec<u8>> {
                     OscType::Int(i32::from(ctl)),
                     OscType::Int(i32::from(val)),
                 ]),
-            })).unwrap(),
+            }))
+            .unwrap(),
         ),
         _ => None,
     }

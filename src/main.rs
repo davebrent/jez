@@ -68,26 +68,26 @@ enum TaskStatus {
     Completed,
 }
 
-type Task = Box<FnMut() -> Result<TaskStatus, Error> + Send>;
+type Task = Box<dyn FnMut() -> Result<TaskStatus, Error> + Send>;
 
 fn watcher_task(
     filepath: String,
     program: Program,
     channel: Sender<Command>,
 ) -> Result<Task, Error> {
-    let meta_data = try!(fs::metadata(filepath.clone()));
-    let mod_time = try!(meta_data.modified());
+    let meta_data = r#try!(fs::metadata(filepath.clone()));
+    let mod_time = r#try!(meta_data.modified());
 
     Ok(Box::new(move || {
-        let new_meta_data = try!(fs::metadata(filepath.clone()));
-        let new_mod_time = try!(new_meta_data.modified());
+        let new_meta_data = r#try!(fs::metadata(filepath.clone()));
+        let new_mod_time = r#try!(new_meta_data.modified());
 
         if new_mod_time != mod_time {
             let mut txt = String::new();
-            let mut fp = try!(fs::File::open(filepath.clone()));
-            try!(fp.read_to_string(&mut txt));
+            let mut fp = r#try!(fs::File::open(filepath.clone()));
+            r#try!(fp.read_to_string(&mut txt));
 
-            if program != try!(Program::new(txt.as_str())) {
+            if program != r#try!(Program::new(txt.as_str())) {
                 channel.send(Command::Reload).unwrap();
                 return Ok(TaskStatus::Completed);
             }
@@ -133,17 +133,17 @@ fn make_sink(names: &str, args: &Args) -> Result<Sink, Error> {
 fn read_program(file_path: &str) -> Result<String, Error> {
     let mut txt = String::new();
     if file_path.is_empty() {
-        try!(io::stdin().read_to_string(&mut txt));
+        r#try!(io::stdin().read_to_string(&mut txt));
     } else {
-        let mut fp = try!(fs::File::open(file_path));
-        try!(fp.read_to_string(&mut txt));
+        let mut fp = r#try!(fs::File::open(file_path));
+        r#try!(fp.read_to_string(&mut txt));
     }
     Ok(txt)
 }
 
 fn run_app(args: &Args) -> Result<(), Error> {
     if args.flag_simulate {
-        let txt = try!(read_program(&args.arg_file));
+        let txt = r#try!(read_program(&args.arg_file));
         let dur = if args.flag_time.is_empty() {
             60000.0
         } else {
@@ -152,12 +152,12 @@ fn run_app(args: &Args) -> Result<(), Error> {
                 Err(_) => return Err(error!(InvalidArgs, "Invalid time")),
             }
         };
-        let data = try!(simulate(dur, 0.5, &txt));
+        let data = r#try!(simulate(dur, 0.5, &txt));
         println!("{}", data);
         return Ok(());
     }
 
-    let mut sink = try!(make_sink(&args.flag_sink, &args));
+    let mut sink = r#try!(make_sink(&args.flag_sink, &args));
 
     if args.cmd_info {
         println!("Sink: {}", sink.name());
@@ -172,14 +172,14 @@ fn run_app(args: &Args) -> Result<(), Error> {
     sink.run_forever(sink_recv);
 
     loop {
-        let txt = try!(read_program(&args.arg_file));
-        let program = try!(Program::new(txt.as_str()));
+        let txt = r#try!(read_program(&args.arg_file));
+        let program = r#try!(Program::new(txt.as_str()));
 
         let (host_to_mach_send, host_to_mach_recv) = channel();
 
         let mut tasks: Vec<Task> = vec![];
         if args.flag_watch && !args.arg_file.is_empty() {
-            let task = try!(watcher_task(
+            let task = r#try!(watcher_task(
                 args.arg_file.clone(),
                 program.clone(),
                 host_to_mach_send.clone(),
@@ -188,7 +188,7 @@ fn run_app(args: &Args) -> Result<(), Error> {
         }
 
         let mach_to_sink_send = sink_send.clone();
-        let mut machine = try!(Machine::new(
+        let mut machine = r#try!(Machine::new(
             &program,
             Box::new(move || host_to_mach_recv.try_recv().ok()),
             Box::new(move |cmd| mach_to_sink_send.send(cmd).unwrap_or(())),
@@ -205,7 +205,7 @@ fn run_app(args: &Args) -> Result<(), Error> {
             thread::spawn(move || run_until_first(tasks));
         }
 
-        match try!(machine.run_forever()) {
+        match r#try!(machine.run_forever()) {
             Status::Stop => return Ok(()),
             Status::Reload | Status::Continue => (),
         };

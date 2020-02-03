@@ -1,6 +1,6 @@
 use std::fmt;
 
-use err::Error;
+use crate::err::Error;
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Value<'a> {
@@ -160,20 +160,20 @@ impl<'a> fmt::Display for Argument<'a> {
 
 impl<'a> fmt::Display for Directive<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "{}", self.name.data));
+        r#try!(write!(f, "{}", self.name.data));
 
         for arg in &self.args {
-            try!(write!(f, " "));
-            try!(write!(f, "{}", arg));
+            r#try!(write!(f, " "));
+            r#try!(write!(f, "{}", arg));
         }
 
         if !self.body.is_empty() {
-            try!(write!(f, ":\n "));
+            r#try!(write!(f, ":\n "));
         }
 
         for code in &self.body {
-            try!(write!(f, " "));
-            try!(write!(f, "{}", code.data));
+            r#try!(write!(f, " "));
+            r#try!(write!(f, "{}", code.data));
         }
 
         write!(f, "\n")

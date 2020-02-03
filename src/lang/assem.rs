@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use std::collections::hash_map::{DefaultHasher, Entry};
+use std::collections::HashMap;
 use std::hash::Hasher;
 
 use super::dirs::{Argument, Code, Directive, Location, Name, Symbol, Value};
-use err::Error;
-use vm::Instr;
+use crate::err::Error;
+use crate::vm::Instr;
 
 pub fn hash_str(text: &str) -> u64 {
     let mut hasher = DefaultHasher::new();
@@ -41,7 +41,7 @@ impl<'a> Assembler<'a> {
             return Err(error!(UnsupportedVersion));
         }
 
-        let arg = try!(try!(try!(dir.arg_at(0)).as_value()).as_num());
+        let arg = r#try!(r#try!(r#try!(dir.arg_at(0)).as_value()).as_num());
         let ver = arg as u64;
         if ver != 0 {
             return Err(error!(UnsupportedVersion));
@@ -71,23 +71,23 @@ impl<'a> Assembler<'a> {
 
     /// Define new keywords/functions
     fn define_directive(&mut self, dir: &'a Directive) -> Result<(), Error> {
-        let arg = try!(dir.arg_at(0));
-        let name = try!(arg.as_value());
-        self.debug.push((self.instrs.len(), try!(arg.loc())));
+        let arg = r#try!(dir.arg_at(0));
+        let name = r#try!(arg.as_value());
+        self.debug.push((self.instrs.len(), r#try!(arg.loc())));
 
-        let name = hash_str(try!(name.as_keyword()));
-        let args = try!(try!(try!(dir.arg_at(1)).as_value()).as_num()) as u64;
+        let name = hash_str(r#try!(name.as_keyword()));
+        let args = r#try!(r#try!(r#try!(dir.arg_at(1)).as_value()).as_num()) as u64;
         self.emit_func(name, args, dir)
     }
 
     /// Define new track functions
     fn track_directive(&mut self, dir: &'a Directive) -> Result<(), Error> {
-        let arg = try!(dir.arg_at(0));
-        let name = try!(arg.as_value());
-        self.debug.push((self.instrs.len(), try!(arg.loc())));
+        let arg = r#try!(dir.arg_at(0));
+        let name = r#try!(arg.as_value());
+        self.debug.push((self.instrs.len(), r#try!(arg.loc())));
 
-        let name = hash_str(try!(name.as_keyword()));
-        try!(self.emit_func(name, 0, dir));
+        let name = hash_str(r#try!(name.as_keyword()));
+        r#try!(self.emit_func(name, 0, dir));
         self.tracks.push(name);
         Ok(())
     }
@@ -131,7 +131,7 @@ impl<'a> Assembler<'a> {
                 Name::Def => self.define_directive(dir),
                 Name::Track => self.track_directive(dir),
             };
-            try!(res);
+            r#try!(res);
         }
 
         self.instrs.push(Instr::Begin(0));
@@ -221,17 +221,18 @@ pub fn assemble(prog: &str, dirs: &[Directive]) -> Result<Vec<Instr>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::dirs::Token;
+    use super::*;
 
     #[test]
     fn test_strings() {
         let dirs = vec![
             Directive {
                 name: Token::new(Name::Version, Default::default()),
-                args: vec![
-                    Argument::Arg(Token::new(Value::Number(0.0), Default::default())),
-                ],
+                args: vec![Argument::Arg(Token::new(
+                    Value::Number(0.0),
+                    Default::default(),
+                ))],
                 body: vec![],
             },
             Directive {
@@ -295,9 +296,10 @@ mod tests {
         let dirs = vec![
             Directive {
                 name: Token::new(Name::Version, Default::default()),
-                args: vec![
-                    Argument::Arg(Token::new(Value::Number(0.0), Default::default())),
-                ],
+                args: vec![Argument::Arg(Token::new(
+                    Value::Number(0.0),
+                    Default::default(),
+                ))],
                 body: vec![],
             },
             Directive {

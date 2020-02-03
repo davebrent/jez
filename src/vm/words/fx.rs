@@ -1,14 +1,15 @@
-use vm::fx::{MarkovChain, MidiVelocityMapper, PitchQuantizer};
-use vm::interp::InterpState;
-use vm::types::{Result, SeqState};
+use crate::vm::fx::{MarkovChain, MidiVelocityMapper, PitchQuantizer};
+use crate::vm::interp::InterpState;
+use crate::vm::types::{Result, SeqState};
 
 pub fn pitch_quantizer(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let scale = try!(try!(state.pop()).as_sym());
-    let octave = try!(state.pop_num()) as usize;
-    let key = try!(try!(state.pop()).as_sym());
-    let sym = try!(try!(state.pop()).as_sym());
+    let scale = r#try!(r#try!(state.pop()).as_sym());
+    let octave = r#try!(state.pop_num()) as usize;
+    let key = r#try!(r#try!(state.pop()).as_sym());
+    let sym = r#try!(r#try!(state.pop()).as_sym());
 
-    let track = match seq.tracks
+    let track = match seq
+        .tracks
         .iter_mut()
         .find(|ref mut track| track.func == sym)
     {
@@ -27,15 +28,16 @@ pub fn pitch_quantizer(seq: &mut SeqState, state: &mut InterpState) -> Result {
 
 /// Assign a markov chain to a track
 pub fn markov_chain(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let capacity = try!(state.pop_num()) as usize;
-    let order = try!(state.pop_num()) as usize;
-    let sym = try!(try!(state.pop()).as_sym());
+    let capacity = r#try!(state.pop_num()) as usize;
+    let order = r#try!(state.pop_num()) as usize;
+    let sym = r#try!(r#try!(state.pop()).as_sym());
 
     if order == 0 || capacity == 0 {
         return Err(error!(InvalidArgs));
     }
 
-    match seq.tracks
+    match seq
+        .tracks
         .iter_mut()
         .find(|ref mut track| track.func == sym)
     {
@@ -49,11 +51,12 @@ pub fn markov_chain(seq: &mut SeqState, state: &mut InterpState) -> Result {
 }
 
 pub fn midi_velocity_mapper(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let param = try!(try!(state.pop()).as_sym());
-    let device = try!(try!(state.pop()).as_sym());
-    let name = try!(try!(state.pop()).as_sym());
+    let param = r#try!(r#try!(state.pop()).as_sym());
+    let device = r#try!(r#try!(state.pop()).as_sym());
+    let name = r#try!(r#try!(state.pop()).as_sym());
 
-    let track = match seq.tracks
+    let track = match seq
+        .tracks
         .iter_mut()
         .find(|ref mut track| track.func == name)
     {

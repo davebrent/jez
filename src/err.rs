@@ -1,8 +1,8 @@
-use std::io;
 use std::convert::From;
 use std::error;
 use std::fmt;
 use std::fmt::Write;
+use std::io;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Location {
@@ -61,7 +61,7 @@ impl Error {
 }
 
 impl error::Error for Error {
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         None
     }
 
@@ -108,35 +108,33 @@ impl fmt::Display for Error {
 
 #[macro_export]
 macro_rules! error {
-    ( $type:ident ) => (
+    ( $type:ident ) => {
         $crate::Error::new($crate::Kind::$type)
-    );
-    ( $type:ident, $message:expr ) => (
+    };
+    ( $type:ident, $message:expr ) => {
         $crate::Error::with($crate::Kind::$type, $message)
-    );
+    };
 }
 
 #[macro_export]
 macro_rules! exception {
-    () => (
-        $crate::Error::new(
-            $crate::Kind::Internal($crate::Location{
-                filename: file!(),
-                line: line!(),
-                column: column!(),
-            })
-        )
-    );
-    ( $message:expr ) => (
+    () => {
+        $crate::Error::new($crate::Kind::Internal($crate::Location {
+            filename: file!(),
+            line: line!(),
+            column: column!(),
+        }))
+    };
+    ( $message:expr ) => {
         $crate::Error::with(
-            $crate::Kind::Internal($crate::Location{
+            $crate::Kind::Internal($crate::Location {
                 filename: file!(),
                 line: line!(),
                 column: column!(),
             }),
-            $message
+            $message,
         );
-    );
+    };
 }
 
 impl From<io::Error> for Error {

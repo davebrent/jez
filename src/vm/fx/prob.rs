@@ -3,7 +3,7 @@ use std::f64::EPSILON;
 
 use rand::{Rng, StdRng};
 
-use vm::types::{Effect, Event};
+use crate::vm::types::{Effect, Event};
 
 #[derive(Copy, Clone, Debug)]
 struct State {
@@ -290,7 +290,7 @@ impl Effect for MarkovChain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vm::types::{Destination, EventValue};
+    use crate::vm::types::{Destination, EventValue};
 
     use rand::SeedableRng;
 

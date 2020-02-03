@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::mpsc::Receiver;
 use std::thread;
 
-use vm::Command;
+use crate::vm::Command;
 
 pub trait Device: fmt::Display {}
 
@@ -11,7 +11,7 @@ pub trait Sink: Send {
 
     fn process(&mut self, cmd: Command);
 
-    fn devices(&self) -> Vec<Box<Device>> {
+    fn devices(&self) -> Vec<Box<dyn Device>> {
         vec![]
     }
 
@@ -23,12 +23,12 @@ pub trait Sink: Send {
 }
 
 pub struct CompositeSink {
-    inner: Vec<Box<Sink>>,
+    inner: Vec<Box<dyn Sink>>,
     name: String,
 }
 
 impl CompositeSink {
-    pub fn new(sinks: Vec<Box<Sink>>) -> CompositeSink {
+    pub fn new(sinks: Vec<Box<dyn Sink>>) -> CompositeSink {
         let name = sinks
             .iter()
             .map(|s| s.name())
@@ -47,7 +47,7 @@ impl Sink for CompositeSink {
         &self.name
     }
 
-    fn devices(&self) -> Vec<Box<Device>> {
+    fn devices(&self) -> Vec<Box<dyn Device>> {
         let mut devices = vec![];
         for sink in &self.inner {
             let mut devs = sink.devices();
@@ -64,11 +64,11 @@ impl Sink for CompositeSink {
 }
 
 pub struct ThreadedSink {
-    inner: Option<Box<Sink>>,
+    inner: Option<Box<dyn Sink>>,
 }
 
 impl ThreadedSink {
-    pub fn new(sink: Box<Sink>) -> ThreadedSink {
+    pub fn new(sink: Box<dyn Sink>) -> ThreadedSink {
         ThreadedSink { inner: Some(sink) }
     }
 }
@@ -81,7 +81,7 @@ impl Sink for ThreadedSink {
         }
     }
 
-    fn devices(&self) -> Vec<Box<Device>> {
+    fn devices(&self) -> Vec<Box<dyn Device>> {
         match self.inner {
             Some(ref sink) => sink.devices(),
             None => vec![],

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use err::Error;
-use lang::hash_str;
+use crate::err::Error;
+use crate::lang::hash_str;
 
-pub use super::types::{Instr, InterpResult, Value};
 pub use super::stack::StackFrame;
 pub use super::state::InterpState;
+pub use super::types::{Instr, InterpResult, Value};
 
 pub type Keyword<S> = fn(&mut S, &mut InterpState) -> InterpResult;
 
@@ -45,7 +45,7 @@ pub trait Interpreter<S> {
 
 fn list_begin(state: &mut InterpState, begin: Instr) -> InterpResult {
     let val = Value::Instruction(begin);
-    try!(state.push(val));
+    r#try!(state.push(val));
     Ok(None)
 }
 
@@ -55,13 +55,13 @@ where
 {
     let start = state.heap_len();
     loop {
-        let val = try!(state.pop());
+        let val = r#try!(state.pop());
         match val {
             Value::Instruction(instr) => {
                 if instr == end {
                     let end = state.heap_len();
-                    try!(state.push(con(start, end)));
-                    try!(state.heap_slice_mut(start, end)).reverse();
+                    r#try!(state.push(con(start, end)));
+                    r#try!(state.heap_slice_mut(start, end)).reverse();
                     return Ok(None);
                 } else {
                     state.heap_push(val)
@@ -134,20 +134,20 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
             Instr::Return => self.state.ret(),
 
             Instr::StoreGlob(name) => {
-                let val = try!(self.state.pop());
-                try!(self.state.store_glob(name, val));
+                let val = r#try!(self.state.pop());
+                r#try!(self.state.store_glob(name, val));
                 Ok(None)
             }
 
             Instr::StoreVar(name) => {
-                let val = try!(self.state.pop());
-                try!(self.state.store(name, val));
+                let val = r#try!(self.state.pop());
+                r#try!(self.state.store(name, val));
                 Ok(None)
             }
 
             Instr::LoadVar(name) => {
-                let val = try!(self.state.lookup(name));
-                try!(self.state.push(val));
+                let val = r#try!(self.state.lookup(name));
+                r#try!(self.state.push(val));
                 Ok(None)
             }
 
@@ -180,7 +180,7 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
                 let string = self.state.strings.get(&id).map(|s| s.clone());
                 match string {
                     Some(string) => {
-                        try!(self.state.push(Value::Str(string)));
+                        r#try!(self.state.push(Value::Str(string)));
                         Ok(None)
                     }
                     None => Err(error!(InvalidArgs)),
@@ -211,11 +211,11 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
     }
 
     fn eval(&mut self, pc: usize) -> InterpResult {
-        try!(self.state.call(pc, 0, pc));
+        r#try!(self.state.call(pc, 0, pc));
         while self.state.pc < self.instrs.len() && !self.state.exit {
             let pc = self.state.pc;
             let instr = self.instrs[pc];
-            match try!(self.execute(pc, instr)) {
+            match r#try!(self.execute(pc, instr)) {
                 None => (),
                 Some(val) => return Ok(Some(val)),
             }
@@ -227,11 +227,11 @@ impl<S> Interpreter<S> for BaseInterpreter<S> {
 
 /// An interpreter that adds stack trace support to another interpreter
 pub struct StackTraceInterpreter<S> {
-    inner: Box<Interpreter<S>>,
+    inner: Box<dyn Interpreter<S>>,
 }
 
 impl<S> StackTraceInterpreter<S> {
-    pub fn new(interp: Box<Interpreter<S>>) -> StackTraceInterpreter<S> {
+    pub fn new(interp: Box<dyn Interpreter<S>>) -> StackTraceInterpreter<S> {
         StackTraceInterpreter { inner: interp }
     }
 

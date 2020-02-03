@@ -1,23 +1,23 @@
 use std::sync::mpsc::{channel, Receiver};
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 use serde_json;
 
-use err::Error;
-use lang::{assemble, parser, Directive};
-use vm::{millis_to_dur, Clock, Command, Instr, Machine as VmMachine, Schedule, Status};
-use sinks::{factory, Backend, CompositeSink, Device, Sink as SinkTrait, ThreadedSink};
+use crate::err::Error;
+use crate::lang::{assemble, parser, Directive};
+use crate::sinks::{factory, Backend, CompositeSink, Device, Sink as SinkTrait, ThreadedSink};
+use crate::vm::{millis_to_dur, Clock, Command, Instr, Machine as VmMachine, Schedule, Status};
 
 pub struct Sink {
-    inner: Box<SinkTrait>,
+    inner: Box<dyn SinkTrait>,
 }
 
 impl Sink {
     pub fn new(requests: &[Backend]) -> Result<Sink, Error> {
         let mut sinks = vec![];
         for request in requests {
-            let sink = try!(factory(request));
+            let sink = r#try!(factory(request));
             sinks.push(sink);
         }
         let sink = Box::new(CompositeSink::new(sinks));
@@ -30,7 +30,7 @@ impl Sink {
         self.inner.name()
     }
 
-    pub fn devices(&self) -> Vec<Box<Device>> {
+    pub fn devices(&self) -> Vec<Box<dyn Device>> {
         self.inner.devices()
     }
 
@@ -43,8 +43,8 @@ impl Sink {
     }
 }
 
-type Input = Box<FnMut() -> Option<Command>>;
-type Output = Box<FnMut(Command)>;
+type Input = Box<dyn FnMut() -> Option<Command>>;
+type Output = Box<dyn FnMut(Command)>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Program {
@@ -59,8 +59,8 @@ pub struct Machine {
 
 impl Program {
     pub fn new(code: &str) -> Result<Program, Error> {
-        let dirs = try!(parser(code));
-        let instrs = try!(assemble(code, &dirs));
+        let dirs = r#try!(parser(code));
+        let instrs = r#try!(assemble(code, &dirs));
         Ok(Program { instrs: instrs })
     }
 }
@@ -73,7 +73,7 @@ impl Machine {
         let mut clock = Clock::new(clock_to_mach_send, mach_to_clock_recv);
         clock.interval(1000.0, Command::Clock);
 
-        let machine = try!(VmMachine::new(
+        let machine = r#try!(VmMachine::new(
             input,
             output,
             Box::new(move |evt| mach_to_clock_send.send(evt).unwrap_or(())),
@@ -104,7 +104,7 @@ impl Machine {
 
         while let Ok(event) = self.channel.try_recv() {
             if let Schedule::At(_, cmd) = event {
-                let status = try!(self.machine.process(cmd));
+                let status = r#try!(self.machine.process(cmd));
                 match status {
                     Status::Continue => (),
                     Status::Stop | Status::Reload => return Ok(status),
@@ -128,7 +128,7 @@ impl Machine {
 
         while let Ok(event) = self.channel.recv() {
             if let Schedule::At(_, cmd) = event {
-                let status = try!(self.machine.process(cmd));
+                let status = r#try!(self.machine.process(cmd));
                 match status {
                     Status::Continue => (),
                     Status::Stop | Status::Reload => return Ok(status),
@@ -154,9 +154,9 @@ pub fn simulate(duration: f64, delta: f64, program: &str) -> Result<String, Erro
     }
 
     let (sender, receiver) = channel();
-    let directives = try!(parser(program));
-    let instructions = try!(assemble(program, &directives));
-    let mut machine = try!(Machine::new(
+    let directives = r#try!(parser(program));
+    let instructions = r#try!(assemble(program, &directives));
+    let mut machine = r#try!(Machine::new(
         &Program {
             instrs: instructions.clone(),
         },
@@ -168,7 +168,7 @@ pub fn simulate(duration: f64, delta: f64, program: &str) -> Result<String, Erro
 
     let mut commands = Vec::new();
     loop {
-        let status = try!(machine.update(delta));
+        let status = r#try!(machine.update(delta));
         while let Ok(cmd) = receiver.try_recv() {
             commands.push(cmd);
         }

@@ -1,35 +1,35 @@
 use std::collections::BTreeSet;
 use std::result;
 
-use err::Error;
-use vm::interp::{InterpState, Value};
-use vm::types::{Result, SeqState};
+use crate::err::Error;
+use crate::vm::interp::{InterpState, Value};
+use crate::vm::types::{Result, SeqState};
 
 /// Apply a residual class to an integer sequence
 pub fn sieve(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let shift = try!(state.pop_num()) as usize;
-    let modulus = try!(state.pop_num()) as usize;
-    let (start, end) = try!(try!(state.pop()).as_range());
+    let shift = r#try!(state.pop_num()) as usize;
+    let modulus = r#try!(state.pop_num()) as usize;
+    let (start, end) = r#try!(r#try!(state.pop()).as_range());
 
     let next_start = state.heap_len();
     for ptr in start..end {
-        let val = try!(try!(state.heap_get(ptr)).as_num()) as usize;
+        let val = r#try!(r#try!(state.heap_get(ptr)).as_num()) as usize;
         if val % modulus == shift {
             state.heap_push(Value::Number(val as f64));
         }
     }
 
     let next_end = state.heap_len();
-    try!(state.push(Value::Seq(next_start, next_end)));
+    r#try!(state.push(Value::Seq(next_start, next_end)));
     Ok(None)
 }
 
 pub fn _pop_set(state: &mut InterpState) -> result::Result<BTreeSet<usize>, Error> {
-    let (start, end) = try!(try!(state.pop()).as_range());
+    let (start, end) = r#try!(r#try!(state.pop()).as_range());
     let mut output = BTreeSet::new();
 
     for ptr in start..end {
-        let val = try!(try!(state.heap_get(ptr)).as_num()) as usize;
+        let val = r#try!(r#try!(state.heap_get(ptr)).as_num()) as usize;
         output.insert(val);
     }
 
@@ -38,8 +38,8 @@ pub fn _pop_set(state: &mut InterpState) -> result::Result<BTreeSet<usize>, Erro
 
 /// Perform the intersection ('or') of two lists
 pub fn intersection(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let a = try!(_pop_set(state));
-    let b = try!(_pop_set(state));
+    let a = r#try!(_pop_set(state));
+    let b = r#try!(_pop_set(state));
     let vals: Vec<usize> = a.intersection(&b).cloned().collect();
 
     let start = state.heap_len();
@@ -48,14 +48,14 @@ pub fn intersection(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Seq(start, end)));
+    r#try!(state.push(Value::Seq(start, end)));
     Ok(None)
 }
 
 /// Perform the union ('and') of two lists
 pub fn union(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let a = try!(_pop_set(state));
-    let b = try!(_pop_set(state));
+    let a = r#try!(_pop_set(state));
+    let b = r#try!(_pop_set(state));
     let vals: Vec<usize> = a.union(&b).cloned().collect();
 
     let start = state.heap_len();
@@ -64,14 +64,14 @@ pub fn union(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Seq(start, end)));
+    r#try!(state.push(Value::Seq(start, end)));
     Ok(None)
 }
 
 /// Perform the symmetric difference ('xor') between two lists
 pub fn symmetric_difference(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let a = try!(_pop_set(state));
-    let b = try!(_pop_set(state));
+    let a = r#try!(_pop_set(state));
+    let b = r#try!(_pop_set(state));
     let vals: Vec<usize> = a.symmetric_difference(&b).cloned().collect();
 
     let start = state.heap_len();
@@ -80,6 +80,6 @@ pub fn symmetric_difference(_: &mut SeqState, state: &mut InterpState) -> Result
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Seq(start, end)));
+    r#try!(state.push(Value::Seq(start, end)));
     Ok(None)
 }

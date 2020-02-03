@@ -2,8 +2,8 @@ use super::math::{point_on_curve, Curve};
 use super::time::Schedule;
 use super::types::{Command, Destination, Event, EventValue};
 
-type Clock = Box<FnMut(Schedule<Command>)>;
-type Out = Box<FnMut(Command)>;
+type Clock = Box<dyn FnMut(Schedule<Command>)>;
+type Out = Box<dyn FnMut(Command)>;
 
 pub struct EventHandler;
 

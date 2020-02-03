@@ -1,6 +1,6 @@
-use err::Error;
+use crate::err::Error;
 
-use vm::math::Curve;
+use crate::vm::math::Curve;
 
 pub type InterpResult = Result<Option<Value>, Error>;
 

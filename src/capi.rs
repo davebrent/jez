@@ -4,8 +4,8 @@ use std::str;
 
 use std::mem;
 
-pub use api::{simulate, Program};
-pub use vm::millis_to_dur;
+pub use crate::api::{simulate, Program};
+pub use crate::vm::millis_to_dur;
 
 fn to_str<'a>(s: *const c_char) -> &'a str {
     if s.is_null() {

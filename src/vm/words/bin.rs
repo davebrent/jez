@@ -1,10 +1,10 @@
-use vm::interp::{InterpState, Value};
-use vm::types::{Result, SeqState};
+use crate::vm::interp::{InterpState, Value};
+use crate::vm::types::{Result, SeqState};
 
 /// Encode a number into a binary list
 pub fn bin_list(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let num = try!(state.pop_num()) as i64;
-    let n = try!(state.pop_num()) as i64;
+    let num = r#try!(state.pop_num()) as i64;
+    let n = r#try!(state.pop_num()) as i64;
 
     let start = state.heap_len();
     for i in 0..n {
@@ -17,15 +17,15 @@ pub fn bin_list(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let len = state.heap_len();
-    try!(state.push(Value::Seq(start, len)));
+    r#try!(state.push(Value::Seq(start, len)));
     Ok(None)
 }
 
 /// Gray code number encoding
 pub fn gray_code(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let num = try!(state.pop_num()) as i64;
+    let num = r#try!(state.pop_num()) as i64;
     let num = (num >> 1) ^ num;
-    try!(state.push(Value::Number(num as f64)));
+    r#try!(state.push(Value::Number(num as f64)));
     Ok(None)
 }
 

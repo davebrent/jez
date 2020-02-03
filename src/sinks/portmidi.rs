@@ -2,8 +2,8 @@ use std::fmt;
 
 use portmidi as pm;
 
-use err::Error;
-use vm::Command;
+use crate::err::Error;
+use crate::vm::Command;
 
 use super::sink::{Device, Sink};
 
@@ -32,7 +32,7 @@ impl Device for PortmidiDevice {}
 
 impl Portmidi {
     pub fn new(id: Option<usize>) -> Result<Self, Error> {
-        let ctx = try!(pm::PortMidi::new());
+        let ctx = r#try!(pm::PortMidi::new());
 
         let id = match id {
             Some(id) => Some(id as i32),
@@ -44,8 +44,8 @@ impl Portmidi {
 
         let port = match id {
             Some(id) => {
-                let info = try!(ctx.device(id));
-                Some(try!(ctx.output_port(info, 1024)))
+                let info = r#try!(ctx.device(id));
+                Some(r#try!(ctx.output_port(info, 1024)))
             }
             None => None,
         };
@@ -65,8 +65,8 @@ impl Sink for Portmidi {
         "portmidi"
     }
 
-    fn devices(&self) -> Vec<Box<Device>> {
-        let mut devices: Vec<Box<Device>> = vec![];
+    fn devices(&self) -> Vec<Box<dyn Device>> {
+        let mut devices: Vec<Box<dyn Device>> = vec![];
         for dev in self.ctx.devices().unwrap() {
             devices.push(Box::new(PortmidiDevice { dev: dev.clone() }));
         }

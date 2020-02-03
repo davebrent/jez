@@ -1,23 +1,23 @@
 use rand::Rng;
 
-use vm::interp::{InterpState, Value};
-use vm::types::{Result, SeqState};
+use crate::vm::interp::{InterpState, Value};
+use crate::vm::types::{Result, SeqState};
 
 /// Every cycle, puts the 'next' element of a list on the stack
 pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(try!(state.pop()).as_range());
+    let (start, end) = r#try!(r#try!(state.pop()).as_range());
     if start != end {
         let i = seq.revision % (end - start);
-        let v = try!(state.heap_get(i));
-        try!(state.push(v));
+        let v = r#try!(state.heap_get(i));
+        r#try!(state.push(v));
     }
     Ok(None)
 }
 
 /// Randomly set values to rests in a list
 pub fn degrade(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(try!(state.last()).as_range());
-    let lst = try!(state.heap_slice_mut(start, end));
+    let (start, end) = r#try!(r#try!(state.last()).as_range());
+    let lst = r#try!(state.heap_slice_mut(start, end));
     for item in lst {
         if seq.rng.gen() {
             *item = Value::Null;
@@ -28,14 +28,14 @@ pub fn degrade(seq: &mut SeqState, state: &mut InterpState) -> Result {
 
 /// Put a value on the stack every 'n' cycles
 pub fn every(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let freq = try!(state.pop_num()) as usize;
+    let freq = r#try!(state.pop_num()) as usize;
     if freq % seq.revision == 0 {
-        try!(state.pop());
+        r#try!(state.pop());
     } else {
         // Remove the else clause from the stack
-        let val = try!(state.pop());
-        try!(state.pop());
-        try!(state.push(val));
+        let val = r#try!(state.pop());
+        r#try!(state.pop());
+        r#try!(state.push(val));
     }
     Ok(None)
 }
@@ -50,8 +50,8 @@ pub fn palindrome(seq: &mut SeqState, state: &mut InterpState) -> Result {
 
 /// Construct a continuous integer sequence from `a` to `b`
 pub fn range(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let b = try!(state.pop_num()) as usize;
-    let a = try!(state.pop_num()) as usize;
+    let b = r#try!(state.pop_num()) as usize;
+    let a = r#try!(state.pop_num()) as usize;
 
     let start = state.heap_len();
     for i in a..b {
@@ -59,48 +59,48 @@ pub fn range(_: &mut SeqState, state: &mut InterpState) -> Result {
     }
 
     let end = state.heap_len();
-    try!(state.push(Value::Seq(start, end)));
+    r#try!(state.push(Value::Seq(start, end)));
     Ok(None)
 }
 
 /// Repeat a value 'n' times
 pub fn repeat(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let times = try!(state.pop_num()) as usize;
-    let val = try!(state.pop());
+    let times = r#try!(state.pop_num()) as usize;
+    let val = r#try!(state.pop());
     for _ in 0..times {
-        try!(state.push(val.clone()));
+        r#try!(state.push(val.clone()));
     }
     Ok(None)
 }
 
 /// Reverse a list, leaving it on the stack
 pub fn reverse(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(try!(state.last()).as_range());
-    let slice = try!(state.heap_slice_mut(start, end));
+    let (start, end) = r#try!(r#try!(state.last()).as_range());
+    let slice = r#try!(state.heap_slice_mut(start, end));
     slice.reverse();
     Ok(None)
 }
 
 /// Rotate a list
 pub fn rotate(_: &mut SeqState, state: &mut InterpState) -> Result {
-    let amount = try!(state.pop_num()) as usize;
-    let (start, end) = try!(try!(state.last()).as_range());
+    let amount = r#try!(state.pop_num()) as usize;
+    let (start, end) = r#try!(r#try!(state.last()).as_range());
 
-    let lst = try!(state.heap_slice_mut(start, end)).to_vec();
+    let lst = r#try!(state.heap_slice_mut(start, end)).to_vec();
     let len = lst.len();
     let (a, b) = lst.split_at(len - (amount % len));
     let mut out = Vec::new();
     out.extend_from_slice(b);
     out.extend_from_slice(a);
-    let slice = try!(state.heap_slice_mut(start, end));
+    let slice = r#try!(state.heap_slice_mut(start, end));
     slice.clone_from_slice(&out);
     Ok(None)
 }
 
 /// Shuffle a list, leaving it on the stack
 pub fn shuffle(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let (start, end) = try!(try!(state.last()).as_range());
-    let slice = try!(state.heap_slice_mut(start, end));
+    let (start, end) = r#try!(r#try!(state.last()).as_range());
+    let slice = r#try!(state.heap_slice_mut(start, end));
     seq.rng.shuffle(slice);
     Ok(None)
 }

@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use super::dirs::{Argument, Code, Directive, Location, Name, Symbol, Token, Value};
 
-use err::Error;
+use crate::err::Error;
 
 fn is_alphabetic(chr: char) -> bool {
     (chr as u8 >= 0x41 && chr as u8 <= 0x5A) || (chr as u8 >= 0x61 && chr as u8 <= 0x7A)
@@ -227,7 +227,8 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             None => return Err(error!(IncompleteInput)),
         };
 
-        let res = self.stream
+        let res = self
+            .stream
             .take_while(|c| is_alphanumeric(c) || c == '#' || c == '_' || c == '-');
 
         match res {
@@ -244,12 +245,12 @@ impl<'c, 's: 'c> Parser<'c, 's> {
 
         let val = match tk {
             '@' => {
-                let var = try!(self.parse_variable());
+                let var = r#try!(self.parse_variable());
                 Token::new(Value::Variable(var.data), var.loc)
             }
             '\'' => {
-                try!(self.stream.expect('\''));
-                let word = try!(self.parse_word());
+                r#try!(self.stream.expect('\''));
+                let word = r#try!(self.parse_word());
                 Token::new(Value::Symbol(word.data), word.loc)
             }
             '"' => {
@@ -260,13 +261,14 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             }
             _ => {
                 if is_digit(tk) || tk == '-' {
-                    let (raw, loc) = self.stream
+                    let (raw, loc) = self
+                        .stream
                         .take_while(|c| is_digit(c) || c == '-' || c == '.')
                         .unwrap();
                     let num = raw.parse::<f64>().unwrap();
                     Token::new(Value::Number(num), loc)
                 } else {
-                    let word = try!(self.parse_word());
+                    let word = r#try!(self.parse_word());
                     Token::new(Value::Keyword(word.data), word.loc)
                 }
             }
@@ -282,12 +284,12 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         };
 
         if tk == '@' {
-            let key = try!(self.parse_variable());
+            let key = r#try!(self.parse_variable());
             self.stream.next().unwrap(); // =
-            let val = try!(self.parse_value());
+            let val = r#try!(self.parse_value());
             Ok(Argument::Kwarg(key, val))
         } else {
-            let val = try!(self.parse_value());
+            let val = r#try!(self.parse_value());
             Ok(Argument::Arg(val))
         }
     }
@@ -334,11 +336,11 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             }
             '=' => {
                 self.stream.next().unwrap();
-                let var = try!(self.parse_variable());
+                let var = r#try!(self.parse_variable());
                 Token::new(Code::Symbol(Symbol::Assign(var.data)), loc)
             }
             _ => {
-                let val = try!(self.parse_value());
+                let val = r#try!(self.parse_value());
                 Token::new(Code::Value(val.data), val.loc)
             }
         };
@@ -357,7 +359,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
         }
 
         self.stream.next().unwrap(); // .
-        let name = try!(self.parse_name());
+        let name = r#try!(self.parse_name());
         let mut args = vec![];
         let mut body = vec![];
 
@@ -365,7 +367,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
             if tk == '.' || tk == ':' {
                 break;
             }
-            let arg = try!(self.parse_arg());
+            let arg = r#try!(self.parse_arg());
             args.push(arg);
         }
 
@@ -380,7 +382,7 @@ impl<'c, 's: 'c> Parser<'c, 's> {
                 if tk == '.' {
                     break;
                 }
-                let code = try!(self.parse_code());
+                let code = r#try!(self.parse_code());
                 body.push(code);
             }
         }

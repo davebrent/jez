@@ -8,16 +8,16 @@ mod words;
 
 use std::collections::HashMap;
 
-use err::Error;
-use lang::hash_str;
+use crate::err::Error;
+use crate::lang::hash_str;
 
-pub use self::interp::{Instr, InterpState, Value};
+use self::handler::{EventHandler, NoteInterceptor};
 use self::interp::{BaseInterpreter, Interpreter, StackTraceInterpreter};
+pub use self::interp::{Instr, InterpState, Value};
 use self::time::Clock as InternalClock;
 pub use self::time::{millis_to_dur, Schedule};
 pub use self::types::{Command, Destination, Event, EventValue};
 use self::types::{SeqState, Track};
-use self::handler::{EventHandler, NoteInterceptor};
 
 pub type Clock = InternalClock<Command>;
 
@@ -30,7 +30,7 @@ pub enum Status {
 
 fn interpreter(
     instrs: &[Instr],
-) -> Result<(HashMap<u64, usize>, Box<Interpreter<SeqState>>), Error> {
+) -> Result<(HashMap<u64, usize>, Box<dyn Interpreter<SeqState>>), Error> {
     let mut interp = Box::new(StackTraceInterpreter::new(Box::new(BaseInterpreter::new(
         instrs.to_vec(),
         &words::all(),
@@ -38,11 +38,11 @@ fn interpreter(
     ))));
 
     // Create tracks as defined by block 1 (the extension block)
-    if let Some(val) = try!(interp.eval_block(1)) {
-        let (start, end) = try!(val.as_range());
+    if let Some(val) = r#try!(interp.eval_block(1)) {
+        let (start, end) = r#try!(val.as_range());
         let state = interp.state();
         for (i, ptr) in (start..end).enumerate() {
-            let sym = try!(try!(state.heap_get(ptr)).as_sym());
+            let sym = r#try!(r#try!(state.heap_get(ptr)).as_sym());
             let data = interp.data_mut();
             data.tracks.push(Track::new(i, sym));
         }
@@ -61,7 +61,7 @@ fn interpreter(
     interp.reset();
     match funcs.get(&hash_str("main")).map(|p| *p) {
         Some(pc) => {
-            try!(interp.eval(pc));
+            r#try!(interp.eval(pc));
         }
         None => (),
     };
@@ -72,12 +72,12 @@ fn interpreter(
     Ok((funcs, interp))
 }
 
-type Timer = Box<FnMut(Schedule<Command>)>;
-type In = Box<FnMut() -> Option<Command>>;
-type Out = Box<FnMut(Command)>;
+type Timer = Box<dyn FnMut(Schedule<Command>)>;
+type In = Box<dyn FnMut() -> Option<Command>>;
+type Out = Box<dyn FnMut(Command)>;
 
 pub struct Machine {
-    interp: Box<Interpreter<SeqState>>,
+    interp: Box<dyn Interpreter<SeqState>>,
     clock: Timer,
     sink: Out,
     input: In,
@@ -87,7 +87,7 @@ pub struct Machine {
 
 impl Machine {
     pub fn new(input: In, sink: Out, clock: Timer, instrs: &[Instr]) -> Result<Machine, Error> {
-        let (funcs, mut interp) = try!(self::interpreter(instrs));
+        let (funcs, mut interp) = r#try!(self::interpreter(instrs));
         let mut cmds = vec![];
 
         for track in &interp.data_mut().tracks {
@@ -107,14 +107,14 @@ impl Machine {
         };
 
         for cmd in &cmds {
-            try!(machine.process(*cmd));
+            r#try!(machine.process(*cmd));
         }
 
         Ok(machine)
     }
 
     pub fn process(&mut self, cmd: Command) -> Result<Status, Error> {
-        let status = try!(match cmd {
+        let status = r#try!(match cmd {
             Command::Stop => Ok(Status::Stop),
             Command::Reload => Ok(Status::Reload),
             Command::Clock => self.handle_clock_cmd(),
@@ -152,7 +152,7 @@ impl Machine {
     fn handle_track_cmd(&mut self, num: usize, rev: usize, func: u64) -> Result<Status, Error> {
         self.interp.data_mut().reset(rev);
         self.interp.reset();
-        try!(self.interp.eval(self.functions[&func]));
+        r#try!(self.interp.eval(self.functions[&func]));
 
         let data = self.interp.data_mut();
         let track = &mut data.tracks[num];
@@ -168,8 +168,7 @@ impl Machine {
 
         // Tracks are scheduled one revision _ahead_ of the clock
         track.real_time += data.duration;
-        track.schedule_time +=
-            if rev == 0 { 0.0 } else { data.duration };
+        track.schedule_time += if rev == 0 { 0.0 } else { data.duration };
         let cmd = Command::Track(num, rev + 1, func);
         (self.clock)(Schedule::At(track.schedule_time, cmd));
         Ok(Status::Continue)

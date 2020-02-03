@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use lang::hash_str;
-use vm::types::{Effect, Event, EventValue};
+use crate::lang::hash_str;
+use crate::vm::types::{Effect, Event, EventValue};
 
 #[derive(Clone, Debug)]
 pub struct PitchQuantizer {

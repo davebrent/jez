@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use lang::hash_str;
-use vm::math::path_to_curve;
-use vm::types::{Destination, Effect, Event, EventValue};
+use crate::lang::hash_str;
+use crate::vm::math::path_to_curve;
+use crate::vm::types::{Destination, Effect, Event, EventValue};
 
 type MidiMap = HashMap<u64, u8>;
 

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use err::Error;
+use crate::err::Error;
 
-use super::types::{InterpResult, Value};
 use super::stack::StackFrame;
+use super::types::{InterpResult, Value};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct InterpState {
@@ -71,9 +71,9 @@ impl InterpState {
         // the previous frame
         let mut frame = StackFrame::new(loc, self.pc);
         if args != 0 {
-            let caller = try!(self.frame_mut());
+            let caller = r#try!(self.frame_mut());
             for _ in 0..args {
-                try!(frame.push(try!(caller.pop())));
+                r#try!(frame.push(r#try!(caller.pop())));
             }
         }
         self.frames.push(frame);
@@ -98,7 +98,7 @@ impl InterpState {
                     self.exit = true;
                     Ok(Some(res))
                 } else {
-                    try!(self.push(res));
+                    r#try!(self.push(res));
                     self.pc = frame.ret_addr;
                     Ok(None)
                 }
@@ -107,17 +107,17 @@ impl InterpState {
     }
 
     pub fn last(&self) -> Result<Value, Error> {
-        let frame = try!(self.frame());
-        Ok(try!(frame.last()))
+        let frame = r#try!(self.frame());
+        Ok(r#try!(frame.last()))
     }
 
     pub fn pop(&mut self) -> Result<Value, Error> {
-        let frame = try!(self.frame_mut());
-        Ok(try!(frame.pop()))
+        let frame = r#try!(self.frame_mut());
+        Ok(r#try!(frame.pop()))
     }
 
     pub fn pop_num(&mut self) -> Result<f64, Error> {
-        match try!(self.pop()) {
+        match r#try!(self.pop()) {
             Value::Number(num) => Ok(num),
             _ => Err(error!(InvalidArgs)),
         }
@@ -127,7 +127,7 @@ impl InterpState {
         match self.frames.last_mut() {
             None => Err(error!(StackExhausted)),
             Some(frame) => {
-                try!(frame.push(val));
+                r#try!(frame.push(val));
                 Ok(None)
             }
         }
@@ -167,6 +167,6 @@ impl InterpState {
 
     pub fn reset(&mut self) {
         self.exit = false;
-        self.heap.truncate(self.reserved);;
+        self.heap.truncate(self.reserved);
     }
 }

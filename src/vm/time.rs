@@ -38,11 +38,7 @@ where
     }
 }
 
-impl<T> Eq for Timer<T>
-where
-    T: Copy + Clone + Debug + Priority,
-{
-}
+impl<T> Eq for Timer<T> where T: Copy + Clone + Debug + Priority {}
 
 impl<T> PartialOrd for Timer<T>
 where
@@ -154,7 +150,7 @@ where
 
             let expected = dur_to_millis(timer.t);
             if expected.floor() != elapsed.floor() {
-                let miss = elapsed - expected;
+                let _miss = elapsed - expected;
                 println!(
                     "Event dispatched at incorrect time, off by {}ms",
                     elapsed - expected

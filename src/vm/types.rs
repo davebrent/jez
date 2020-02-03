@@ -60,7 +60,7 @@ pub type Keyword = fn(&mut SeqState, &mut InterpState) -> InterpResult;
 pub struct Track {
     pub id: usize,
     pub func: u64,
-    pub effects: Vec<Box<Effect>>,
+    pub effects: Vec<Box<dyn Effect>>,
     pub real_time: f64,
     pub schedule_time: f64,
 }

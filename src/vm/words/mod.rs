@@ -13,7 +13,7 @@ mod track;
 
 use std::collections::HashMap;
 
-use vm::types::Keyword;
+use crate::vm::types::Keyword;
 
 type Module = HashMap<&'static str, Keyword>;
 

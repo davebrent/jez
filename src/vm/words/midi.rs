@@ -1,10 +1,10 @@
-use vm::interp::{InterpState, Value};
-use vm::types::{Destination, Event, EventValue, Result, SeqState};
+use crate::vm::interp::{InterpState, Value};
+use crate::vm::types::{Destination, Event, EventValue, Result, SeqState};
 
 /// Output midi events
 pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
-    let chan = try!(state.pop_num()) as u8;
-    let dur = try!(state.pop_num());
+    let chan = r#try!(state.pop_num()) as u8;
+    let dur = r#try!(state.pop_num());
     if dur == 0.0 {
         return Err(error!(InvalidArgs));
     }
@@ -12,7 +12,7 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let mut output = Vec::new();
 
     let mut visit: Vec<(f64, f64, Value)> = Vec::new();
-    visit.push((0.0, dur, try!(state.pop())));
+    visit.push((0.0, dur, r#try!(state.pop())));
 
     while let Some((onset, dur, val)) = visit.pop() {
         match val {
@@ -39,20 +39,22 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
                 let interval = dur / (end - start) as f64;
                 let mut onset = onset;
                 for n in start..end {
-                    visit.push((onset, interval, try!(state.heap_get(n))));
+                    visit.push((onset, interval, r#try!(state.heap_get(n))));
                     onset += interval;
                 }
             }
-            Value::Group(start, end) => for n in start..end {
-                visit.push((onset, dur, try!(state.heap_get(n))));
-            },
+            Value::Group(start, end) => {
+                for n in start..end {
+                    visit.push((onset, dur, r#try!(state.heap_get(n))));
+                }
+            }
             Value::List(start, end) => {
                 let len = end - start;
                 if len == 0 || len > 3 {
                     return Err(error!(InvalidArgs));
                 }
 
-                let (value, default) = match try!(state.heap_get(start)) {
+                let (value, default) = match r#try!(state.heap_get(start)) {
                     Value::Curve(points) => (EventValue::Curve(points), 0),
                     Value::Number(pitch) => (EventValue::Trigger(pitch), 127),
                     _ => return Err(error!(InvalidArgs)),
@@ -60,12 +62,12 @@ pub fn midi_out(seq: &mut SeqState, state: &mut InterpState) -> Result {
 
                 let dest = Destination::Midi(
                     if len == 3 {
-                        try!(try!(state.heap_get(start + 2)).as_num()) as u8
+                        r#try!(r#try!(state.heap_get(start + 2)).as_num()) as u8
                     } else {
                         chan
                     },
                     if len == 2 {
-                        try!(try!(state.heap_get(start + 1)).as_num()) as u8
+                        r#try!(r#try!(state.heap_get(start + 1)).as_num()) as u8
                     } else {
                         default
                     },

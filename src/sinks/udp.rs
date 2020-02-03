@@ -1,10 +1,10 @@
 use std::net::UdpSocket;
 
-use err::Error;
-use vm::Command;
+use crate::err::Error;
+use crate::vm::Command;
 
-use super::sink::Sink;
 use super::osc::encode;
+use super::sink::Sink;
 
 pub struct Udp {
     sock: UdpSocket,
@@ -12,8 +12,8 @@ pub struct Udp {
 
 impl Udp {
     pub fn new(host_addr: &str, client_addr: &str) -> Result<Self, Error> {
-        let sock = try!(UdpSocket::bind(host_addr));
-        try!(sock.connect(client_addr));
+        let sock = r#try!(UdpSocket::bind(host_addr));
+        r#try!(sock.connect(client_addr));
         Ok(Udp { sock: sock })
     }
 }

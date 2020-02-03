@@ -1,4 +1,4 @@
-use vm::Command;
+use crate::vm::Command;
 
 use super::sink::Sink;
 
