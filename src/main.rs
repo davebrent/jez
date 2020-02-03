@@ -29,7 +29,7 @@ Options:
   --watch               Reload input file on changes.
   --simulate            Run as a non-realtime simulation.
   --time=MS             Length of time (in milliseconds) to run for.
-  --sink=NAME           Specify the output sink(s) [default: console].
+  --sink=NAME           Specify the output sink(s).
   --udp-host=ADDRESS    UDP host address [default: 127.0.0.1:34254].
   --udp-client=ADDRESS  UDP client address [default: 127.0.0.1:3000].
   --midi-out=DEVICE     Midi output device id.
@@ -40,6 +40,7 @@ Sinks:
   portmidi
   udp
   websocket
+  null
 ";
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -118,7 +119,8 @@ fn make_sink(names: &str, args: &Args) -> Result<Sink, Error> {
     let mut requests = vec![];
     for name in names.split(',') {
         requests.push(match name {
-            "console" | "" => Backend::Console,
+            "null" | "" => Backend::Null,
+            "console" => Backend::Console,
             "udp" => Backend::Udp(&args.flag_udp_host, &args.flag_udp_client),
             "portmidi" => Backend::PortMidi(args.flag_midi_out),
             "websocket" => Backend::WebSocket(&args.flag_ws_host),

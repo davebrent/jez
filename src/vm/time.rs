@@ -150,7 +150,6 @@ where
 
             let expected = dur_to_millis(timer.t);
             if expected.floor() != elapsed.floor() {
-                let _miss = elapsed - expected;
                 println!(
                     "Event dispatched at incorrect time, off by {}ms",
                     elapsed - expected
