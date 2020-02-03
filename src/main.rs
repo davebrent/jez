@@ -15,7 +15,7 @@ use docopt::Docopt;
 
 use jez::{simulate, Backend, Command, Error, Machine, Program, Sink, Status};
 
-const USAGE: &str = "
+const USAGE: &'static str = "
 Jez.
 
 Usage:
