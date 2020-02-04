@@ -35,6 +35,7 @@ fn fx(words: &mut Module) {
     words.insert("pitch_quantizer", fx::pitch_quantizer);
     words.insert("markov_chain", fx::markov_chain);
     words.insert("midi_velocity_mapper", fx::midi_velocity_mapper);
+    words.insert("midi_pitch_mapper", fx::midi_pitch_mapper);
 }
 
 fn list(words: &mut Module) {

@@ -63,6 +63,11 @@ pub struct MidiVelocityMapper {
     ctrl: u8,
 }
 
+/// Map note pitches to CC messages
+pub struct MidiPitchMapper {
+    ctrl: u8,
+}
+
 impl MidiVelocityMapper {
     pub fn new(device: u64, param: u64) -> Option<MidiVelocityMapper> {
         match mapping(device, param) {
@@ -90,7 +95,49 @@ impl MidiVelocityMapper {
     }
 }
 
+impl MidiPitchMapper {
+    pub fn new(device: u64, param: u64) -> Option<MidiPitchMapper> {
+        match mapping(device, param) {
+            Some(ctrl) => Some(MidiPitchMapper { ctrl: ctrl }),
+            None => None,
+        }
+    }
+
+    fn map(&self, event: Event) -> Option<Event> {
+        let pitch = match event.value {
+            EventValue::Curve(_) => return None,
+            EventValue::Trigger(pitch) => pitch,
+        };
+
+        let mut next = event;
+        match event.dest {
+            Destination::Midi(channel, _) => {
+                next.dest = Destination::Midi(channel, self.ctrl);
+                next.value = EventValue::Curve(path_to_curve(
+                    &[event.onset, f64::from(pitch)],
+                    &[event.dur, f64::from(pitch)],
+                ));
+                Some(next)
+            }
+        }
+    }
+}
+
 impl Effect for MidiVelocityMapper {
+    fn apply(&mut self, _: f64, events: &[Event]) -> Vec<Event> {
+        let mut output = Vec::with_capacity(events.len());
+        for event in events {
+            let event = *event;
+            if let Some(cc) = self.map(event) {
+                output.push(cc)
+            }
+            output.push(event);
+        }
+        output
+    }
+}
+
+impl Effect for MidiPitchMapper {
     fn apply(&mut self, _: f64, events: &[Event]) -> Vec<Event> {
         let mut output = Vec::with_capacity(events.len());
         for event in events {

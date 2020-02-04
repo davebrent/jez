@@ -1,4 +1,4 @@
-use crate::vm::fx::{MarkovChain, MidiVelocityMapper, PitchQuantizer};
+use crate::vm::fx::{MarkovChain, MidiPitchMapper, MidiVelocityMapper, PitchQuantizer};
 use crate::vm::interp::InterpState;
 use crate::vm::types::{Result, SeqState};
 
@@ -65,6 +65,28 @@ pub fn midi_velocity_mapper(seq: &mut SeqState, state: &mut InterpState) -> Resu
     };
 
     match MidiVelocityMapper::new(device, param) {
+        Some(fx) => track.effects.push(Box::new(fx)),
+        None => return Err(error!(InvalidArgs)),
+    };
+
+    Ok(None)
+}
+
+pub fn midi_pitch_mapper(seq: &mut SeqState, state: &mut InterpState) -> Result {
+    let param = (state.pop()?).as_sym()?;
+    let device = (state.pop()?).as_sym()?;
+    let name = (state.pop()?).as_sym()?;
+
+    let track = match seq
+        .tracks
+        .iter_mut()
+        .find(|ref mut track| track.func == name)
+    {
+        Some(track) => track,
+        None => return Err(error!(InvalidArgs)),
+    };
+
+    match MidiPitchMapper::new(device, param) {
         Some(fx) => track.effects.push(Box::new(fx)),
         None => return Err(error!(InvalidArgs)),
     };
