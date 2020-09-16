@@ -3,6 +3,7 @@ mod null;
 mod osc;
 #[cfg(feature = "with-portmidi")]
 mod portmidi;
+mod renoise;
 mod sink;
 mod udp;
 #[cfg(feature = "with-websocket")]
@@ -18,6 +19,7 @@ pub enum Backend<'a> {
     Null,
     PortMidi(Option<usize>),
     Udp(&'a str, &'a str),
+    Renoise(&'a str, &'a str),
     WebSocket(&'a str),
 }
 
@@ -31,6 +33,7 @@ pub fn factory(request: &Backend) -> Result<Box<dyn Sink>, Error> {
         Backend::WebSocket(host) => Box::new(ws::WebSocket::new(host)?),
         #[cfg(feature = "with-portmidi")]
         Backend::PortMidi(device) => Box::new(portmidi::Portmidi::new(device)?),
+        Backend::Renoise(host, client) => Box::new(renoise::Renoise::new(host, client)?),
         _ => return Err(error!(UnknownBackend, &format!("{:?}", request))),
     })
 }

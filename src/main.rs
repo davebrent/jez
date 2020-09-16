@@ -41,6 +41,7 @@ Sinks:
   udp
   websocket
   null
+  renoise
 ";
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -122,6 +123,7 @@ fn make_sink(names: &str, args: &Args) -> Result<Sink, Error> {
             "null" | "" => Backend::Null,
             "console" => Backend::Console,
             "udp" => Backend::Udp(&args.flag_udp_host, &args.flag_udp_client),
+            "renoise" => Backend::Renoise(&args.flag_udp_host, &args.flag_udp_client),
             "portmidi" => Backend::PortMidi(args.flag_midi_out),
             "websocket" => Backend::WebSocket(&args.flag_ws_host),
             _ => return Err(error!(UnknownBackend, name)),
