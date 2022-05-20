@@ -8,7 +8,7 @@ pub fn cycle(seq: &mut SeqState, state: &mut InterpState) -> Result {
     let (start, end) = (state.pop()?).as_range()?;
     if start != end {
         let i = seq.revision % (end - start);
-        let v = state.heap_get(i)?;
+        let v = state.heap_get(start + i)?;
         state.push(v)?;
     }
     Ok(None)
